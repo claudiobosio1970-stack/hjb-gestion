@@ -24,7 +24,7 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
   const [showWorkModal, setShowWorkModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Form states para edición de equipo
+  // Form states para edición completa de equipo
   const [editNombre, setEditNombre] = useState("");
   const [editMarca, setEditMarca] = useState("");
   const [editModelo, setEditModelo] = useState("");
@@ -38,6 +38,7 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
   const [editHorometro, setEditHorometro] = useState("");
   const [editRubro, setEditRubro] = useState("");
   const [editNotas, setEditNotas] = useState("");
+  const [editUnidades, setEditUnidades] = useState<string[]>([]);
 
   // Form states para nuevo mantenimiento
   const [maintTipo, setMaintTipo] = useState<MaintenanceRecord["tipoEvento"]>("Mantenimiento Programado");
@@ -103,12 +104,14 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
     );
     setEditRubro(equipment.rubroContable || "");
     setEditNotas(equipment.notas || "");
+    setEditUnidades([...equipment.unidadesNegocio]);
     setShowEditModal(true);
   }
 
   function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!equipment) return;
+
     const updated: Equipment = {
       ...equipment,
       nombre: editNombre.trim() || equipment.nombre,
@@ -117,13 +120,14 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
       tipo: editTipo,
       propiedad: editPropiedad,
       condicion: editCondicion.trim() || equipment.condicion,
-      anoIncorporacion: editAno ? editAno : "DATO PENDIENTE",
+      anoIncorporacion: editAno.trim() || "DATO PENDIENTE",
       proveedor: editProveedor.trim() || equipment.proveedor,
       capacidad: editCapacidad.trim() || null,
       estadoOperativo: editEstado,
       horometroActual: hasHorometro(editTipo) && editHorometro ? parseFloat(editHorometro) : null,
       rubroContable: editRubro.trim() || null,
       notas: editNotas.trim() || equipment.notas,
+      unidadesNegocio: editUnidades.length ? editUnidades : ["Transversal"],
     };
 
     machineryData.saveEquipment(updated);
@@ -206,6 +210,12 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
     "Cosecha / Picado",
   ];
 
+  function toggleUnidad(u: string) {
+    setEditUnidades((prev) =>
+      prev.includes(u) ? prev.filter((item) => item !== u) : [...prev, u]
+    );
+  }
+
   return (
     <AppShell active="Maquinarias">
       <div style={{ marginBottom: "12px" }}>
@@ -240,7 +250,7 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
           <button
             type="button"
             className="tableAction"
-            style={{ padding: "8px 16px", borderColor: "var(--brand-600)", color: "var(--brand-800)", fontWeight: 600 }}
+            style={{ padding: "8px 16px", borderColor: "var(--brand-600)", color: "var(--brand-800)", fontWeight: 700 }}
             onClick={openEditModal}
           >
             ✏️ Editar Equipo
@@ -250,7 +260,7 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
             className="thResetBtn"
             style={{ padding: "8px 14px", color: "#dc2626", borderColor: "#fca5a5" }}
             onClick={handleDelete}
-            title="Eliminar este equipo del sistema"
+            title="Dar de baja o eliminar este equipo del sistema"
           >
             🗑️ Eliminar
           </button>
@@ -325,7 +335,7 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
             <button
               type="button"
               className="tableAction"
-              style={{ fontSize: "12.5px" }}
+              style={{ fontSize: "12.5px", color: "var(--brand-800)", fontWeight: 700 }}
               onClick={openEditModal}
             >
               ✏️ Editar Ficha Técnica
@@ -555,342 +565,409 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
         </div>
       )}
 
-      {/* Modal para Editar Datos de la Máquina */}
+      {/* ======================================================== */}
+      {/* MODAL: EDITAR DATOS DEL EQUIPO (modalBackdrop + modal) */}
+      {/* ======================================================== */}
       {showEditModal && (
-        <div className="modalOverlay">
-          <div className="modalCard" style={{ maxWidth: "600px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3>Editar Ficha del Equipo</h3>
-              <button className="thResetBtn" onClick={() => setShowEditModal(false)}>✕</button>
+        <div className="modalBackdrop" onClick={() => setShowEditModal(false)}>
+          <div className="modal modalWide" onClick={(e) => e.stopPropagation()}>
+            <div className="modalHeader">
+              <div>
+                <p style={{ fontSize: "12px", color: "var(--slate-500)", textTransform: "uppercase", fontWeight: 700, margin: "0 0 4px", letterSpacing: ".04em" }}>
+                  {equipment.tipo} · {equipment.propiedad}
+                </p>
+                <h2>Editar Ficha del Equipo</h2>
+              </div>
+              <button type="button" className="iconButton" onClick={() => setShowEditModal(false)}>×</button>
             </div>
 
-            <form onSubmit={handleSaveEdit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div>
-                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Nombre del Equipo:</label>
-                <input
-                  type="text"
-                  className="thFilterInput"
-                  value={editNombre}
-                  onChange={(e) => setEditNombre(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
-                  required
-                />
+            <form onSubmit={handleSaveEdit}>
+              {/* Sección 1: Identificación */}
+              <div className="formSection" style={{ borderTop: "none", paddingTop: 0, marginTop: 0 }}>
+                <h3>1. Identificación Principal</h3>
+                <div className="formGrid">
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Nombre del Equipo / Implemento:</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={editNombre}
+                      onChange={(e) => setEditNombre(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Categoría / Tipo de Activo:</label>
+                    <select
+                      className="input"
+                      value={editTipo}
+                      onChange={(e) => setEditTipo(e.target.value as EquipmentCategory)}
+                    >
+                      {CATEGORIES_OPTIONS.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="formGrid" style={{ marginTop: "12px" }}>
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Marca:</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={editMarca}
+                      onChange={(e) => setEditMarca(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Modelo:</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={editModelo}
+                      onChange={(e) => setEditModelo(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              {/* Sección 2: Condición Patrimonial y Operativa */}
+              <div className="formSection">
+                <h3>2. Estado Patrimonial y Operativo</h3>
+                <div className="formGrid">
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Condición de Propiedad:</label>
+                    <select
+                      className="input"
+                      value={editPropiedad}
+                      onChange={(e) => setEditPropiedad(e.target.value as OwnershipStatus)}
+                    >
+                      <option value="Propiedad HJB">Propiedad HJB</option>
+                      <option value="Propiedad a confirmar">Propiedad a confirmar</option>
+                      <option value="Tercero / Contratista">Tercero / Contratista</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Estado Operativo:</label>
+                    <select
+                      className="input"
+                      value={editEstado}
+                      onChange={(e) => setEditEstado(e.target.value as EquipmentStatus)}
+                    >
+                      <option value="Operativo">Operativo</option>
+                      <option value="En servicio">En servicio</option>
+                      <option value="En mantenimiento">En mantenimiento</option>
+                      <option value="A confirmar">A confirmar</option>
+                      <option value="Fuera de servicio">Fuera de servicio</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="formGrid" style={{ marginTop: "12px" }}>
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Condición Descriptiva:</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="ej: Incorporación 2026 nuevo, Histórico en servicio"
+                      value={editCondicion}
+                      onChange={(e) => setEditCondicion(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Año de Incorporación:</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="ej: 2026 o DATO PENDIENTE"
+                      value={editAno}
+                      onChange={(e) => setEditAno(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección 3: Especificaciones Técnicas */}
+              <div className="formSection">
+                <h3>3. Especificaciones Técnicas y Proveedor</h3>
+                <div className="formGrid">
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Proveedor / Origen:</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={editProveedor}
+                      onChange={(e) => setEditProveedor(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Capacidad / Medidas:</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="ej: 12.000 L, 2 metros, 1,60 m"
+                      value={editCapacidad}
+                      onChange={(e) => setEditCapacidad(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {hasHorometro(editTipo) && (
+                  <div style={{ marginTop: "12px" }}>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
+                      Horómetro Actual (horas de motor):
+                    </label>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="ej: 100"
+                      value={editHorometro}
+                      onChange={(e) => setEditHorometro(e.target.value)}
+                    />
+                    <small style={{ color: "var(--slate-500)", display: "block", marginTop: "3px" }}>
+                      Solo aplicable a tractores y maquinaria autopropulsada.
+                    </small>
+                  </div>
+                )}
+              </div>
+
+              {/* Sección 4: Administración y Notas */}
+              <div className="formSection">
+                <h3>4. Asignación Contable y Notas</h3>
                 <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Marca:</label>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Rubro Contable:</label>
                   <input
                     type="text"
-                    className="thFilterInput"
-                    value={editMarca}
-                    onChange={(e) => setEditMarca(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
+                    className="input"
+                    value={editRubro}
+                    onChange={(e) => setEditRubro(e.target.value)}
+                    placeholder="ej: Inversión · Maquinaria y Equipos"
                   />
                 </div>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Modelo:</label>
-                  <input
-                    type="text"
-                    className="thFilterInput"
-                    value={editModelo}
-                    onChange={(e) => setEditModelo(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
-                  />
-                </div>
-              </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Tipo de Equipo:</label>
-                  <select
-                    className="thFilterSelect"
-                    value={editTipo}
-                    onChange={(e) => setEditTipo(e.target.value as EquipmentCategory)}
-                    style={{ width: "100%", padding: "8px" }}
-                  >
-                    {CATEGORIES_OPTIONS.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                <div style={{ marginTop: "12px" }}>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Unidades de Negocio Habilitadas:</label>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "6px" }}>
+                    {["HJB Leche", "HJB Cereales", "HJB Carne", "Transversal"].map((u) => {
+                      const selected = editUnidades.includes(u);
+                      return (
+                        <button
+                          key={u}
+                          type="button"
+                          className={`pill ${selected ? "badgeGreen" : "badgeSlate"}`}
+                          style={{ cursor: "pointer", padding: "6px 12px", fontSize: "12px" }}
+                          onClick={() => toggleUnidad(u)}
+                        >
+                          {selected ? "✓ " : "+ "}{u}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Condición Patrimonial:</label>
-                  <select
-                    className="thFilterSelect"
-                    value={editPropiedad}
-                    onChange={(e) => setEditPropiedad(e.target.value as OwnershipStatus)}
-                    style={{ width: "100%", padding: "8px" }}
-                  >
-                    <option value="Propiedad HJB">Propiedad HJB</option>
-                    <option value="Propiedad a confirmar">Propiedad a confirmar</option>
-                    <option value="Tercero / Contratista">Tercero / Contratista</option>
-                  </select>
-                </div>
-              </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Año de Incorporación:</label>
-                  <input
-                    type="text"
-                    className="thFilterInput"
-                    placeholder="ej: 2026 o DATO PENDIENTE"
-                    value={editAno}
-                    onChange={(e) => setEditAno(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Estado Operativo:</label>
-                  <select
-                    className="thFilterSelect"
-                    value={editEstado}
-                    onChange={(e) => setEditEstado(e.target.value as EquipmentStatus)}
-                    style={{ width: "100%", padding: "8px" }}
-                  >
-                    <option value="Operativo">Operativo</option>
-                    <option value="En servicio">En servicio</option>
-                    <option value="En mantenimiento">En mantenimiento</option>
-                    <option value="A confirmar">A confirmar</option>
-                    <option value="Fuera de servicio">Fuera de servicio</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Proveedor:</label>
-                  <input
-                    type="text"
-                    className="thFilterInput"
-                    value={editProveedor}
-                    onChange={(e) => setEditProveedor(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Capacidad / Medida:</label>
-                  <input
-                    type="text"
-                    className="thFilterInput"
-                    placeholder="ej: 12.000 L, 2 m, 1.60 m"
-                    value={editCapacidad}
-                    onChange={(e) => setEditCapacidad(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
+                <div style={{ marginTop: "12px" }}>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Notas Técnicas y Operativas:</label>
+                  <textarea
+                    className="input textarea"
+                    rows={3}
+                    value={editNotas}
+                    onChange={(e) => setEditNotas(e.target.value)}
+                    placeholder="Directivas de uso, referencias documentales..."
                   />
                 </div>
               </div>
 
-              {hasHorometro(editTipo) && (
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Horómetro Actual (horas):</label>
-                  <input
-                    type="number"
-                    className="thFilterInput"
-                    placeholder="ej: 100"
-                    value={editHorometro}
-                    onChange={(e) => setEditHorometro(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
-                  />
-                </div>
-              )}
-
-              <div>
-                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Condición / Estado:</label>
-                <input
-                  type="text"
-                  className="thFilterInput"
-                  value={editCondicion}
-                  onChange={(e) => setEditCondicion(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Rubro Contable:</label>
-                <input
-                  type="text"
-                  className="thFilterInput"
-                  value={editRubro}
-                  onChange={(e) => setEditRubro(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Notas Técnicas / Operativas:</label>
-                <textarea
-                  className="thFilterInput"
-                  rows={3}
-                  value={editNotas}
-                  onChange={(e) => setEditNotas(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
-                />
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
-                <button type="button" className="thResetBtn" onClick={() => setShowEditModal(false)}>Cancelar</button>
-                <button type="submit" className="primaryButton">Guardar Cambios</button>
+              <div className="modalFooter">
+                <button type="button" className="secondaryButton" onClick={() => setShowEditModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="primaryButton">
+                  Guardar Cambios
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal para Registrar Mantenimiento */}
+      {/* ======================================================== */}
+      {/* MODAL: REGISTRAR MANTENIMIENTO                           */}
+      {/* ======================================================== */}
       {showMaintModal && (
-        <div className="modalOverlay">
-          <div className="modalCard" style={{ maxWidth: "560px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3>Registrar Mantenimiento / Reparación</h3>
-              <button className="thResetBtn" onClick={() => setShowMaintModal(false)}>✕</button>
+        <div className="modalBackdrop" onClick={() => setShowMaintModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modalHeader">
+              <div>
+                <p style={{ fontSize: "12px", color: "var(--slate-500)", textTransform: "uppercase", fontWeight: 700, margin: "0 0 4px" }}>
+                  {equipment.nombre}
+                </p>
+                <h2>Registrar Mantenimiento / Reparación</h2>
+              </div>
+              <button type="button" className="iconButton" onClick={() => setShowMaintModal(false)}>×</button>
             </div>
 
-            <form onSubmit={handleSaveMaint} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div>
-                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Tipo de Evento:</label>
-                <select
-                  className="thFilterSelect"
-                  value={maintTipo}
-                  onChange={(e) => setMaintTipo(e.target.value as MaintenanceRecord["tipoEvento"])}
-                  style={{ width: "100%", padding: "8px" }}
-                >
-                  <option value="Mantenimiento Programado">Mantenimiento Programado</option>
-                  <option value="Reparación">Reparación</option>
-                  <option value="Mejora / Modificación">Mejora / Modificación</option>
-                  <option value="Service">Service</option>
-                </select>
-              </div>
+            <form onSubmit={handleSaveMaint}>
+              <div className="formGrid">
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Tipo de Evento:</label>
+                  <select
+                    className="input"
+                    value={maintTipo}
+                    onChange={(e) => setMaintTipo(e.target.value as MaintenanceRecord["tipoEvento"])}
+                  >
+                    <option value="Mantenimiento Programado">Mantenimiento Programado</option>
+                    <option value="Reparación">Reparación</option>
+                    <option value="Mejora / Modificación">Mejora / Modificación</option>
+                    <option value="Service">Service</option>
+                  </select>
+                </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: carriesHorometro ? "1fr 1fr" : "1fr", gap: "12px" }}>
                 <div>
                   <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Fecha:</label>
                   <input
                     type="date"
-                    className="thFilterInput"
+                    className="input"
                     value={maintFecha}
                     onChange={(e) => setMaintFecha(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
                   />
                 </div>
-                {carriesHorometro && (
+              </div>
+
+              <div className="formGrid" style={{ marginTop: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Descripción del Trabajo:</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="ej: Cambio de aceite, filtros, engrase general"
+                    value={maintDescripcion}
+                    onChange={(e) => setMaintDescripcion(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Componentes Afectados:</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="ej: Filtros de rodaje, embrague, caja de cambios"
+                    value={maintComponente}
+                    onChange={(e) => setMaintComponente(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="formGrid" style={{ marginTop: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Taller / Proveedor:</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="ej: Taller propio, Agronorte"
+                    value={maintTaller}
+                    onChange={(e) => setMaintTaller(e.target.value)}
+                  />
+                </div>
+
+                {carriesHorometro ? (
                   <div>
                     <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Horómetro (horas):</label>
                     <input
                       type="number"
-                      className="thFilterInput"
+                      className="input"
                       placeholder="ej: 100, 250"
                       value={maintHorometro}
                       onChange={(e) => setMaintHorometro(e.target.value)}
-                      style={{ width: "100%", padding: "8px" }}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Costo (si aplica):</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="DATO PENDIENTE"
+                      value={maintCosto}
+                      onChange={(e) => setMaintCosto(e.target.value)}
                     />
                   </div>
                 )}
               </div>
 
-              <div>
-                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Descripción del Trabajo:</label>
-                <input
-                  type="text"
-                  className="thFilterInput"
-                  placeholder="ej: Cambio de aceite, filtros, engrase general"
-                  value={maintDescripcion}
-                  onChange={(e) => setMaintDescripcion(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Componentes Afectados:</label>
-                <input
-                  type="text"
-                  className="thFilterInput"
-                  placeholder="ej: Filtros de rodaje, embrague, caja de cambios"
-                  value={maintComponente}
-                  onChange={(e) => setMaintComponente(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Taller / Proveedor:</label>
-                  <input
-                    type="text"
-                    className="thFilterInput"
-                    placeholder="ej: Taller propio, Agronorte"
-                    value={maintTaller}
-                    onChange={(e) => setMaintTaller(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
-                  />
-                </div>
-                <div>
+              {carriesHorometro && (
+                <div style={{ marginTop: "12px" }}>
                   <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Costo (si aplica):</label>
                   <input
                     type="text"
-                    className="thFilterInput"
+                    className="input"
                     placeholder="DATO PENDIENTE"
                     value={maintCosto}
                     onChange={(e) => setMaintCosto(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
                   />
                 </div>
-              </div>
+              )}
 
-              <div>
+              <div style={{ marginTop: "12px" }}>
                 <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Observaciones:</label>
                 <textarea
-                  className="thFilterInput"
-                  rows={3}
-                  placeholder="Notas adicionales..."
+                  className="input textarea"
+                  rows={2}
+                  placeholder="Detalles adicionales del service..."
                   value={maintObservaciones}
                   onChange={(e) => setMaintObservaciones(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
-                <button type="button" className="thResetBtn" onClick={() => setShowMaintModal(false)}>Cancelar</button>
-                <button type="submit" className="primaryButton">Guardar Mantenimiento</button>
+              <div className="modalFooter">
+                <button type="button" className="secondaryButton" onClick={() => setShowMaintModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="primaryButton">
+                  Guardar Mantenimiento
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal para Registrar Labor */}
+      {/* ======================================================== */}
+      {/* MODAL: REGISTRAR LABOR / USO A CAMPO                     */}
+      {/* ======================================================== */}
       {showWorkModal && (
-        <div className="modalOverlay">
-          <div className="modalCard" style={{ maxWidth: "560px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3>Registrar Labor / Uso a Campo</h3>
-              <button className="thResetBtn" onClick={() => setShowWorkModal(false)}>✕</button>
+        <div className="modalBackdrop" onClick={() => setShowWorkModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modalHeader">
+              <div>
+                <p style={{ fontSize: "12px", color: "var(--slate-500)", textTransform: "uppercase", fontWeight: 700, margin: "0 0 4px" }}>
+                  {equipment.nombre}
+                </p>
+                <h2>Registrar Labor / Uso a Campo</h2>
+              </div>
+              <button type="button" className="iconButton" onClick={() => setShowWorkModal(false)}>×</button>
             </div>
 
-            <form onSubmit={handleSaveWork} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div>
-                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Actividad / Labor:</label>
-                <input
-                  type="text"
-                  className="thFilterInput"
-                  placeholder="ej: Aplicación de efluente, siembra, confección de rollos"
-                  value={workActividad}
-                  onChange={(e) => setWorkActividad(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
-                  required
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <form onSubmit={handleSaveWork}>
+              <div className="formGrid">
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Actividad / Labor:</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="ej: Aplicación de efluente, siembra, confección de rollos"
+                    value={workActividad}
+                    onChange={(e) => setWorkActividad(e.target.value)}
+                    required
+                  />
+                </div>
                 <div>
                   <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Campo:</label>
                   <select
-                    className="thFilterSelect"
+                    className="input"
                     value={workCampo}
                     onChange={(e) => setWorkCampo(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
                   >
                     <option value="Tambo">Tambo</option>
                     <option value="Aguilera">Aguilera</option>
@@ -899,61 +976,46 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
                     <option value="Keuneke">Keuneke</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="formGrid" style={{ marginTop: "12px" }}>
                 <div>
                   <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Lote:</label>
                   <input
                     type="text"
-                    className="thFilterInput"
+                    className="input"
                     placeholder="ej: Lote 1, Lote 7"
                     value={workLote}
                     onChange={(e) => setWorkLote(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
                   />
                 </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Fecha:</label>
                   <input
                     type="date"
-                    className="thFilterInput"
+                    className="input"
                     value={workFecha}
                     onChange={(e) => setWorkFecha(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Campaña:</label>
-                  <input
-                    type="text"
-                    className="thFilterInput"
-                    value={workCampana}
-                    onChange={(e) => setWorkCampana(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div className="formGrid" style={{ marginTop: "12px" }}>
                 <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Operarios:</label>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Campaña:</label>
                   <input
                     type="text"
-                    className="thFilterInput"
-                    placeholder="ej: Edgard, Gonzalo"
-                    value={workOperadores}
-                    onChange={(e) => setWorkOperadores(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
+                    className="input"
+                    value={workCampana}
+                    onChange={(e) => setWorkCampana(e.target.value)}
                   />
                 </div>
                 <div>
                   <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Unidad de Negocio:</label>
                   <select
-                    className="thFilterSelect"
+                    className="input"
                     value={workUnidadNegocio}
                     onChange={(e) => setWorkUnidadNegocio(e.target.value as MachineryWorkRecord["unidadNegocio"])}
-                    style={{ width: "100%", padding: "8px" }}
                   >
                     <option value="Transversal">Transversal</option>
                     <option value="HJB Leche">HJB Leche</option>
@@ -963,34 +1025,48 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Superficie (ha):</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  className="thFilterInput"
-                  placeholder="ej: 25.5"
-                  value={workSuperficie}
-                  onChange={(e) => setWorkSuperficie(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
-                />
+              <div className="formGrid" style={{ marginTop: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Operarios:</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="ej: Edgard, Gonzalo"
+                    value={workOperadores}
+                    onChange={(e) => setWorkOperadores(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Superficie (ha):</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="input"
+                    placeholder="ej: 25.5"
+                    value={workSuperficie}
+                    onChange={(e) => setWorkSuperficie(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div>
+              <div style={{ marginTop: "12px" }}>
                 <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Observaciones:</label>
                 <textarea
-                  className="thFilterInput"
+                  className="input textarea"
                   rows={2}
                   placeholder="Detalles del trabajo..."
                   value={workObservaciones}
                   onChange={(e) => setWorkObservaciones(e.target.value)}
-                  style={{ width: "100%", padding: "8px" }}
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
-                <button type="button" className="thResetBtn" onClick={() => setShowWorkModal(false)}>Cancelar</button>
-                <button type="submit" className="primaryButton">Guardar Labor</button>
+              <div className="modalFooter">
+                <button type="button" className="secondaryButton" onClick={() => setShowWorkModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="primaryButton">
+                  Guardar Labor
+                </button>
               </div>
             </form>
           </div>
