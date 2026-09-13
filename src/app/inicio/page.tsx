@@ -28,7 +28,7 @@ export default function InicioPage() {
 
         <div className="pillarsGrid">
           {/* Agricultura */}
-          <div className="pillarCard featurePillar">
+          <Link href="/agricultura" className="pillarCard featurePillar clickableCard">
             <div className="pillarHeader">
               <div className="pillarIconWrap iconGreen">🌾</div>
               <span className="statusPill statusActive">Operativo v0.4</span>
@@ -41,13 +41,10 @@ export default function InicioPage() {
               <span><strong>5</strong> campos</span>
               <span><strong>Maíz / Pasturas</strong></span>
             </div>
-            <Link href="/agricultura" className="pillarButton primaryBtn">
-              Entrar a Agricultura →
-            </Link>
-          </div>
+          </Link>
 
           {/* Tambo */}
-          <div className="pillarCard">
+          <Link href="/tambo" className="pillarCard clickableCard">
             <div className="pillarHeader">
               <div className="pillarIconWrap iconBlue">🥛</div>
               <span className="statusPill statusUpcoming">En desarrollo</span>
@@ -60,13 +57,10 @@ export default function InicioPage() {
               <span><strong>9</strong> lotes forrajeros</span>
               <span><strong>Rodeo lechero</strong></span>
             </div>
-            <Link href="/tambo" className="pillarButton secondaryBtn">
-              Ver módulo Tambo →
-            </Link>
-          </div>
+          </Link>
 
           {/* Ganadería */}
-          <div className="pillarCard">
+          <Link href="/ganaderia" className="pillarCard clickableCard">
             <div className="pillarHeader">
               <div className="pillarIconWrap iconAmber">🐂</div>
               <span className="statusPill statusUpcoming">En desarrollo</span>
@@ -79,10 +73,7 @@ export default function InicioPage() {
               <span><strong>Recría</strong> & terminación</span>
               <span><strong>Hacienda</strong></span>
             </div>
-            <Link href="/ganaderia" className="pillarButton secondaryBtn">
-              Ver módulo Ganadería →
-            </Link>
-          </div>
+          </Link>
         </div>
       </section>
 

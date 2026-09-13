@@ -461,17 +461,26 @@ input:focus, .input:focus, .select:focus {
   flex-direction: column;
   transition: all .2s ease;
   box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
 }
 
 .pillarCard:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow-md);
+  border-color: var(--brand-500);
 }
 
 .pillarCard.featurePillar {
   border-color: rgba(5,150,105,0.4);
   background: linear-gradient(180deg, #ffffff 0%, #f7fdf9 100%);
   box-shadow: 0 4px 12px rgba(5,150,105,0.06);
+}
+
+.pillarCard.featurePillar:hover {
+  border-color: var(--brand-600);
+  box-shadow: 0 8px 20px rgba(5,150,105,0.12);
 }
 
 .pillarHeader {
@@ -522,12 +531,14 @@ input:focus, .input:focus, .select:focus {
 .pillarMeta {
   display: flex;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 11px 14px;
   background: var(--slate-50);
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 12px;
   color: var(--slate-600);
-  margin-bottom: 18px;
+  margin-top: auto;
+  margin-bottom: 0;
+  border: 1px solid var(--slate-100);
 }
 
 .pillarButton {
