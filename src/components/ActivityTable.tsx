@@ -45,8 +45,8 @@ export default function ActivityTable({
         <thead>
           <tr>
             <th style={{ width: "135px" }}>Fecha</th>
-            <th style={{ width: "140px" }}>{showCampo ? "Campo / Lote" : "Lote"}</th>
-            <th style={{ width: "170px" }}>Cultivo & Labor</th>
+            <th style={{ width: "180px" }}>{showCampo ? "Campo y Lote" : "Lote"}</th>
+            <th style={{ width: "180px" }}>Cultivo y Labor</th>
             <th>Insumos & Dosis</th>
             <th style={{ width: "175px" }}>Producción / Rend.</th>
             <th style={{ width: "115px" }}>Estado</th>
@@ -61,54 +61,63 @@ export default function ActivityTable({
 
             return (
               <tr key={activity.id}>
-                {/* Fecha formateada según requerimiento: DD/MM/YYYY o -/MM/YYYY o Estación/YYYY */}
+                {/* Fecha */}
                 <td>
-                  <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>
+                  <strong style={{ fontSize: "13.5px", color: "var(--slate-900)", display: "block" }}>
                     {formatHistoricalDate(fechaStr)}
                   </strong>
-                  <span className="pill badgeSlate" style={{ marginTop: "5px", fontSize: "10px", display: "inline-block" }}>
-                    {activity.campana}
-                  </span>
+                  <small style={{ color: "var(--slate-500)", fontSize: "11.5px", marginTop: "3px", display: "block" }}>
+                    Campaña {activity.campana}
+                  </small>
                 </td>
 
-                {/* Campo y Lote */}
+                {/* Campo y Lote integrados directamente con sus nombres */}
                 <td>
-                  {showCampo && (
-                    <span className="pill badgeGreen" style={{ fontSize: "10px", marginBottom: "3px", display: "inline-block" }}>
-                      {activity.campo}
-                    </span>
-                  )}
-                  <strong style={{ color: "var(--slate-900)", display: "block", fontSize: "13.5px" }}>
-                    {activity.lote || "Lote Único"}
-                  </strong>
-                  {activity.superficieReal || activity.superficiePlanificada ? (
-                    <small style={{ color: "var(--muted)" }}>
-                      {activity.superficieReal ?? activity.superficiePlanificada} ha
-                    </small>
-                  ) : null}
-                  {activity.esGrupal && (
-                    <div className="groupBadge" title={activity.lotesAfectados?.join(", ")}>
-                      👥 Bloque grupal
-                    </div>
-                  )}
-                </td>
-
-                {/* Cultivo & Labor */}
-                <td>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <span className={getTipoBadge(activity.tipo)}>{activity.tipo}</span>
-                    <strong style={{ fontSize: "14px", color: "var(--slate-900)", marginTop: "2px" }}>
-                      {activity.cultivo}
-                    </strong>
-                    {activity.cultivoAntecesor && (
-                      <small style={{ color: "var(--slate-500)", fontStyle: "italic" }}>
-                        Antecesor: {activity.cultivoAntecesor}
-                      </small>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "6px", flexWrap: "wrap" }}>
+                    {showCampo && (
+                      <strong style={{ fontSize: "14.5px", color: "var(--slate-950)", letterSpacing: "-0.01em" }}>
+                        {activity.campo}
+                      </strong>
                     )}
-                    {activity.metodoAplicacion && (
-                      <small style={{ color: "var(--muted)" }}>Aplicación {activity.metodoAplicacion}</small>
+                    {showCampo && <span style={{ color: "var(--slate-400)", fontWeight: 700 }}>·</span>}
+                    <span style={{ fontSize: "14px", fontWeight: showCampo ? 600 : 700, color: "var(--slate-800)" }}>
+                      {activity.lote || "Lote Único"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "3px", flexWrap: "wrap" }}>
+                    {activity.superficieReal || activity.superficiePlanificada ? (
+                      <small style={{ color: "var(--muted)", fontSize: "12px", fontWeight: 500 }}>
+                        {activity.superficieReal ?? activity.superficiePlanificada} ha
+                      </small>
+                    ) : null}
+                    {activity.esGrupal && (
+                      <span className="groupBadge" title={activity.lotesAfectados?.join(", ")}>
+                        👥 Grupal
+                      </span>
                     )}
                   </div>
+                </td>
+
+                {/* Cultivo y Labor integrados directamente */}
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: "7px", flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
+                      {activity.cultivo}
+                    </strong>
+                    <span className={getTipoBadge(activity.tipo)} style={{ fontSize: "10.5px" }}>
+                      {activity.tipo}
+                    </span>
+                  </div>
+                  {activity.cultivoAntecesor && (
+                    <small style={{ color: "var(--slate-500)", fontStyle: "italic", display: "block", marginTop: "3px" }}>
+                      Antecesor: {activity.cultivoAntecesor}
+                    </small>
+                  )}
+                  {activity.metodoAplicacion && (
+                    <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
+                      Aplicación {activity.metodoAplicacion}
+                    </small>
+                  )}
                 </td>
 
                 {/* Insumos & Dosis */}
