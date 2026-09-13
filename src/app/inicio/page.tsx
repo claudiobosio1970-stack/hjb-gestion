@@ -1,73 +1,137 @@
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
+import { campos } from "@/lib/mockData";
 
 export default function InicioPage() {
   return (
     <AppShell active="Inicio">
       <div className="pageHeader">
         <div>
-          <p className="eyebrow">Resumen general</p>
-          <h1>HJB hoy</h1>
-          <p className="muted">Una vista simple de la empresa y sus áreas.</p>
+          <div className="badgeRow">
+            <span className="pill badgeGreen">Operaciones HJB</span>
+            <span className="pill badgeSlate">Campaña 2026/27</span>
+          </div>
+          <h1>Panel de Control</h1>
+          <p className="muted">Resumen ejecutivo y operativo de las tres unidades productivas de HJB.</p>
         </div>
       </div>
 
-      <section className="businessGrid">
-        <Link href="#" className="businessCard">
-          <span className="businessTag">10</span>
-          <h3>HJB Leche</h3>
-          <p>Producción, rodeo, alimentación y sanidad.</p>
-          <strong>Entrar →</strong>
-        </Link>
-
-        <Link href="#" className="businessCard">
-          <span className="businessTag">20</span>
-          <h3>HJB Cereales</h3>
-          <p>Agricultura, campañas, producción y resultados.</p>
-          <strong>Entrar →</strong>
-        </Link>
-
-        <Link href="#" className="businessCard">
-          <span className="businessTag">30</span>
-          <h3>HJB Carne</h3>
-          <p>Recría, terminación, pesos, ventas y margen.</p>
-          <strong>Entrar →</strong>
-        </Link>
-      </section>
-
+      {/* Tres Pilares Productivos Reales */}
       <section className="section">
         <div className="sectionTitle">
-          <h2>Procesos transversales</h2>
+          <div>
+            <h2>Unidades Productivas</h2>
+            <p className="muted">Ejes centrales de la operación agropecuaria de HJB.</p>
+          </div>
         </div>
-        <div className="quickGrid">
-          <Link href="/agricultura" className="quickCard">
-            <strong>Agricultura</strong>
-            <span>Campos, lotes, campañas y actividades</span>
-          </Link>
-          <div className="quickCard"><strong>Animales</strong><span>Próximamente</span></div>
-          <div className="quickCard"><strong>Compras</strong><span>Próximamente</span></div>
-          <div className="quickCard"><strong>Inventario</strong><span>Próximamente</span></div>
-          <div className="quickCard"><strong>Maquinarias</strong><span>Próximamente</span></div>
-          <div className="quickCard"><strong>Administración</strong><span>Próximamente</span></div>
+
+        <div className="pillarsGrid">
+          {/* Agricultura */}
+          <div className="pillarCard featurePillar">
+            <div className="pillarHeader">
+              <div className="pillarIconWrap iconGreen">🌾</div>
+              <span className="statusPill statusActive">Operativo v0.4</span>
+            </div>
+            <h3>Agricultura</h3>
+            <p className="pillarDesc">
+              Centraliza todos los campos de la empresa. Campañas, rotaciones, labores (Plan vs Real), insumos y suelos.
+            </p>
+            <div className="pillarMeta">
+              <span><strong>5</strong> campos</span>
+              <span><strong>Maíz / Pasturas</strong></span>
+            </div>
+            <Link href="/agricultura" className="pillarButton primaryBtn">
+              Entrar a Agricultura →
+            </Link>
+          </div>
+
+          {/* Tambo */}
+          <div className="pillarCard">
+            <div className="pillarHeader">
+              <div className="pillarIconWrap iconBlue">🥛</div>
+              <span className="statusPill statusUpcoming">En desarrollo</span>
+            </div>
+            <h3>Tambo</h3>
+            <p className="pillarDesc">
+              Gestión lechera integral: rodeo en ordeñe, vacas secas, entregas diarias de leche, calidad, sanidad y forrajes.
+            </p>
+            <div className="pillarMeta">
+              <span><strong>9</strong> lotes forrajeros</span>
+              <span><strong>Rodeo lechero</strong></span>
+            </div>
+            <Link href="/tambo" className="pillarButton secondaryBtn">
+              Ver módulo Tambo →
+            </Link>
+          </div>
+
+          {/* Ganadería */}
+          <div className="pillarCard">
+            <div className="pillarHeader">
+              <div className="pillarIconWrap iconAmber">🐂</div>
+              <span className="statusPill statusUpcoming">En desarrollo</span>
+            </div>
+            <h3>Ganadería</h3>
+            <p className="pillarDesc">
+              Producción de carne: tropas, recría, terminación, pesajes, ganancias diarias de peso vivo y sanidad.
+            </p>
+            <div className="pillarMeta">
+              <span><strong>Recría</strong> & terminación</span>
+              <span><strong>Hacienda</strong></span>
+            </div>
+            <Link href="/ganaderia" className="pillarButton secondaryBtn">
+              Ver módulo Ganadería →
+            </Link>
+          </div>
         </div>
       </section>
 
-      <section className="twoCol">
-        <div className="panel">
-          <div className="sectionTitle"><h2>Indicadores</h2></div>
-          <div className="metricsGrid">
-            <MetricCard label="Campos" value="5" note="Maestro inicial" />
-            <MetricCard label="Campaña" value="2026/27" note="Activa" />
-            <MetricCard label="Maíces agrícolas" value="3" note="Destinos confirmados" />
+      {/* Todos los Campos bajo Agricultura */}
+      <section className="section">
+        <div className="sectionTitle">
+          <div>
+            <h2>Campos en Agricultura</h2>
+            <p className="muted">Todos los establecimientos de HJB integrados en el área agrícola.</p>
           </div>
+          <Link href="/agricultura" className="inlineLink">Ver gestión completa →</Link>
         </div>
 
-        <div className="panel">
-          <div className="sectionTitle"><h2>Alertas y tareas</h2></div>
-          <div className="emptyState">
-            Todavía no hay alertas operativas cargadas.
+        <div className="fieldCardsGrid">
+          {campos.map((campo) => (
+            <Link
+              key={campo.nombre}
+              href={campo.nombre === "Aguilera" ? "/agricultura/aguilera" : "/agricultura"}
+              className={`fieldCardModern ${campo.estado === "Activo" ? "borderActive" : ""}`}
+            >
+              <div className="fieldCardTop">
+                <span className="fieldName">{campo.nombre}</span>
+                <span className={`statusDot ${campo.estado === "Activo" ? "dotGreen" : "dotAmber"}`}>
+                  {campo.estado}
+                </span>
+              </div>
+              <div className="fieldSuperficie">{campo.superficie}</div>
+              <p className="fieldDetail">{campo.detalle}</p>
+              <span className="fieldAction">
+                {campo.nombre === "Aguilera" ? "Gestionar lote →" : "Ver campo →"}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Indicadores Clave */}
+      <section className="section">
+        <div className="sectionTitle">
+          <div>
+            <h2>Indicadores de Campaña 2026/27</h2>
+            <p className="muted">Métricas consolidadas del ejercicio actual.</p>
           </div>
+        </div>
+        <div className="metricsGrid four">
+          <MetricCard label="Campos Totales" value="5" note="Superficie centralizada" />
+          <MetricCard label="Destino Maíz Agrícola" value="3 campos" note="Aguilera, Racca 2, Kitty" />
+          <MetricCard label="Maíz Forrajero Tambo" value="43 ha" note="Superficie confirmada" />
+          <MetricCard label="Estado del Sistema" value="Tester Activo" note="Ambiente de pruebas" />
         </div>
       </section>
     </AppShell>
