@@ -91,7 +91,7 @@ export default function AgriculturaPage() {
           </div>
         </div>
 
-        <ActivityTable activities={activities} showCampo={true} />
+        <ActivityTable activities={activities} onSaved={refresh} showCampo={true} />
       </section>
 
       <NewActivityModal open={open} onClose={() => setOpen(false)} onSaved={refresh} />

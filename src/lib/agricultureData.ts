@@ -1,4 +1,5 @@
 import { HISTORIAL_AGRICOLA_HJB, HistoricalActivity } from "./historicalData";
+import { sortActivitiesRecentFirst } from "./dateUtils";
 
 export type ActivityStatus = "Planificada" | "Realizada" | "Cancelada";
 
@@ -178,8 +179,8 @@ const localRepository: AgricultureRepository = {
   listActivities() {
     initializeActivities();
     const stored = readArray<Activity>(KEYS.activities);
-    if (stored.length > 0) return stored;
-    return HISTORIAL_AGRICOLA_HJB.map(historicalToActivity);
+    const list = stored.length > 0 ? stored : HISTORIAL_AGRICOLA_HJB.map(historicalToActivity);
+    return sortActivitiesRecentFirst(list);
   },
 
   saveActivity(activity) {
@@ -187,7 +188,8 @@ const localRepository: AgricultureRepository = {
     const index = all.findIndex((x) => x.id === activity.id);
     if (index >= 0) all[index] = activity;
     else all.unshift(activity);
-    writeArray(KEYS.activities, all);
+    const sorted = sortActivitiesRecentFirst(all);
+    writeArray(KEYS.activities, sorted);
   },
 
   deleteActivity(id) {

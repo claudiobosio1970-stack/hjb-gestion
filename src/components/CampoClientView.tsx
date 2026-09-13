@@ -139,7 +139,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
       {tab === "Actividades" && (
         <section className="panel">
           {/* Barra de Filtros Completa */}
-          <ActivityTable activities={activities} onEdit={startEdit} showCampo={false} />
+          <ActivityTable activities={activities} onEdit={startEdit} onSaved={refresh} showCampo={false} />
         </section>
       )}
 
@@ -233,7 +233,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
             </div>
           </div>
 
-          <ActivityTable activities={biofertActivities} onEdit={startEdit} showCampo={false} />
+          <ActivityTable activities={biofertActivities} onEdit={startEdit} onSaved={refresh} showCampo={false} />
         </section>
       )}
 

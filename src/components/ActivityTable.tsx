@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Activity } from "@/lib/agricultureData";
-import { formatHistoricalDate } from "@/lib/dateUtils";
+import { Activity, agricultureData } from "@/lib/agricultureData";
+import { formatHistoricalDate, sortActivitiesRecentFirst } from "@/lib/dateUtils";
 
 function getTipoBadge(tipo: string) {
   switch (tipo) {
@@ -46,10 +46,12 @@ const INITIAL_FILTERS: TableFilters = {
 export default function ActivityTable({
   activities,
   onEdit,
+  onSaved,
   showCampo = true,
 }: {
   activities: Activity[];
   onEdit?: (activity: Activity) => void;
+  onSaved?: () => void;
   showCampo?: boolean;
 }) {
   const [filters, setFilters] = useState<TableFilters>(INITIAL_FILTERS);
@@ -71,9 +73,28 @@ export default function ActivityTable({
     filters.estado !== "Todos" ||
     filters.observacion !== "";
 
-  // Filtrado reactivo en vivo
+  // Acción de 1 solo clic para pasar de Planificada a Realizada
+  function handleQuickComplete(activity: Activity) {
+    const today = new Date().toISOString().split("T")[0];
+    const updated: Activity = {
+      ...activity,
+      estado: "Realizada",
+      fechaReal: activity.fechaReal || activity.fechaPlanificada || today,
+      superficieReal: activity.superficieReal ?? activity.superficiePlanificada,
+      insumos: activity.insumos.map((i) => ({
+        ...i,
+        dosisReal: i.dosisReal ?? i.dosisPlanificada,
+      })),
+      updatedAt: new Date().toISOString(),
+    };
+
+    agricultureData.saveActivity(updated);
+    if (onSaved) onSaved();
+  }
+
+  // Filtrado reactivo en vivo + ordenado desde lo más reciente arriba de todo
   const filteredActivities = useMemo(() => {
-    return activities.filter((act) => {
+    const filtered = activities.filter((act) => {
       // 1. Filtro Fecha
       if (filters.fecha.trim()) {
         const q = filters.fecha.trim().toLowerCase();
@@ -141,6 +162,9 @@ export default function ActivityTable({
 
       return true;
     });
+
+    // Siempre ordenar desde lo más reciente arriba de todo, hacia lo más antiguo
+    return sortActivitiesRecentFirst(filtered);
   }, [activities, filters]);
 
   const CULTIVOS_OPTIONS = ["Maíz", "Trigo", "Soja", "Girasol", "Alfalfa", "Avena", "Forrajes"];
@@ -150,7 +174,7 @@ export default function ActivityTable({
       {/* Barra de estado de filtros en vivo */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
         <span style={{ fontSize: "12.5px", color: "var(--slate-600)", fontWeight: 600 }}>
-          Mostrando <strong>{filteredActivities.length}</strong> de {activities.length} labores
+          Mostrando <strong>{filteredActivities.length}</strong> de {activities.length} labores (orden cronológico reciente primero)
         </span>
         {hasActiveFilters && (
           <button className="thResetBtn" onClick={reset} title="Restablecer todos los filtros">
@@ -172,7 +196,7 @@ export default function ActivityTable({
                   <input
                     type="text"
                     className="thFilterInput"
-                    placeholder="Filtrar fecha..."
+                    placeholder="ej: 2026, 05/25"
                     value={filters.fecha}
                     onChange={(e) => update("fecha", e.target.value)}
                   />
@@ -180,10 +204,10 @@ export default function ActivityTable({
               </th>
 
               {/* Columna Campo y Lote + Filtro */}
-              <th style={{ width: "175px" }}>
+              <th style={{ width: "180px" }}>
                 <div className="thHeaderWrap">
                   <div className="thTitleRow">
-                    <span className="thTitle">{showCampo ? "Campo / Lote" : "Lote"}</span>
+                    <span className="thTitle">{showCampo ? "Campo y Lote" : "Lote"}</span>
                   </div>
                   <input
                     type="text"
@@ -247,7 +271,7 @@ export default function ActivityTable({
               </th>
 
               {/* Columna Estado + Filtro */}
-              <th style={{ width: "115px" }}>
+              <th style={{ width: "135px" }}>
                 <div className="thHeaderWrap">
                   <div className="thTitleRow">
                     <span className="thTitle">Estado</span>
@@ -428,19 +452,32 @@ export default function ActivityTable({
                       )}
                     </td>
 
-                    {/* Estado */}
+                    {/* Estado con botón 1-clic para pasar a Realizada */}
                     <td>
-                      <span
-                        className={
-                          activity.estado === "Realizada"
-                            ? "status good"
-                            : activity.estado === "Cancelada"
-                            ? "status neutral"
-                            : "status warn"
-                        }
-                      >
-                        {activity.estado}
-                      </span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                        <span
+                          className={
+                            activity.estado === "Realizada"
+                              ? "status good"
+                              : activity.estado === "Cancelada"
+                              ? "status neutral"
+                              : "status warn"
+                          }
+                        >
+                          {activity.estado}
+                        </span>
+
+                        {activity.estado === "Planificada" && (
+                          <button
+                            type="button"
+                            className="quickDoneBtn"
+                            onClick={() => handleQuickComplete(activity)}
+                            title="Hacé 1 clic para marcar esta labor como Realizada inmediatamente"
+                          >
+                            ✓ Marcar realizada
+                          </button>
+                        )}
+                      </div>
                     </td>
 
                     {/* Observaciones & Discrepancias */}
