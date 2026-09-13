@@ -1,0 +1,15 @@
+# Configuración de Firebase App Hosting para TESTER / STAGING (Rama staging)
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 1
+  concurrency: 40
+
+env:
+  - variable: NEXT_PUBLIC_APP_ENV
+    value: tester
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: hjb--gestion-staging
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: hjb--gestion-staging.firebaseapp.com
