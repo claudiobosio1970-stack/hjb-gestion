@@ -6,11 +6,7 @@ import AppShell from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
 import NewActivityModal from "@/components/NewActivityModal";
 import ActivityTable from "@/components/ActivityTable";
-import ActivityFilterBar, {
-  FilterState,
-  INITIAL_FILTERS,
-  filterActivities,
-} from "@/components/ActivityFilterBar";
+
 import InputsPanel from "@/components/InputsPanel";
 import SoilPanel from "@/components/SoilPanel";
 import DocumentsPanel from "@/components/DocumentsPanel";
@@ -41,13 +37,6 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
   const [openModal, setOpenModal] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
 
-  // Filtros unificados
-  const [filters, setFilters] = useState<FilterState>({
-    ...INITIAL_FILTERS,
-    campo: campoNombre,
-  });
-
-  // Datos
   const [activities, setActivities] = useState<Activity[]>([]);
   const [soils, setSoils] = useState<SoilAnalysis[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -61,7 +50,6 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
 
   useEffect(() => {
     refresh();
-    setFilters({ ...INITIAL_FILTERS, campo: campoNombre });
   }, [campoNombre]);
 
   const lotesDisponibles = LOTES_POR_CAMPO[campoNombre] || ["Lote Único"];
@@ -70,10 +58,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
     (r) => r.campo.toLowerCase() === campoNombre.toLowerCase()
   );
 
-  // Actividades filtradas usando el mismo motor
-  const actividadesFiltradas = useMemo(() => {
-    return filterActivities(activities, { ...filters, campo: campoNombre });
-  }, [activities, filters, campoNombre]);
+  
 
   // Actividades de biofertilización para pestaña dedicada
   const biofertActivities = useMemo(() => {
@@ -144,7 +129,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
             onClick={() => setTab(name)}
           >
             {name === "Biofertilización" && campoNombre === "Tambo" ? "🐄 Biofertilización" : name}
-            {name === "Actividades" && ` (${actividadesFiltradas.length})`}
+            {name === "Actividades" && ` (${activities.length})`}
             {name === "Rotaciones" && ` (${rotacionesCampo.length})`}
           </button>
         ))}
@@ -154,17 +139,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
       {tab === "Actividades" && (
         <section className="panel">
           {/* Barra de Filtros Completa */}
-          <ActivityFilterBar
-            filters={filters}
-            onChange={setFilters}
-            onReset={() => setFilters({ ...INITIAL_FILTERS, campo: campoNombre })}
-            showCampo={false}
-            fixedCampo={campoNombre}
-            totalCount={activities.length}
-            filteredCount={actividadesFiltradas.length}
-          />
-
-          <ActivityTable activities={actividadesFiltradas} onEdit={startEdit} showCampo={false} />
+          <ActivityTable activities={activities} onEdit={startEdit} showCampo={false} />
         </section>
       )}
 
@@ -219,7 +194,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
               </p>
             </div>
           </div>
-          <InputsPanel activities={actividadesFiltradas} />
+          <InputsPanel activities={activities} />
         </section>
       )}
 
@@ -285,8 +260,8 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
         }}
         onSaved={refresh}
         fixedCampo={campoNombre}
-        fixedLote={filters.lote !== "Todos" ? filters.lote : undefined}
-        fixedCampana={filters.campana !== "Todas" ? filters.campana : undefined}
+        fixedLote={undefined}
+        fixedCampana={undefined}
         editingActivity={editingActivity}
       />
     </AppShell>
