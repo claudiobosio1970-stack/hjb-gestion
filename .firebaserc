@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "hjb--gestion-main"
+    "default": "hjb--gestion",
+    "production": "hjb--gestion",
+    "staging": "hjb-gestion-tester"
   }
 }
