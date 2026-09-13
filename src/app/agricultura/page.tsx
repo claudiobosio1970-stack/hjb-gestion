@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
 import NewActivityModal from "@/components/NewActivityModal";
 import ActivityTable from "@/components/ActivityTable";
+import ActivityFilterBar, {
+  FilterState,
+  INITIAL_FILTERS,
+  filterActivities,
+} from "@/components/ActivityFilterBar";
 import { campos } from "@/lib/mockData";
 import { Activity, agricultureData } from "@/lib/agricultureData";
 
 export default function AgriculturaPage() {
   const [open, setOpen] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
 
   function refresh() {
     setActivities(agricultureData.listActivities());
@@ -20,6 +26,10 @@ export default function AgriculturaPage() {
   useEffect(() => {
     refresh();
   }, []);
+
+  const filteredActivities = useMemo(() => {
+    return filterActivities(activities, filters);
+  }, [activities, filters]);
 
   return (
     <AppShell active="Agricultura">
@@ -85,10 +95,23 @@ export default function AgriculturaPage() {
         <div className="sectionTitle">
           <div>
             <h2>Historial Agronómico General</h2>
-            <p className="muted">Últimas labores agrícolas registradas en todos los establecimientos de HJB.</p>
+            <p className="muted">
+              Consulta y filtra todas las labores por fecha, campo, lote, cultivo, estado u observaciones.
+            </p>
           </div>
         </div>
-        <ActivityTable activities={activities.slice(0, 15)} />
+
+        {/* Barra de Filtros Completa */}
+        <ActivityFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onReset={() => setFilters(INITIAL_FILTERS)}
+          showCampo={true}
+          totalCount={activities.length}
+          filteredCount={filteredActivities.length}
+        />
+
+        <ActivityTable activities={filteredActivities} showCampo={true} />
       </section>
 
       <NewActivityModal open={open} onClose={() => setOpen(false)} onSaved={refresh} />

@@ -1,15 +1,7 @@
 "use client";
 
-import { Activity, plannedQuantity, realQuantity } from "@/lib/agricultureData";
-
-function fmtDate(value?: string) {
-  if (!value) return "—";
-  if (value.includes("-")) {
-    const parts = value.split("-");
-    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return value;
-}
+import { Activity } from "@/lib/agricultureData";
+import { formatHistoricalDate } from "@/lib/dateUtils";
 
 function getTipoBadge(tipo: string) {
   switch (tipo) {
@@ -33,14 +25,16 @@ function getTipoBadge(tipo: string) {
 export default function ActivityTable({
   activities,
   onEdit,
+  showCampo = true,
 }: {
   activities: Activity[];
   onEdit?: (activity: Activity) => void;
+  showCampo?: boolean;
 }) {
   if (!activities.length) {
     return (
-      <div className="emptyState" style={{ padding: "32px", textAlign: "center", color: "var(--muted)" }}>
-        No se encontraron actividades para los filtros seleccionados.
+      <div className="emptyState" style={{ padding: "36px 20px", textAlign: "center", color: "var(--muted)" }}>
+        No se encontraron labores que coincidan con los filtros seleccionados.
       </div>
     );
   }
@@ -50,13 +44,13 @@ export default function ActivityTable({
       <table className="dataTable">
         <thead>
           <tr>
-            <th style={{ width: "120px" }}>Fecha / Momento</th>
-            <th style={{ width: "130px" }}>Lote</th>
-            <th style={{ width: "160px" }}>Cultivo & Labor</th>
+            <th style={{ width: "135px" }}>Fecha</th>
+            <th style={{ width: "140px" }}>{showCampo ? "Campo / Lote" : "Lote"}</th>
+            <th style={{ width: "170px" }}>Cultivo & Labor</th>
             <th>Insumos & Dosis</th>
-            <th style={{ width: "170px" }}>Producción / Rend.</th>
-            <th style={{ width: "110px" }}>Estado</th>
-            <th>Observaciones & Notas</th>
+            <th style={{ width: "175px" }}>Producción / Rend.</th>
+            <th style={{ width: "115px" }}>Estado</th>
+            <th>Observaciones & Discrepancias</th>
             {onEdit && <th style={{ width: "70px" }}></th>}
           </tr>
         </thead>
@@ -67,19 +61,30 @@ export default function ActivityTable({
 
             return (
               <tr key={activity.id}>
-                {/* Fecha / Campaña */}
+                {/* Fecha formateada según requerimiento: DD/MM/YYYY o -/MM/YYYY o Estación/YYYY */}
                 <td>
-                  <strong>{fmtDate(fechaStr)}</strong>
-                  <span className="pill badgeSlate" style={{ marginTop: "4px", fontSize: "10px" }}>
+                  <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>
+                    {formatHistoricalDate(fechaStr)}
+                  </strong>
+                  <span className="pill badgeSlate" style={{ marginTop: "5px", fontSize: "10px", display: "inline-block" }}>
                     {activity.campana}
                   </span>
                 </td>
 
-                {/* Lote */}
+                {/* Campo y Lote */}
                 <td>
-                  <strong style={{ color: "var(--slate-900)" }}>{activity.lote || "Lote Único"}</strong>
+                  {showCampo && (
+                    <span className="pill badgeGreen" style={{ fontSize: "10px", marginBottom: "3px", display: "inline-block" }}>
+                      {activity.campo}
+                    </span>
+                  )}
+                  <strong style={{ color: "var(--slate-900)", display: "block", fontSize: "13.5px" }}>
+                    {activity.lote || "Lote Único"}
+                  </strong>
                   {activity.superficieReal || activity.superficiePlanificada ? (
-                    <small>{activity.superficieReal ?? activity.superficiePlanificada} ha</small>
+                    <small style={{ color: "var(--muted)" }}>
+                      {activity.superficieReal ?? activity.superficiePlanificada} ha
+                    </small>
                   ) : null}
                   {activity.esGrupal && (
                     <div className="groupBadge" title={activity.lotesAfectados?.join(", ")}>
@@ -90,9 +95,11 @@ export default function ActivityTable({
 
                 {/* Cultivo & Labor */}
                 <td>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                     <span className={getTipoBadge(activity.tipo)}>{activity.tipo}</span>
-                    <strong style={{ fontSize: "14px", marginTop: "2px" }}>{activity.cultivo}</strong>
+                    <strong style={{ fontSize: "14px", color: "var(--slate-900)", marginTop: "2px" }}>
+                      {activity.cultivo}
+                    </strong>
                     {activity.cultivoAntecesor && (
                       <small style={{ color: "var(--slate-500)", fontStyle: "italic" }}>
                         Antecesor: {activity.cultivoAntecesor}
@@ -104,10 +111,10 @@ export default function ActivityTable({
                   </div>
                 </td>
 
-                {/* Insumos */}
+                {/* Insumos & Dosis */}
                 <td>
                   {activity.insumos.length ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       {activity.insumos.map((input) => {
                         const dosis = input.dosisReal ?? input.dosisPlanificada;
                         return (
@@ -115,13 +122,13 @@ export default function ActivityTable({
                             <strong style={{ fontSize: "12.5px" }}>{input.producto}</strong>
                             <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", marginTop: "2px" }}>
                               {dosis !== null && (
-                                <span style={{ fontSize: "12px", color: "var(--slate-700)", fontWeight: 600 }}>
+                                <span style={{ fontSize: "12px", color: "var(--slate-800)", fontWeight: 600 }}>
                                   {dosis.toLocaleString("es-AR")} {input.unidad}
                                 </span>
                               )}
                               {input.esDosisDerivada && (
                                 <span className="pill badgeAmber" style={{ fontSize: "9.5px", padding: "1px 5px" }} title="Dosis calculada a partir de los totales y hectáreas históricas">
-                                  Dosis deriv.
+                                  Dosis calc.
                                 </span>
                               )}
                               {input.cantidadTotal && (
@@ -149,12 +156,12 @@ export default function ActivityTable({
                   {activity.produccion ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       {activity.produccion.rendimiento !== null && (
-                        <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--brand-800)" }}>
+                        <div style={{ fontSize: "14.5px", fontWeight: 800, color: "var(--brand-800)" }}>
                           {activity.produccion.rendimiento.toLocaleString("es-AR")} {activity.produccion.unidadRendimiento}
                         </div>
                       )}
                       {activity.produccion.cantidad !== null && (
-                        <small style={{ fontWeight: 600 }}>
+                        <small style={{ fontWeight: 600, color: "var(--slate-700)" }}>
                           Total: {activity.produccion.cantidad.toLocaleString("es-AR")} {activity.produccion.unidad}
                         </small>
                       )}
@@ -187,7 +194,7 @@ export default function ActivityTable({
                 {/* Observaciones & Discrepancias */}
                 <td>
                   {activity.observaciones && (
-                    <div style={{ fontSize: "12.5px", color: "var(--slate-700)" }}>
+                    <div style={{ fontSize: "12.5px", color: "var(--slate-700)", lineHeight: 1.4 }}>
                       {activity.observaciones}
                     </div>
                   )}

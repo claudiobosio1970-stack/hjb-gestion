@@ -6,6 +6,11 @@ import AppShell from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
 import NewActivityModal from "@/components/NewActivityModal";
 import ActivityTable from "@/components/ActivityTable";
+import ActivityFilterBar, {
+  FilterState,
+  INITIAL_FILTERS,
+  filterActivities,
+} from "@/components/ActivityFilterBar";
 import InputsPanel from "@/components/InputsPanel";
 import SoilPanel from "@/components/SoilPanel";
 import DocumentsPanel from "@/components/DocumentsPanel";
@@ -36,11 +41,11 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
   const [openModal, setOpenModal] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
 
-  // Filtros
-  const [campanaFiltro, setCampanaFiltro] = useState<string>("Todas");
-  const [loteFiltro, setLoteFiltro] = useState<string>("Todos");
-  const [tipoFiltro, setTipoFiltro] = useState<string>("Todos");
-  const [busqueda, setBusqueda] = useState<string>("");
+  // Filtros unificados
+  const [filters, setFilters] = useState<FilterState>({
+    ...INITIAL_FILTERS,
+    campo: campoNombre,
+  });
 
   // Datos
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -56,6 +61,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
 
   useEffect(() => {
     refresh();
+    setFilters({ ...INITIAL_FILTERS, campo: campoNombre });
   }, [campoNombre]);
 
   const lotesDisponibles = LOTES_POR_CAMPO[campoNombre] || ["Lote Único"];
@@ -64,30 +70,10 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
     (r) => r.campo.toLowerCase() === campoNombre.toLowerCase()
   );
 
-  // Filtrado de actividades
+  // Actividades filtradas usando el mismo motor
   const actividadesFiltradas = useMemo(() => {
-    return activities.filter((act) => {
-      if (campanaFiltro !== "Todas" && act.campana !== campanaFiltro) return false;
-      if (loteFiltro !== "Todos") {
-        const actLote = act.lote || "";
-        const matchesLote =
-          actLote.toLowerCase().includes(loteFiltro.toLowerCase()) ||
-          (act.esGrupal && act.lotesAfectados?.some((l) => l.toLowerCase().includes(loteFiltro.toLowerCase())));
-        if (!matchesLote) return false;
-      }
-      if (tipoFiltro !== "Todos" && act.tipo !== tipoFiltro) return false;
-      if (busqueda.trim()) {
-        const q = busqueda.toLowerCase();
-        const inCultivo = act.cultivo.toLowerCase().includes(q);
-        const inTipo = act.tipo.toLowerCase().includes(q);
-        const inInsumo = act.insumos.some((i) => i.producto.toLowerCase().includes(q));
-        const inObs = (act.observaciones || "").toLowerCase().includes(q);
-        const inLote = (act.lote || "").toLowerCase().includes(q);
-        if (!inCultivo && !inTipo && !inInsumo && !inObs && !inLote) return false;
-      }
-      return true;
-    });
-  }, [activities, campanaFiltro, loteFiltro, tipoFiltro, busqueda]);
+    return filterActivities(activities, { ...filters, campo: campoNombre });
+  }, [activities, filters, campoNombre]);
 
   // Actividades de biofertilización para pestaña dedicada
   const biofertActivities = useMemo(() => {
@@ -167,81 +153,18 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
       {/* PESTAÑA: ACTIVIDADES */}
       {tab === "Actividades" && (
         <section className="panel">
-          {/* Barra de Filtros Cronológicos */}
-          <div className="filterBar">
-            <div className="filterGroup">
-              <span className="filterLabel">Campaña:</span>
-              <select
-                className="filterSelect"
-                value={campanaFiltro}
-                onChange={(e) => setCampanaFiltro(e.target.value)}
-              >
-                <option value="Todas">Todas las campañas</option>
-                <option value="2026/27">Campaña 2026/27</option>
-                <option value="2025/26">Campaña 2025/26</option>
-                <option value="2024/25">Campaña 2024/25</option>
-              </select>
-            </div>
+          {/* Barra de Filtros Completa */}
+          <ActivityFilterBar
+            filters={filters}
+            onChange={setFilters}
+            onReset={() => setFilters({ ...INITIAL_FILTERS, campo: campoNombre })}
+            showCampo={false}
+            fixedCampo={campoNombre}
+            totalCount={activities.length}
+            filteredCount={actividadesFiltradas.length}
+          />
 
-            <div className="filterGroup">
-              <span className="filterLabel">Lote:</span>
-              <select
-                className="filterSelect"
-                value={loteFiltro}
-                onChange={(e) => setLoteFiltro(e.target.value)}
-              >
-                <option value="Todos">Todos los lotes</option>
-                {lotesDisponibles.map((lote) => (
-                  <option key={lote} value={lote}>{lote}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="filterGroup">
-              <span className="filterLabel">Labor:</span>
-              <select
-                className="filterSelect"
-                value={tipoFiltro}
-                onChange={(e) => setTipoFiltro(e.target.value)}
-              >
-                <option value="Todos">Todos los tipos</option>
-                <option value="Siembra">Siembra</option>
-                <option value="Cosecha">Cosecha</option>
-                <option value="Picado">Picado</option>
-                <option value="Rollos">Rollos</option>
-                <option value="Fertilización">Fertilización</option>
-                <option value="Biofertilización">Biofertilización</option>
-                <option value="Fumigación">Fumigación</option>
-                <option value="Barbecho">Barbecho</option>
-                <option value="Laboreo">Laboreo</option>
-              </select>
-            </div>
-
-            <div className="filterGroup" style={{ marginLeft: "auto" }}>
-              <input
-                type="text"
-                className="searchInput"
-                placeholder="Buscar cultivo, insumo, lote..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-              />
-              {(campanaFiltro !== "Todas" || loteFiltro !== "Todos" || tipoFiltro !== "Todos" || busqueda) && (
-                <button
-                  className="secondaryButton smallButton"
-                  onClick={() => {
-                    setCampanaFiltro("Todas");
-                    setLoteFiltro("Todos");
-                    setTipoFiltro("Todos");
-                    setBusqueda("");
-                  }}
-                >
-                  Limpiar
-                </button>
-              )}
-            </div>
-          </div>
-
-          <ActivityTable activities={actividadesFiltradas} onEdit={startEdit} />
+          <ActivityTable activities={actividadesFiltradas} onEdit={startEdit} showCampo={false} />
         </section>
       )}
 
@@ -335,7 +258,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
             </div>
           </div>
 
-          <ActivityTable activities={biofertActivities} onEdit={startEdit} />
+          <ActivityTable activities={biofertActivities} onEdit={startEdit} showCampo={false} />
         </section>
       )}
 
@@ -362,8 +285,8 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
         }}
         onSaved={refresh}
         fixedCampo={campoNombre}
-        fixedLote={loteFiltro !== "Todos" ? loteFiltro : undefined}
-        fixedCampana={campanaFiltro !== "Todas" ? campanaFiltro : undefined}
+        fixedLote={filters.lote !== "Todos" ? filters.lote : undefined}
+        fixedCampana={filters.campana !== "Todas" ? filters.campana : undefined}
         editingActivity={editingActivity}
       />
     </AppShell>

@@ -89,10 +89,10 @@ export interface AgricultureRepository {
 }
 
 const KEYS = {
-  activities: "hjb_agriculture_activities_v05",
+  activities: "hjb_agriculture_activities_v06",
   soils: "hjb_agriculture_soils_v04",
   documents: "hjb_agriculture_documents_v04",
-  migrated: "hjb_agriculture_migrated_v05",
+  migrated: "hjb_agriculture_migrated_v06",
 };
 
 const LEGACY_V04_KEY = "hjb_agriculture_activities_v04";

@@ -45,7 +45,7 @@ export const HISTORIAL_AGRICOLA_HJB: HistoricalActivity[] = [
     cultivo: "Trigo",
     tipo: "Siembra",
     estado: "Realizada",
-    fecha: "Campaña 2024/25",
+    fecha: "Invierno 2024",
     superficie: 28.5,
     superficieNota: "Aproximadamente 28-29 ha según distintas hojas",
     insumos: [
@@ -67,7 +67,7 @@ export const HISTORIAL_AGRICOLA_HJB: HistoricalActivity[] = [
     cultivo: "Trigo",
     tipo: "Fertilización",
     estado: "Realizada",
-    fecha: "Campaña 2024/25",
+    fecha: "Invierno 2024",
     superficie: 28.5,
     insumos: [
       { producto: "Urea", dosis: 120, unidad: "kg/ha" },
@@ -334,7 +334,7 @@ export const HISTORIAL_AGRICOLA_HJB: HistoricalActivity[] = [
     cultivo: "Trigo",
     tipo: "Siembra",
     estado: "Realizada",
-    fecha: "Campaña 2024/25",
+    fecha: "Invierno 2024",
     superficie: 33,
     superficieNota: "Aproximadamente 28-33 ha según distintas hojas",
     insumos: [
@@ -351,7 +351,7 @@ export const HISTORIAL_AGRICOLA_HJB: HistoricalActivity[] = [
     cultivo: "Trigo",
     tipo: "Fertilización",
     estado: "Realizada",
-    fecha: "Campaña 2024/25",
+    fecha: "Invierno 2024",
     superficie: 33,
     insumos: [
       { producto: "Urea", dosis: 120, unidad: "kg/ha" },
@@ -658,7 +658,7 @@ export const HISTORIAL_AGRICOLA_HJB: HistoricalActivity[] = [
     cultivo: "Maíz",
     tipo: "Fumigación",
     estado: "Realizada",
-    fecha: "Campaña 2024/25",
+    fecha: "Primavera 2024",
     superficie: 56,
     esGrupal: true,
     lotesAfectados: ["Aguilera Lote Único", "Racca Lote 3"],
@@ -1614,7 +1614,7 @@ export const HISTORIAL_AGRICOLA_HJB: HistoricalActivity[] = [
     cultivo: "Alfalfa",
     tipo: "Siembra",
     estado: "Realizada",
-    fecha: "Campaña 2025/26",
+    fecha: "Primavera 2025",
     superficie: 9,
     superficieNota: "Keuneke 9 ha (implantación conjunta con CAT 5,5 ha = 14,5 ha totales)",
     insumos: [
