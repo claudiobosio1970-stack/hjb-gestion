@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
-import { Equipment, machineryData } from "@/lib/machineryData";
+import { Equipment, machineryData, hasHorometro } from "@/lib/machineryData";
 
 export default function MaquinariasPage() {
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
@@ -222,7 +222,7 @@ export default function MaquinariasPage() {
                       </div>
                     )}
 
-                    {eq.horometroActual !== null && (
+                    {hasHorometro(eq.tipo) && eq.horometroActual !== null && (
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <span style={{ color: "var(--slate-500)" }}>Horómetro:</span>
                         <strong style={{ color: "var(--slate-900)" }}>{eq.horometroActual} h</strong>

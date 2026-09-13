@@ -2,15 +2,42 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
-import { Equipment, MaintenanceRecord, MachineryWorkRecord, machineryData } from "@/lib/machineryData";
+import {
+  Equipment,
+  EquipmentCategory,
+  EquipmentStatus,
+  MaintenanceRecord,
+  MachineryWorkRecord,
+  OwnershipStatus,
+  hasHorometro,
+  machineryData,
+} from "@/lib/machineryData";
 
 export default function EquipmentDetailClientView({ equipmentId }: { equipmentId: string }) {
+  const router = useRouter();
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [activeTab, setActiveTab] = useState<"ficha" | "mantenimientos" | "labores" | "administracion">("ficha");
   const [showMaintModal, setShowMaintModal] = useState(false);
   const [showWorkModal, setShowWorkModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  // Form states para edición de equipo
+  const [editNombre, setEditNombre] = useState("");
+  const [editMarca, setEditMarca] = useState("");
+  const [editModelo, setEditModelo] = useState("");
+  const [editTipo, setEditTipo] = useState<EquipmentCategory>("Tractor");
+  const [editPropiedad, setEditPropiedad] = useState<OwnershipStatus>("Propiedad HJB");
+  const [editCondicion, setEditCondicion] = useState("");
+  const [editAno, setEditAno] = useState("");
+  const [editProveedor, setEditProveedor] = useState("");
+  const [editCapacidad, setEditCapacidad] = useState("");
+  const [editEstado, setEditEstado] = useState<EquipmentStatus>("Operativo");
+  const [editHorometro, setEditHorometro] = useState("");
+  const [editRubro, setEditRubro] = useState("");
+  const [editNotas, setEditNotas] = useState("");
 
   // Form states para nuevo mantenimiento
   const [maintTipo, setMaintTipo] = useState<MaintenanceRecord["tipoEvento"]>("Mantenimiento Programado");
@@ -55,6 +82,64 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
   }
 
   const isPropio = equipment.propiedad === "Propiedad HJB";
+  const carriesHorometro = hasHorometro(equipment.tipo);
+
+  function openEditModal() {
+    if (!equipment) return;
+    setEditNombre(equipment.nombre);
+    setEditMarca(equipment.marca);
+    setEditModelo(equipment.modelo);
+    setEditTipo(equipment.tipo);
+    setEditPropiedad(equipment.propiedad);
+    setEditCondicion(equipment.condicion);
+    setEditAno(equipment.anoIncorporacion ? String(equipment.anoIncorporacion) : "");
+    setEditProveedor(equipment.proveedor);
+    setEditCapacidad(equipment.capacidad || "");
+    setEditEstado(equipment.estadoOperativo);
+    setEditHorometro(
+      equipment.horometroActual !== null && equipment.horometroActual !== undefined
+        ? String(equipment.horometroActual)
+        : ""
+    );
+    setEditRubro(equipment.rubroContable || "");
+    setEditNotas(equipment.notas || "");
+    setShowEditModal(true);
+  }
+
+  function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!equipment) return;
+    const updated: Equipment = {
+      ...equipment,
+      nombre: editNombre.trim() || equipment.nombre,
+      marca: editMarca.trim() || equipment.marca,
+      modelo: editModelo.trim() || equipment.modelo,
+      tipo: editTipo,
+      propiedad: editPropiedad,
+      condicion: editCondicion.trim() || equipment.condicion,
+      anoIncorporacion: editAno ? editAno : "DATO PENDIENTE",
+      proveedor: editProveedor.trim() || equipment.proveedor,
+      capacidad: editCapacidad.trim() || null,
+      estadoOperativo: editEstado,
+      horometroActual: hasHorometro(editTipo) && editHorometro ? parseFloat(editHorometro) : null,
+      rubroContable: editRubro.trim() || null,
+      notas: editNotas.trim() || equipment.notas,
+    };
+
+    machineryData.saveEquipment(updated);
+    setEquipment(updated);
+    setShowEditModal(false);
+  }
+
+  function handleDelete() {
+    if (!equipment) return;
+    const ok = window.confirm(
+      `¿Estás seguro de que deseas dar de baja / eliminar "${equipment.nombre}" del inventario de HJB?\n\nEsta acción quitará el equipo y sus registros asociados del sistema.`
+    );
+    if (!ok) return;
+    machineryData.deleteEquipment(equipment.id);
+    router.push("/maquinarias");
+  }
 
   function handleSaveMaint(e: React.FormEvent) {
     e.preventDefault();
@@ -64,14 +149,13 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
       tipoEvento: maintTipo,
       componentes: maintComponente ? [maintComponente] : ["General"],
       descripcion: maintDescripcion || "Mantenimiento registrado",
-      horometro: maintHorometro ? parseFloat(maintHorometro) : null,
+      horometro: carriesHorometro && maintHorometro ? parseFloat(maintHorometro) : null,
       estado: "Realizado",
       costo: maintCosto || "DATO PENDIENTE",
       proveedorTaller: maintTaller || "DATO PENDIENTE",
       observaciones: maintObservaciones || undefined,
     });
     setShowMaintModal(false);
-    // Limpiar form
     setMaintFecha("");
     setMaintComponente("");
     setMaintDescripcion("");
@@ -102,7 +186,6 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
       observaciones: workObservaciones || undefined,
     });
     setShowWorkModal(false);
-    // Limpiar form
     setWorkFecha("");
     setWorkActividad("");
     setWorkLote("");
@@ -111,6 +194,17 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
     setWorkObservaciones("");
     refresh();
   }
+
+  const CATEGORIES_OPTIONS: EquipmentCategory[] = [
+    "Tractor",
+    "Implemento Efluentes",
+    "Implemento Forrajero",
+    "Implemento Agrícola",
+    "Transporte / Acoplado",
+    "Equipo Tambo",
+    "Maquinaria Pesada",
+    "Cosecha / Picado",
+  ];
 
   return (
     <AppShell active="Maquinarias">
@@ -136,12 +230,29 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
             {equipment.marca} · {equipment.modelo} — {equipment.condicion}
           </p>
         </div>
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           <button className="primaryButton" onClick={() => setShowMaintModal(true)}>
             + Registrar Mantenimiento
           </button>
           <button className="tableAction" style={{ padding: "8px 16px" }} onClick={() => setShowWorkModal(true)}>
             + Registrar Labor / Uso
+          </button>
+          <button
+            type="button"
+            className="tableAction"
+            style={{ padding: "8px 16px", borderColor: "var(--brand-600)", color: "var(--brand-800)", fontWeight: 600 }}
+            onClick={openEditModal}
+          >
+            ✏️ Editar Equipo
+          </button>
+          <button
+            type="button"
+            className="thResetBtn"
+            style={{ padding: "8px 14px", color: "#dc2626", borderColor: "#fca5a5" }}
+            onClick={handleDelete}
+            title="Eliminar este equipo del sistema"
+          >
+            🗑️ Eliminar
           </button>
         </div>
       </div>
@@ -156,7 +267,19 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
       )}
 
       <div className="metricsGrid four">
-        <MetricCard label="Horómetro / Horas" value={equipment.horometroActual ? `${equipment.horometroActual} h` : "DATO PENDIENTE"} note="Horas de uso registradas" />
+        {carriesHorometro ? (
+          <MetricCard
+            label="Horómetro / Horas"
+            value={equipment.horometroActual ? `${equipment.horometroActual} h` : "DATO PENDIENTE"}
+            note="Horas de motor registradas"
+          />
+        ) : (
+          <MetricCard
+            label="Capacidad / Dimensión"
+            value={equipment.capacidad || "DATO PENDIENTE"}
+            note="Especificación del implemento"
+          />
+        )}
         <MetricCard label="Mantenimientos" value={String(equipment.mantenimientos.length)} note="Services y reparaciones" />
         <MetricCard label="Labores Registradas" value={String(equipment.labores.length)} note="Intervenciones a campo" />
         <MetricCard label="Año Incorporación" value={equipment.anoIncorporacion ? String(equipment.anoIncorporacion) : "DATO PENDIENTE"} note={equipment.proveedor} />
@@ -197,7 +320,18 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
       {/* Tab 1: Ficha Técnica */}
       {activeTab === "ficha" && (
         <div className="panel section">
-          <h2 style={{ marginBottom: "16px" }}>Ficha Técnica del Equipo</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <h2>Ficha Técnica del Equipo</h2>
+            <button
+              type="button"
+              className="tableAction"
+              style={{ fontSize: "12.5px" }}
+              onClick={openEditModal}
+            >
+              ✏️ Editar Ficha Técnica
+            </button>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "20px" }}>
             <div className="inputSummary">
               <span style={{ color: "var(--slate-500)", fontSize: "12px", display: "block" }}>Nombre de Equipo:</span>
@@ -241,12 +375,14 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
               <strong style={{ fontSize: "15px", color: "var(--slate-900)" }}>{equipment.proveedor}</strong>
             </div>
 
-            <div className="inputSummary">
-              <span style={{ color: "var(--slate-500)", fontSize: "12px", display: "block" }}>Horómetro Actual:</span>
-              <strong style={{ fontSize: "15px", color: "var(--slate-900)" }}>
-                {equipment.horometroActual ? `${equipment.horometroActual} h` : "DATO PENDIENTE"}
-              </strong>
-            </div>
+            {carriesHorometro && (
+              <div className="inputSummary">
+                <span style={{ color: "var(--slate-500)", fontSize: "12px", display: "block" }}>Horómetro Actual:</span>
+                <strong style={{ fontSize: "15px", color: "var(--slate-900)" }}>
+                  {equipment.horometroActual ? `${equipment.horometroActual} h` : "DATO PENDIENTE"}
+                </strong>
+              </div>
+            )}
 
             <div className="inputSummary">
               <span style={{ color: "var(--slate-500)", fontSize: "12px", display: "block" }}>Unidades de Negocio de Uso:</span>
@@ -293,7 +429,7 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
                     <th>Tipo</th>
                     <th>Descripción</th>
                     <th>Componentes</th>
-                    <th>Horómetro</th>
+                    {carriesHorometro && <th>Horómetro</th>}
                     <th>Taller / Proveedor</th>
                     <th>Costo</th>
                     <th>Estado</th>
@@ -315,7 +451,7 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
                         )}
                       </td>
                       <td>{m.componentes.join(", ")}</td>
-                      <td>{m.horometro ? `${m.horometro} h` : "—"}</td>
+                      {carriesHorometro && <td>{m.horometro ? `${m.horometro} h` : "—"}</td>}
                       <td>{m.proveedorTaller || "DATO PENDIENTE"}</td>
                       <td>{m.costo || "DATO PENDIENTE"}</td>
                       <td><span className="status good">{m.estado}</span></td>
@@ -419,6 +555,189 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
         </div>
       )}
 
+      {/* Modal para Editar Datos de la Máquina */}
+      {showEditModal && (
+        <div className="modalOverlay">
+          <div className="modalCard" style={{ maxWidth: "600px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3>Editar Ficha del Equipo</h3>
+              <button className="thResetBtn" onClick={() => setShowEditModal(false)}>✕</button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Nombre del Equipo:</label>
+                <input
+                  type="text"
+                  className="thFilterInput"
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  style={{ width: "100%", padding: "8px" }}
+                  required
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Marca:</label>
+                  <input
+                    type="text"
+                    className="thFilterInput"
+                    value={editMarca}
+                    onChange={(e) => setEditMarca(e.target.value)}
+                    style={{ width: "100%", padding: "8px" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Modelo:</label>
+                  <input
+                    type="text"
+                    className="thFilterInput"
+                    value={editModelo}
+                    onChange={(e) => setEditModelo(e.target.value)}
+                    style={{ width: "100%", padding: "8px" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Tipo de Equipo:</label>
+                  <select
+                    className="thFilterSelect"
+                    value={editTipo}
+                    onChange={(e) => setEditTipo(e.target.value as EquipmentCategory)}
+                    style={{ width: "100%", padding: "8px" }}
+                  >
+                    {CATEGORIES_OPTIONS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Condición Patrimonial:</label>
+                  <select
+                    className="thFilterSelect"
+                    value={editPropiedad}
+                    onChange={(e) => setEditPropiedad(e.target.value as OwnershipStatus)}
+                    style={{ width: "100%", padding: "8px" }}
+                  >
+                    <option value="Propiedad HJB">Propiedad HJB</option>
+                    <option value="Propiedad a confirmar">Propiedad a confirmar</option>
+                    <option value="Tercero / Contratista">Tercero / Contratista</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Año de Incorporación:</label>
+                  <input
+                    type="text"
+                    className="thFilterInput"
+                    placeholder="ej: 2026 o DATO PENDIENTE"
+                    value={editAno}
+                    onChange={(e) => setEditAno(e.target.value)}
+                    style={{ width: "100%", padding: "8px" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Estado Operativo:</label>
+                  <select
+                    className="thFilterSelect"
+                    value={editEstado}
+                    onChange={(e) => setEditEstado(e.target.value as EquipmentStatus)}
+                    style={{ width: "100%", padding: "8px" }}
+                  >
+                    <option value="Operativo">Operativo</option>
+                    <option value="En servicio">En servicio</option>
+                    <option value="En mantenimiento">En mantenimiento</option>
+                    <option value="A confirmar">A confirmar</option>
+                    <option value="Fuera de servicio">Fuera de servicio</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Proveedor:</label>
+                  <input
+                    type="text"
+                    className="thFilterInput"
+                    value={editProveedor}
+                    onChange={(e) => setEditProveedor(e.target.value)}
+                    style={{ width: "100%", padding: "8px" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Capacidad / Medida:</label>
+                  <input
+                    type="text"
+                    className="thFilterInput"
+                    placeholder="ej: 12.000 L, 2 m, 1.60 m"
+                    value={editCapacidad}
+                    onChange={(e) => setEditCapacidad(e.target.value)}
+                    style={{ width: "100%", padding: "8px" }}
+                  />
+                </div>
+              </div>
+
+              {hasHorometro(editTipo) && (
+                <div>
+                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Horómetro Actual (horas):</label>
+                  <input
+                    type="number"
+                    className="thFilterInput"
+                    placeholder="ej: 100"
+                    value={editHorometro}
+                    onChange={(e) => setEditHorometro(e.target.value)}
+                    style={{ width: "100%", padding: "8px" }}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Condición / Estado:</label>
+                <input
+                  type="text"
+                  className="thFilterInput"
+                  value={editCondicion}
+                  onChange={(e) => setEditCondicion(e.target.value)}
+                  style={{ width: "100%", padding: "8px" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Rubro Contable:</label>
+                <input
+                  type="text"
+                  className="thFilterInput"
+                  value={editRubro}
+                  onChange={(e) => setEditRubro(e.target.value)}
+                  style={{ width: "100%", padding: "8px" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Notas Técnicas / Operativas:</label>
+                <textarea
+                  className="thFilterInput"
+                  rows={3}
+                  value={editNotas}
+                  onChange={(e) => setEditNotas(e.target.value)}
+                  style={{ width: "100%", padding: "8px" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
+                <button type="button" className="thResetBtn" onClick={() => setShowEditModal(false)}>Cancelar</button>
+                <button type="submit" className="primaryButton">Guardar Cambios</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal para Registrar Mantenimiento */}
       {showMaintModal && (
         <div className="modalOverlay">
@@ -444,7 +763,7 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
                 </select>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: carriesHorometro ? "1fr 1fr" : "1fr", gap: "12px" }}>
                 <div>
                   <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Fecha:</label>
                   <input
@@ -455,17 +774,19 @@ export default function EquipmentDetailClientView({ equipmentId }: { equipmentId
                     style={{ width: "100%", padding: "8px" }}
                   />
                 </div>
-                <div>
-                  <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Horómetro (horas):</label>
-                  <input
-                    type="number"
-                    className="thFilterInput"
-                    placeholder="ej: 100, 250"
-                    value={maintHorometro}
-                    onChange={(e) => setMaintHorometro(e.target.value)}
-                    style={{ width: "100%", padding: "8px" }}
-                  />
-                </div>
+                {carriesHorometro && (
+                  <div>
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, display: "block", marginBottom: "4px" }}>Horómetro (horas):</label>
+                    <input
+                      type="number"
+                      className="thFilterInput"
+                      placeholder="ej: 100, 250"
+                      value={maintHorometro}
+                      onChange={(e) => setMaintHorometro(e.target.value)}
+                      style={{ width: "100%", padding: "8px" }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div>

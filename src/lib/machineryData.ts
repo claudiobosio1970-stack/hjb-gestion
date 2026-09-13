@@ -580,7 +580,11 @@ export const INITIAL_EQUIPMENT: Equipment[] = [
   },
 ];
 
-const STORAGE_KEY = "hjb_machinery_v01";
+export function hasHorometro(tipo: EquipmentCategory | string): boolean {
+  return tipo === "Tractor" || tipo === "Maquinaria Pesada";
+}
+
+const STORAGE_KEY = "hjb_machinery_v02";
 
 export const machineryData = {
   listEquipment(): Equipment[] {
@@ -611,6 +615,12 @@ export const machineryData = {
     } else {
       list.push(equipment);
     }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  },
+
+  deleteEquipment(id: string): void {
+    if (typeof window === "undefined") return;
+    const list = this.listEquipment().filter((e) => e.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
   },
 
