@@ -1,13 +1,17 @@
 {
-  "apphosting": {
-    "backendId": "hjb-gestion",
-    "rootDir": "/",
+  "hosting": {
+    "public": "out",
+    "cleanUrls": true,
     "ignore": [
-      "node_modules",
-      ".git",
-      ".next",
-      "firebase-debug.log",
-      "firebase-debug.*.log"
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   }
 }
