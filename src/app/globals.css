@@ -808,3 +808,194 @@ input:focus, .input:focus, .select:focus {
   .modalBackdrop { padding: 10px; align-items: end; }
   .modal { border-radius: 18px 18px 0 0; max-height: 94vh; }
 }
+
+/* Additional Agricultural Historical Styles */
+.badgeRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  line-height: 1.3;
+}
+
+.badgeGreen { background: var(--brand-50); color: var(--brand-700); border: 1px solid var(--brand-100); }
+.badgeSlate { background: var(--slate-100); color: var(--slate-700); border: 1px solid var(--slate-200); }
+.badgeAmber { background: var(--amber-50); color: var(--amber-700); border: 1px solid var(--amber-100); }
+.badgeBlue  { background: var(--blue-50);  color: var(--blue-700);  border: 1px solid var(--blue-100); }
+.badgePurple{ background: #faf5ff; color: #7e22ce; border: 1px solid #f3e8ff; }
+.badgeTeal  { background: #f0fdfa; color: #0f766e; border: 1px solid #ccfbf1; }
+.badgeRed   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+.discrepancyBox {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  color: #92400e;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.groupBadge {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.filterBar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--slate-600);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.filterSelect {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--slate-800);
+  outline: none;
+}
+
+.filterSelect:focus {
+  border-color: var(--brand-600);
+}
+
+.searchInput {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+  color: var(--slate-800);
+  min-width: 220px;
+}
+
+.rotationGrid {
+  display: grid;
+  gap: 18px;
+}
+
+.rotationCard {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.rotationHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.rotationLoteName {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--slate-900);
+}
+
+.rotationSteps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.rotationStep {
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rotationCampana {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-700);
+}
+
+.rotationCrop {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--slate-900);
+}
+
+.rotationYield {
+  font-size: 12.5px;
+  color: var(--slate-600);
+  background: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  margin-top: 4px;
+}
+
+.biofertSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.biofertCard {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.biofertCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}

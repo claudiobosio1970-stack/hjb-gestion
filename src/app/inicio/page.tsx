@@ -91,7 +91,7 @@ export default function InicioPage() {
           {campos.map((campo) => (
             <Link
               key={campo.nombre}
-              href={campo.nombre === "Aguilera" ? "/agricultura/aguilera" : "/agricultura"}
+              href={`/agricultura/${campo.slug}`}
               className={`fieldCardModern ${campo.estado === "Activo" ? "borderActive" : ""}`}
             >
               <div className="fieldCardTop">
@@ -103,7 +103,7 @@ export default function InicioPage() {
               <div className="fieldSuperficie">{campo.superficie}</div>
               <p className="fieldDetail">{campo.detalle}</p>
               <span className="fieldAction">
-                {campo.nombre === "Aguilera" ? "Gestionar lote →" : "Ver campo →"}
+                "Ver campo y lotes →"
               </span>
             </Link>
           ))}

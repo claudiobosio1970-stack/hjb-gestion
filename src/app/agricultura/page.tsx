@@ -17,45 +17,53 @@ export default function AgriculturaPage() {
     setActivities(agricultureData.listActivities());
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+  }, []);
 
   return (
     <AppShell active="Agricultura">
       <div className="pageHeader">
         <div>
-          <div className="badgeRow">
+          <div className="badgeRow" style={{ marginBottom: "6px" }}>
             <span className="pill badgeGreen">Producción Vegetal</span>
-            <span className="pill badgeSlate">Campaña 2026/27</span>
+            <span className="pill badgeSlate">Historial 2024/25 - 2026/27</span>
           </div>
           <h1>Agricultura</h1>
-          <p className="muted">Todos los campos y lotes de HJB, rotaciones, labores y registros agronómicos.</p>
+          <p className="muted">
+            Todos los campos y lotes de HJB, rotaciones, labores, insumos y rendimientos históricos.
+          </p>
         </div>
-        <button className="primaryButton" onClick={() => setOpen(true)}>+ Nueva actividad</button>
+        <button className="primaryButton" onClick={() => setOpen(true)}>+ Nueva labor</button>
       </div>
 
       <div className="metricsGrid four">
-        <MetricCard label="Campos Totales" value="5" note="Superficie centralizada" />
-        <MetricCard label="Maíces Agrícolas" value="3" note="Aguilera, Kitty, Racca 2" />
-        <MetricCard label="Tambo Maíz/Forraje" value="43 ha" note="Superficie confirmada" />
-        <MetricCard label="Actividades Cargadas" value={String(activities.length)} note="Plan vs Real" />
+        <MetricCard label="Campos Totales" value="5" note="Aguilera, Tambo, Racca, Kitty, Keuneke" />
+        <MetricCard label="Historial Completo" value={String(activities.length)} note="Labores registradas" />
+        <MetricCard label="Campañas Activas" value="3" note="2024/25 · 2025/26 · 2026/27" />
+        <MetricCard label="Destinos de Producción" value="Grano · Silo · Forraje" note="Seguimiento integral" />
       </div>
 
       <section className="section">
         <div className="sectionTitle">
           <div>
-            <h2>Campos y Lotes</h2>
-            <p className="muted">Selecciona un campo para ver sus lotes, labores, insumos y suelos.</p>
+            <h2>Campos y Lotes Productivos</h2>
+            <p className="muted">Haz clic en el cuadro de cualquier campo para ver sus lotes, rotaciones, labores e insumos.</p>
           </div>
           <div className="badgeRow">
-            <span className="pill badgeSlate">Campaña activa: 2026/27</span>
+            <span className="pill badgeSlate">Acceso directo a cada campo</span>
           </div>
         </div>
 
         <div className="fieldCardsGrid">
           {campos.map((campo) => {
-            const isAguilera = campo.nombre === "Aguilera";
-            const content = (
-              <>
+            const count = activities.filter((a) => a.campo.toLowerCase() === campo.nombre.toLowerCase()).length;
+            return (
+              <Link
+                key={campo.nombre}
+                href={`/agricultura/${campo.slug}`}
+                className="fieldCardModern borderActive"
+              >
                 <div className="fieldCardTop">
                   <span className="fieldName">{campo.nombre}</span>
                   <span className={`statusDot ${campo.estado === "Activo" ? "dotGreen" : "dotAmber"}`}>
@@ -65,19 +73,9 @@ export default function AgriculturaPage() {
                 <div className="fieldSuperficie">{campo.superficie}</div>
                 <p className="fieldDetail">{campo.detalle}</p>
                 <span className="fieldAction">
-                  {isAguilera ? "Gestionar lote completo →" : "Ver información →"}
+                  Ver campo y lotes ({count} labores) →
                 </span>
-              </>
-            );
-
-            return isAguilera ? (
-              <Link key={campo.nombre} href="/agricultura/aguilera" className="fieldCardModern borderActive">
-                {content}
               </Link>
-            ) : (
-              <div key={campo.nombre} className="fieldCardModern mutedModern" title="Próximamente disponible">
-                {content}
-              </div>
             );
           })}
         </div>
@@ -86,11 +84,11 @@ export default function AgriculturaPage() {
       <section className="panel section">
         <div className="sectionTitle">
           <div>
-            <h2>Actividades Recientes</h2>
-            <p className="muted">Labores agronómicas registradas con seguimiento Plan vs Real.</p>
+            <h2>Historial Agronómico General</h2>
+            <p className="muted">Últimas labores agrícolas registradas en todos los establecimientos de HJB.</p>
           </div>
         </div>
-        <ActivityTable activities={activities.slice(0, 10)} />
+        <ActivityTable activities={activities.slice(0, 15)} />
       </section>
 
       <NewActivityModal open={open} onClose={() => setOpen(false)} onSaved={refresh} />

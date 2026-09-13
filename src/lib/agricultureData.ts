@@ -1,3 +1,5 @@
+import { HISTORIAL_AGRICOLA_HJB, HistoricalActivity } from "./historicalData";
+
 export type ActivityStatus = "Planificada" | "Realizada" | "Cancelada";
 
 export type ActivityInput = {
@@ -6,20 +8,38 @@ export type ActivityInput = {
   unidad: string;
   dosisPlanificada: number | null;
   dosisReal: number | null;
+  cantidadTotal?: number | null;
+  unidadTotal?: string;
+  esDosisDerivada?: boolean;
+  observacion?: string;
 };
 
 export type Activity = {
   id: string;
   campo: string;
+  lote?: string;
   campana: string;
   cultivo: string;
+  cultivoAntecesor?: string;
   tipo: string;
   estado: ActivityStatus;
   fechaPlanificada: string;
   fechaReal?: string;
   superficiePlanificada: number | null;
   superficieReal: number | null;
+  superficieNota?: string;
   insumos: ActivityInput[];
+  metodoAplicacion?: "Terrestre" | "Aérea";
+  esGrupal?: boolean;
+  lotesAfectados?: string[];
+  produccion?: {
+    cantidad: number | null;
+    unidad: string;
+    rendimiento: number | null;
+    unidadRendimiento: string;
+    destino?: string;
+  };
+  discrepancia?: string;
   maquinaria?: string;
   operador?: string;
   observaciones?: string;
@@ -69,13 +89,58 @@ export interface AgricultureRepository {
 }
 
 const KEYS = {
-  activities: "hjb_agriculture_activities_v04",
+  activities: "hjb_agriculture_activities_v05",
   soils: "hjb_agriculture_soils_v04",
   documents: "hjb_agriculture_documents_v04",
-  migrated: "hjb_agriculture_migrated_v04",
+  migrated: "hjb_agriculture_migrated_v05",
 };
 
-const LEGACY_ACTIVITY_KEY = "hjb_activities_v02";
+const LEGACY_V04_KEY = "hjb_agriculture_activities_v04";
+
+export function historicalToActivity(h: HistoricalActivity): Activity {
+  return {
+    id: h.id,
+    campo: h.campo,
+    lote: h.lote,
+    campana: h.campana,
+    cultivo: h.cultivo,
+    cultivoAntecesor: h.cultivoAntecesor,
+    tipo: h.tipo,
+    estado: h.estado,
+    fechaPlanificada: h.estado === "Planificada" ? h.fecha : "",
+    fechaReal: h.estado === "Realizada" ? h.fecha : "",
+    superficiePlanificada: h.superficie,
+    superficieReal: h.estado === "Realizada" ? h.superficie : null,
+    superficieNota: h.superficieNota,
+    insumos: h.insumos.map((ins, idx) => ({
+      id: `${h.id}-in-${idx}`,
+      producto: ins.producto,
+      unidad: ins.unidad,
+      dosisPlanificada: ins.dosis,
+      dosisReal: h.estado === "Realizada" ? ins.dosis : null,
+      cantidadTotal: ins.cantidadTotal,
+      unidadTotal: ins.unidadTotal,
+      esDosisDerivada: ins.esDosisDerivada,
+      observacion: ins.observacion,
+    })),
+    metodoAplicacion: h.metodoAplicacion,
+    esGrupal: h.esGrupal,
+    lotesAfectados: h.lotesAfectados,
+    produccion: h.produccion ? {
+      cantidad: h.produccion.cantidad,
+      unidad: h.produccion.unidad,
+      rendimiento: h.produccion.rendimiento,
+      unidadRendimiento: h.produccion.unidadRendimiento,
+      destino: h.produccion.destino,
+    } : undefined,
+    discrepancia: h.discrepancia,
+    maquinaria: "Sin asignar",
+    operador: "Sin asignar",
+    observaciones: h.observaciones,
+    createdAt: "2024-01-01T00:00:00.000Z",
+    updatedAt: "2024-01-01T00:00:00.000Z",
+  };
+}
 
 function readArray<T>(key: string): T[] {
   if (typeof window === "undefined") return [];
@@ -94,52 +159,27 @@ function writeArray<T>(key: string, value: T[]) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
-function migrateLegacyActivities() {
+function initializeActivities() {
   if (typeof window === "undefined") return;
   if (window.localStorage.getItem(KEYS.migrated)) return;
 
-  const existing = readArray<Activity>(KEYS.activities);
-  if (existing.length > 0) {
-    window.localStorage.setItem(KEYS.migrated, "1");
-    return;
-  }
+  const baseHistorical: Activity[] = HISTORIAL_AGRICOLA_HJB.map(historicalToActivity);
+  const existingV04 = readArray<Activity>(LEGACY_V04_KEY);
 
-  const legacy = readArray<any>(LEGACY_ACTIVITY_KEY);
-  const migrated: Activity[] = legacy.map((item) => ({
-    id: item.id,
-    campo: item.campo || "Aguilera",
-    campana: item.campana || "2026/27",
-    cultivo: item.cultivo || "Maíz",
-    tipo: item.tipo || "Fertilización",
-    estado: item.estado || "Planificada",
-    fechaPlanificada: item.fechaPlanificada || "",
-    fechaReal: item.fechaReal || "",
-    superficiePlanificada: item.superficie ?? null,
-    superficieReal: item.estado === "Realizada" ? (item.superficie ?? null) : null,
-    insumos: item.producto
-      ? [{
-          id: crypto.randomUUID(),
-          producto: item.producto,
-          unidad: "kg/ha",
-          dosisPlanificada: item.dosis ?? null,
-          dosisReal: item.estado === "Realizada" ? (item.dosis ?? null) : null,
-        }]
-      : [],
-    maquinaria: item.maquinaria || "Sin asignar",
-    operador: item.operador || "Sin asignar",
-    observaciones: item.observaciones || "",
-    createdAt: item.createdAt || new Date().toISOString(),
-    updatedAt: item.updatedAt || new Date().toISOString(),
-  }));
+  const historyIds = new Set(baseHistorical.map((x) => x.id));
+  const userAdded = existingV04.filter((x) => !historyIds.has(x.id));
 
-  if (migrated.length) writeArray(KEYS.activities, migrated);
+  const consolidated = [...userAdded, ...baseHistorical];
+  writeArray(KEYS.activities, consolidated);
   window.localStorage.setItem(KEYS.migrated, "1");
 }
 
 const localRepository: AgricultureRepository = {
   listActivities() {
-    migrateLegacyActivities();
-    return readArray<Activity>(KEYS.activities);
+    initializeActivities();
+    const stored = readArray<Activity>(KEYS.activities);
+    if (stored.length > 0) return stored;
+    return HISTORIAL_AGRICOLA_HJB.map(historicalToActivity);
   },
 
   saveActivity(activity) {
@@ -179,19 +219,16 @@ const localRepository: AgricultureRepository = {
   },
 };
 
-/**
- * Único punto de acceso a datos de Agricultura.
- * Hoy: localStorage.
- * Mañana: SQL Connect, sin rehacer las pantallas.
- */
 export const agricultureData = localRepository;
 
 export function plannedQuantity(activity: Activity, input: ActivityInput) {
+  if (input.cantidadTotal) return input.cantidadTotal;
   if (!activity.superficiePlanificada || !input.dosisPlanificada) return null;
   return activity.superficiePlanificada * input.dosisPlanificada;
 }
 
 export function realQuantity(activity: Activity, input: ActivityInput) {
+  if (input.cantidadTotal && activity.estado === "Realizada") return input.cantidadTotal;
   if (!activity.superficieReal || !input.dosisReal) return null;
   return activity.superficieReal * input.dosisReal;
 }
