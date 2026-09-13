@@ -10,6 +10,6 @@ env:
   - variable: NEXT_PUBLIC_APP_ENV
     value: produccion
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: hjb--gestion
+    value: hjb--gestion-main
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: hjb--gestion.firebaseapp.com
+    value: hjb--gestion-main.firebaseapp.com
