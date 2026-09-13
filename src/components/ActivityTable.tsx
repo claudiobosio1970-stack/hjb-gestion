@@ -27,6 +27,7 @@ interface TableFilters {
   fecha: string;
   campoLote: string;
   cultivo: string;
+  labor: string;
   insumo: string;
   produccion: string;
   estado: string;
@@ -37,6 +38,7 @@ const INITIAL_FILTERS: TableFilters = {
   fecha: "",
   campoLote: "",
   cultivo: "Todos",
+  labor: "Todos",
   insumo: "",
   produccion: "",
   estado: "Todos",
@@ -68,6 +70,7 @@ export default function ActivityTable({
     filters.fecha !== "" ||
     filters.campoLote !== "" ||
     filters.cultivo !== "Todos" ||
+    filters.labor !== "Todos" ||
     filters.insumo !== "" ||
     filters.produccion !== "" ||
     filters.estado !== "Todos" ||
@@ -115,15 +118,21 @@ export default function ActivityTable({
         if (!campoMatch && !loteMatch && !grupalMatch) return false;
       }
 
-      // 3. Filtro Cultivo / Labor
+      // 3. Filtro Cultivo
       if (filters.cultivo !== "Todos") {
         const q = filters.cultivo.toLowerCase();
         const cultMatch = act.cultivo.toLowerCase().includes(q);
-        const laborMatch = act.tipo.toLowerCase().includes(q);
-        if (!cultMatch && !laborMatch) return false;
+        if (!cultMatch) return false;
       }
 
-      // 4. Filtro Insumos
+      // 4. Filtro Labor (Trabajo)
+      if (filters.labor !== "Todos") {
+        const q = filters.labor.toLowerCase();
+        const laborMatch = act.tipo.toLowerCase().includes(q);
+        if (!laborMatch) return false;
+      }
+
+      // 5. Filtro Insumos
       if (filters.insumo.trim()) {
         const q = filters.insumo.trim().toLowerCase();
         const inInsumos = act.insumos.some(
@@ -132,7 +141,7 @@ export default function ActivityTable({
         if (!inInsumos) return false;
       }
 
-      // 5. Filtro Producción / Rendimiento
+      // 6. Filtro Producción / Rendimiento
       if (filters.produccion.trim()) {
         const q = filters.produccion.trim().toLowerCase();
         if (!act.produccion) return false;
@@ -146,12 +155,12 @@ export default function ActivityTable({
         }
       }
 
-      // 6. Filtro Estado
+      // 7. Filtro Estado
       if (filters.estado !== "Todos") {
         if (act.estado !== filters.estado) return false;
       }
 
-      // 7. Filtro Observaciones / Discrepancias
+      // 8. Filtro Observaciones / Discrepancias
       if (filters.observacion.trim()) {
         const q = filters.observacion.trim().toLowerCase();
         const inObs = (act.observaciones || "").toLowerCase().includes(q);
@@ -168,6 +177,7 @@ export default function ActivityTable({
   }, [activities, filters]);
 
   const CULTIVOS_OPTIONS = ["Maíz", "Trigo", "Soja", "Girasol", "Alfalfa", "Avena", "Forrajes"];
+  const LABORES_OPTIONS = ["Siembra", "Fertilización", "Biofertilización", "Fumigación", "Barbecho", "Cosecha", "Picado", "Rollos", "Monitoreo"];
 
   return (
     <div>
@@ -203,24 +213,24 @@ export default function ActivityTable({
                 </div>
               </th>
 
-              {/* Columna Campo y Lote + Filtro */}
-              <th style={{ width: "180px" }}>
+              {/* Columna Lote + Filtro */}
+              <th style={{ width: "175px" }}>
                 <div className="thHeaderWrap">
                   <div className="thTitleRow">
-                    <span className="thTitle">{showCampo ? "Campo y Lote" : "Lote"}</span>
+                    <span className="thTitle">Lote</span>
                   </div>
                   <input
                     type="text"
                     className="thFilterInput"
-                    placeholder={showCampo ? "Campo o lote..." : "Filtrar lote..."}
+                    placeholder={showCampo ? "Lote o campo..." : "Filtrar lote..."}
                     value={filters.campoLote}
                     onChange={(e) => update("campoLote", e.target.value)}
                   />
                 </div>
               </th>
 
-              {/* Columna Cultivo & Labor + Filtro */}
-              <th style={{ width: "165px" }}>
+              {/* Columna Cultivo + Filtro */}
+              <th style={{ width: "140px" }}>
                 <div className="thHeaderWrap">
                   <div className="thTitleRow">
                     <span className="thTitle">Cultivo</span>
@@ -238,11 +248,30 @@ export default function ActivityTable({
                 </div>
               </th>
 
-              {/* Columna Insumos & Dosis + Filtro */}
+              {/* Columna Labor + Filtro */}
+              <th style={{ width: "155px" }}>
+                <div className="thHeaderWrap">
+                  <div className="thTitleRow">
+                    <span className="thTitle">Labor</span>
+                  </div>
+                  <select
+                    className="thFilterSelect"
+                    value={filters.labor}
+                    onChange={(e) => update("labor", e.target.value)}
+                  >
+                    <option value="Todos">Todas</option>
+                    {LABORES_OPTIONS.map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+              </th>
+
+              {/* Columna Insumos + Filtro */}
               <th>
                 <div className="thHeaderWrap">
                   <div className="thTitleRow">
-                    <span className="thTitle">Insumos & Dosis</span>
+                    <span className="thTitle">Insumos</span>
                   </div>
                   <input
                     type="text"
@@ -310,7 +339,7 @@ export default function ActivityTable({
           <tbody>
             {!filteredActivities.length ? (
               <tr>
-                <td colSpan={onEdit ? 8 : 7} style={{ textAlign: "center", padding: "36px", color: "var(--muted)" }}>
+                <td colSpan={onEdit ? 9 : 8} style={{ textAlign: "center", padding: "36px", color: "var(--muted)" }}>
                   No se encontraron labores que coincidan con los filtros aplicados.
                   {hasActiveFilters && (
                     <div style={{ marginTop: "8px" }}>
@@ -365,23 +394,27 @@ export default function ActivityTable({
                       </div>
                     </td>
 
-                    {/* Cultivo & Labor */}
+                    {/* Cultivo */}
                     <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: "7px", flexWrap: "wrap" }}>
-                        <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
-                          {activity.cultivo}
-                        </strong>
-                        <span className={getTipoBadge(activity.tipo)} style={{ fontSize: "10.5px" }}>
-                          {activity.tipo}
-                        </span>
-                      </div>
+                      <strong style={{ fontSize: "14px", color: "var(--slate-900)", display: "block" }}>
+                        {activity.cultivo}
+                      </strong>
                       {activity.cultivoAntecesor && (
                         <small style={{ color: "var(--slate-500)", fontStyle: "italic", display: "block", marginTop: "3px" }}>
                           Antecesor: {activity.cultivoAntecesor}
                         </small>
                       )}
+                    </td>
+
+                    {/* Labor (Tipo de trabajo) */}
+                    <td>
+                      <div>
+                        <span className={getTipoBadge(activity.tipo)} style={{ fontSize: "11px", fontWeight: 600 }}>
+                          {activity.tipo}
+                        </span>
+                      </div>
                       {activity.metodoAplicacion && (
-                        <small style={{ color: "var(--muted)", display: "block", marginTop: "2px" }}>
+                        <small style={{ color: "var(--slate-600)", display: "block", marginTop: "3px", fontSize: "11px" }}>
                           Aplicación {activity.metodoAplicacion}
                         </small>
                       )}
