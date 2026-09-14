@@ -11,10 +11,21 @@ import { Activity, agricultureData } from "@/lib/agricultureData";
 
 export default function AgriculturaPage() {
   const [open, setOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
 
   function refresh() {
     setActivities(agricultureData.listActivities());
+  }
+
+  function startNew() {
+    setEditingActivity(null);
+    setOpen(true);
+  }
+
+  function startEdit(act: Activity) {
+    setEditingActivity(act);
+    setOpen(true);
   }
 
   useEffect(() => {
@@ -34,7 +45,7 @@ export default function AgriculturaPage() {
             Todos los campos y lotes de HJB, rotaciones, labores, insumos y rendimientos históricos.
           </p>
         </div>
-        <button className="primaryButton" onClick={() => setOpen(true)}>+ Nueva labor</button>
+        <button className="primaryButton" onClick={startNew}>+ Nueva labor</button>
       </div>
 
       <div className="metricsGrid four">
@@ -91,10 +102,18 @@ export default function AgriculturaPage() {
           </div>
         </div>
 
-        <ActivityTable activities={activities} onSaved={refresh} showCampo={true} />
+        <ActivityTable activities={activities} onEdit={startEdit} onSaved={refresh} showCampo={true} />
       </section>
 
-      <NewActivityModal open={open} onClose={() => setOpen(false)} onSaved={refresh} />
+      <NewActivityModal
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          setEditingActivity(null);
+        }}
+        onSaved={refresh}
+        editingActivity={editingActivity}
+      />
     </AppShell>
   );
 }
