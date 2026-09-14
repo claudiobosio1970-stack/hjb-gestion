@@ -22,19 +22,29 @@ export default function GoogleMapView() {
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState<string>("");
-  const [inputKey, setInputKey] = useState<string>("");
+  const DEFAULT_MAPS_KEY = "AIzaSyDlcWjg9_Tb3ZnvVkL-loRridz6AuVD5R4";
+  const [apiKey, setApiKey] = useState<string>(
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || DEFAULT_MAPS_KEY
+  );
+  const [inputKey, setInputKey] = useState<string>(
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || DEFAULT_MAPS_KEY
+  );
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   // Cargar datos geográficos al montar
   useEffect(() => {
     setCampos(getCamposGeo());
-    const envKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+    const envKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || DEFAULT_MAPS_KEY;
     const storedKey = typeof window !== "undefined" ? localStorage.getItem("hjb_gmaps_api_key") || "" : "";
     const activeKey = storedKey || envKey;
     setApiKey(activeKey);
     setInputKey(activeKey);
+
+    // Escuchar posibles errores de autenticación de Google Maps
+    (window as any).gm_authFailure = () => {
+      setLoadError("Google Maps reportó que la clave requiere verificar que la 'Maps JavaScript API' esté habilitada en Google Cloud Console.");
+    };
   }, []);
 
   // Inicializar Google Maps
