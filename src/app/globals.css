@@ -712,8 +712,29 @@ input:focus, .input:focus, .select:focus {
 .status.neutral { background: var(--slate-100); color: var(--slate-600); }
 
 /* Tabs & Cycle */
-.tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
-.tab { border: none; background: transparent; padding: 12px 16px; color: var(--muted); font-weight: 600; font-size: 14px; border-bottom: 2px solid transparent; transition: all .15s ease; }
+.tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  border: none;
+  background: transparent;
+  padding: 12px 16px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+  transition: all .15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .tab:hover { color: var(--slate-900); }
 .tab.active { color: var(--brand-600); border-bottom-color: var(--brand-600); }
 
@@ -775,7 +796,134 @@ input:focus, .input:focus, .select:focus {
 .parameterGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .infoCallout { margin-top: 18px; padding: 14px 16px; border-radius: 10px; background: var(--blue-50); border: 1px solid var(--blue-100); color: var(--blue-700); font-size: 13px; line-height: 1.5; }
 
-/* Responsive */
+/* ==========================================================================
+   Responsive & Mobile Optimization
+   ========================================================================== */
+
+/* Botón Hamburguesa y Drawer Móvil */
+.hamburgerBtn {
+  display: none;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: var(--slate-800);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+.hamburgerBtn:hover {
+  background: var(--slate-100);
+  border-color: var(--slate-300);
+}
+.mobileBrandMark {
+  display: none;
+}
+.sidebarCloseBtn {
+  display: none;
+  background: var(--slate-800);
+  border: 1px solid var(--slate-700);
+  color: var(--slate-200);
+  font-size: 14px;
+  font-weight: 700;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  place-items: center;
+}
+.sidebarCloseBtn:hover {
+  background: var(--slate-700);
+  color: #ffffff;
+}
+.mobileNavBackdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(3px);
+  z-index: 99;
+  animation: fadeIn 0.2s ease-in-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Columna de Acciones Sticky en la Tabla de Labores */
+.stickyActionCol {
+  position: sticky !important;
+  right: 0;
+  background: #ffffff !important;
+  z-index: 5;
+  box-shadow: -4px 0 8px -2px rgba(0, 0, 0, 0.08);
+}
+thead th.stickyActionCol {
+  background: var(--slate-50) !important;
+  z-index: 6;
+}
+tr:hover .stickyActionCol {
+  background: var(--slate-50) !important;
+}
+
+/* Indicador de Deslizamiento Horizontal en Móvil */
+.mobileTableHint {
+  display: none;
+  background: #f0fdf4;
+  border: 1px dashed #86efac;
+  border-radius: 8px;
+  padding: 7px 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #166534;
+  text-align: center;
+}
+
+/* Botones de Cabecera del Campo */
+.campoHeaderActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 175px;
+}
+
+/* Mapa de Campos Responsivo */
+.mapGridResponsive {
+  display: grid;
+  grid-template-columns: 310px 1fr;
+  gap: 16px;
+  min-height: 680px;
+}
+.mapSidebarFields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--card-bg, #ffffff);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line, #e2e8f0);
+  height: fit-content;
+}
+.mapVisorContainer {
+  position: relative;
+  background: #1e293b;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line, #e2e8f0);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0,0,0,0.1));
+  min-height: 680px;
+}
+.mapCanvas {
+  width: 100%;
+  height: 100%;
+  min-height: 680px;
+}
+
+/* Media Queries para Pantallas Medianas (Laptops / Tablets) */
 @media (max-width: 1080px) {
   .pillarsGrid { grid-template-columns: 1fr; }
   .gridThree { grid-template-columns: 1fr; }
@@ -783,30 +931,169 @@ input:focus, .input:focus, .select:focus {
 }
 
 @media (max-width: 900px) {
-  .appShell { grid-template-columns: 78px 1fr; }
-  .sidebar { padding: 18px 10px; }
-  .brandText, .navLabel, .navBadge, .navGroupTitle, .sideUserText, .sideLogoutBtn span { display: none; }
-  .sideBrand { justify-content: center; padding: 0 0 16px; }
-  .navItem { justify-content: center; padding: 12px; }
-  .navGroupTitle { display: none; }
-  .sideUserCard { justify-content: center; padding: 6px; }
-  .sideLogoutBtn { justify-content: center; padding: 10px; }
-  .fourForm, .soilParamGrid, .parameterGrid { grid-template-columns: 1fr 1fr; }
+  .mapGridResponsive {
+    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    min-height: unset;
+  }
+  .mapVisorContainer {
+    order: 1;
+    min-height: 440px;
+    height: 440px;
+  }
+  .mapCanvas {
+    min-height: 440px;
+    height: 440px;
+  }
+  .mapSidebarFields {
+    order: 2;
+  }
 }
 
-@media (max-width: 680px) {
-  .loginPage { grid-template-columns: 1fr; }
-  .loginHero { min-height: 38vh; padding: 30px; }
-  .loginPanel { padding: 24px; }
-  .appShell { display: block; }
-  .sidebar { display: none; }
-  .pageBody { padding: 20px 16px 80px; }
-  .topbar { padding: 0 16px; }
-  .pageHeader { flex-direction: column; align-items: flex-start; }
-  .metricsGrid, .metricsGrid.four, .twoCol, .formGrid, .formGrid.three, .fourForm, .soilParamGrid, .parameterGrid { grid-template-columns: 1fr; }
-  .tabs { overflow-x: auto; }
-  .modalBackdrop { padding: 10px; align-items: end; }
-  .modal { border-radius: 18px 18px 0 0; max-height: 94vh; }
+/* Media Queries para Teléfonos Celulares (<= 768px) */
+@media (max-width: 768px) {
+  .hamburgerBtn {
+    display: flex;
+  }
+  .mobileBrandMark {
+    display: inline-block;
+  }
+  .searchBtnMobile {
+    display: none;
+  }
+
+  .appShell {
+    display: block;
+    position: relative;
+  }
+
+  /* Drawer Lateral Deslizable */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 290px;
+    max-width: 85vw;
+    height: 100vh;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+    border-right: 1px solid var(--slate-800);
+    display: flex !important;
+  }
+  .sidebar.sidebarMobileOpen {
+    transform: translateX(0);
+    box-shadow: 12px 0 35px rgba(0, 0, 0, 0.6);
+  }
+  .mobileNavBackdrop {
+    display: block;
+  }
+  .sidebarCloseBtn {
+    display: grid;
+  }
+  .brandText, .navLabel, .navBadge, .navGroupTitle, .sideUserText, .sideLogoutBtn span {
+    display: inline !important;
+  }
+  .navItem {
+    justify-content: flex-start !important;
+    padding: 12px 14px !important;
+  }
+  .sideBrand {
+    justify-content: flex-start !important;
+  }
+  .sideUserCard {
+    justify-content: flex-start !important;
+  }
+  .sideLogoutBtn {
+    justify-content: center !important;
+  }
+
+  .topbar {
+    padding: 0 16px;
+    height: 56px;
+  }
+
+  .pageBody {
+    padding: 16px 12px 80px;
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .pageHeader h1 {
+    font-size: 26px;
+  }
+
+  .campoHeaderActions {
+    width: 100% !important;
+    min-width: unset !important;
+    flex-direction: row !important;
+    gap: 8px;
+  }
+  .campoHeaderActions > * {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+    padding: 11px 12px;
+    font-size: 13.5px;
+  }
+
+  .mobileTableHint {
+    display: block;
+  }
+
+  .metricsGrid, .metricsGrid.four {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    margin-bottom: 18px !important;
+  }
+  .metricCard {
+    padding: 14px !important;
+  }
+  .metricCard strong {
+    font-size: 20px !important;
+  }
+
+  /* Modales Móviles Cómodos con Footer Pegajoso */
+  .modalBackdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal, .modalWide {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 92vh !important;
+    padding: 20px 16px !important;
+  }
+  .modalFooter {
+    position: sticky;
+    bottom: -20px;
+    background: #ffffff;
+    padding: 14px 0 12px;
+    margin-top: 18px;
+    z-index: 10;
+    box-shadow: 0 -4px 12px -2px rgba(0, 0, 0, 0.08);
+  }
+  .formGrid, .formGrid.three, .fourForm {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Pantallas Muy Pequeñas (<= 380px) */
+@media (max-width: 380px) {
+  .metricsGrid, .metricsGrid.four {
+    grid-template-columns: 1fr !important;
+  }
+  .campoHeaderActions {
+    flex-direction: column !important;
+  }
 }
 
 /* Additional Agricultural Historical Styles */

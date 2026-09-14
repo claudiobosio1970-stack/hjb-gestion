@@ -377,28 +377,9 @@ export default function GoogleMapView() {
       )}
 
       {/* Contenedor Principal: Lista de Campos + Mapa */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "310px 1fr",
-          gap: "16px",
-          minHeight: "680px",
-        }}
-        className="mapGridResponsive"
-      >
+      <div className="mapGridResponsive">
         {/* Panel Lateral de Campos */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "10px",
-            background: "var(--card-bg, #ffffff)",
-            padding: "16px",
-            borderRadius: "12px",
-            border: "1px solid var(--line, #e2e8f0)",
-            height: "fit-content",
-          }}
-        >
+        <div className="mapSidebarFields">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
             <strong style={{ fontSize: "14px", color: "var(--slate-800, #1e293b)" }}>
               Establecimientos ({campos.length})
@@ -480,18 +461,8 @@ export default function GoogleMapView() {
         </div>
 
         {/* Visor del Mapa Google Maps */}
-        <div
-          style={{
-            position: "relative",
-            background: "#1e293b",
-            borderRadius: "12px",
-            overflow: "hidden",
-            border: "1px solid var(--line, #e2e8f0)",
-            boxShadow: "var(--shadow-md, 0 4px 6px -1px rgba(0,0,0,0.1))",
-            minHeight: "680px",
-          }}
-        >
-          <div ref={mapContainerRef} style={{ width: "100%", height: "100%", minHeight: "680px" }} />
+        <div className="mapVisorContainer">
+          <div ref={mapContainerRef} className="mapCanvas" />
 
           {/* Mensaje de carga o aviso de API Key */}
           {loadError && (

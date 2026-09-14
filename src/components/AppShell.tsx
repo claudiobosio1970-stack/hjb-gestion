@@ -45,16 +45,49 @@ export default function AppShell({
     );
   }
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
     <div className="appShell">
-      <Sidebar active={active} email={email} onLogout={handleLogout} />
+      <Sidebar
+        active={active}
+        email={email}
+        onLogout={handleLogout}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
+      />
+
+      {mobileNavOpen && (
+        <div
+          className="mobileNavBackdrop"
+          onClick={() => setMobileNavOpen(false)}
+          title="Tocar para cerrar el menú"
+        />
+      )}
+
       <main className="content">
         <header className="topbar">
-          <div>
-            <strong>HJB Gestión</strong>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <button
+              type="button"
+              className="hamburgerBtn"
+              onClick={() => setMobileNavOpen((prev) => !prev)}
+              aria-label="Abrir menú de navegación"
+              title="Abrir menú"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span className="brandMark compact mobileBrandMark">HJB</span>
+              <strong>HJB Gestión</strong>
+            </div>
           </div>
           <div className="topActions">
-            <button className="ghostButton">Buscar</button>
+            <button className="ghostButton searchBtnMobile">Buscar</button>
             <div className="avatar small">H</div>
           </div>
         </header>

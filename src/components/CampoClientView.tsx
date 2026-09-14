@@ -137,7 +137,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
             Historial agrícola completo: rotaciones, siembras, fertilizaciones, biofertilizaciones, fumigaciones y cosechas.
           </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", minWidth: "175px" }}>
+        <div className="campoHeaderActions">
           <button className="primaryButton" onClick={startNew}>
             + Registrar labor
           </button>

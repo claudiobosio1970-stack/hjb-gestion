@@ -193,6 +193,11 @@ export default function ActivityTable({
         )}
       </div>
 
+      {/* Aviso móvil de deslizamiento horizontal */}
+      <div className="mobileTableHint">
+        <span>↔️ Deslizá la tabla hacia los lados para ver todas las columnas y datos</span>
+      </div>
+
       <div className="tableWrap">
         <table className="dataTable">
           <thead>
@@ -333,7 +338,11 @@ export default function ActivityTable({
                 </div>
               </th>
 
-              {onEdit && <th style={{ width: "60px" }}></th>}
+              {onEdit && (
+                <th className="alignRight stickyActionCol" style={{ width: "80px" }}>
+                  <span className="thTitle" style={{ fontSize: "11px", color: "var(--slate-500)" }}>Acción</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -540,7 +549,7 @@ export default function ActivityTable({
 
                     {/* Acciones */}
                     {onEdit && (
-                      <td className="alignRight">
+                      <td className="alignRight stickyActionCol">
                         <button className="tableAction" onClick={() => onEdit(activity)}>
                           Editar
                         </button>

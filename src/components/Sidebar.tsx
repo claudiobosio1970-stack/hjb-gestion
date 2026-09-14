@@ -4,6 +4,8 @@ type Props = {
   active?: string;
   email?: string;
   onLogout?: () => void;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 };
 
 const navigation = [
@@ -106,17 +108,30 @@ const secondaryNav = [
   },
 ];
 
-export default function Sidebar({ active, email, onLogout }: Props) {
+export default function Sidebar({ active, email, onLogout, mobileOpen, onCloseMobile }: Props) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${mobileOpen ? "sidebarMobileOpen" : ""}`}>
       <div className="sideTop">
-        <Link href="/inicio" className="sideBrand">
-          <div className="brandLogo">HJB</div>
-          <div className="brandText">
-            <strong>HJB GESTIÓN</strong>
-            <span className="brandTag">AGROPECUARIA</span>
-          </div>
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+          <Link href="/inicio" className="sideBrand" onClick={onCloseMobile} style={{ flex: 1 }}>
+            <div className="brandLogo">HJB</div>
+            <div className="brandText">
+              <strong>HJB GESTIÓN</strong>
+              <span className="brandTag">AGROPECUARIA</span>
+            </div>
+          </Link>
+          {onCloseMobile && (
+            <button
+              type="button"
+              className="sidebarCloseBtn"
+              onClick={onCloseMobile}
+              title="Cerrar menú"
+              aria-label="Cerrar menú"
+            >
+              ✕
+            </button>
+          )}
+        </div>
 
         <div className="navGroup">
           <span className="navGroupTitle">PRODUCCIÓN</span>
@@ -128,6 +143,7 @@ export default function Sidebar({ active, email, onLogout }: Props) {
                   key={item.name}
                   href={item.href}
                   className={`navItem ${isActive ? "active" : ""}`}
+                  onClick={onCloseMobile}
                 >
                   <span className="navIcon">{item.icon}</span>
                   <span className="navLabel">{item.name}</span>
@@ -146,6 +162,7 @@ export default function Sidebar({ active, email, onLogout }: Props) {
                 key={item.name}
                 href={item.href}
                 className={`navItem secondary ${active === item.name ? "active" : ""}`}
+                onClick={onCloseMobile}
               >
                 <span className="navIcon">{item.icon}</span>
                 <span className="navLabel">{item.name}</span>
@@ -165,7 +182,14 @@ export default function Sidebar({ active, email, onLogout }: Props) {
             <span className="userEmail" title={email}>{email || "Sesión activa"}</span>
           </div>
         </div>
-        <button className="sideLogoutBtn" onClick={onLogout} title="Cerrar sesión">
+        <button
+          className="sideLogoutBtn"
+          onClick={() => {
+            onCloseMobile?.();
+            onLogout?.();
+          }}
+          title="Cerrar sesión"
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
