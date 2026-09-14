@@ -16,6 +16,7 @@ export default function AppShell({
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -44,8 +45,6 @@ export default function AppShell({
       </main>
     );
   }
-
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
     <div className="appShell">
