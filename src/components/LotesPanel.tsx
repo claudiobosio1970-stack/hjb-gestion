@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, agricultureData, Lote, LoteStatus } from "@/lib/agricultureData";
 
-const CULTIVOS_SUGERIDOS = [
+export const CULTIVOS_SUGERIDOS = [
   "Maíz Grano",
   "Maíz Silo",
   "Soja de 1ra",
@@ -20,7 +20,7 @@ const CULTIVOS_SUGERIDOS = [
   "Barbecho químico",
 ];
 
-const ESTADOS_LOTE: LoteStatus[] = [
+export const ESTADOS_LOTE: LoteStatus[] = [
   "En producción",
   "Barbecho / Descanso",
   "Pastoreo",
@@ -28,7 +28,7 @@ const ESTADOS_LOTE: LoteStatus[] = [
   "Planificado",
 ];
 
-function emptyLote(campo: string): Lote {
+export function emptyLote(campo: string): Lote {
   return {
     id: "",
     campo,
@@ -39,6 +39,197 @@ function emptyLote(campo: string): Lote {
     aptitudSuelo: "Agrícola Clase I-II",
     observaciones: "",
   };
+}
+
+export function LoteModal({
+  open,
+  onClose,
+  campoNombre,
+  editingLote,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  campoNombre: string;
+  editingLote: Lote | null;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState<Lote>(emptyLote(campoNombre));
+
+  useEffect(() => {
+    if (!open) return;
+    if (editingLote) {
+      setForm({ ...editingLote });
+    } else {
+      setForm(emptyLote(campoNombre));
+    }
+  }, [open, editingLote, campoNombre]);
+
+  if (!open) return null;
+
+  function handleSave() {
+    if (!form.nombre.trim()) {
+      alert("Por favor ingresá un nombre o identificación para el lote.");
+      return;
+    }
+
+    const loteToSave: Lote = {
+      ...form,
+      id: form.id || `lote-${campoNombre.toLowerCase()}-${Date.now()}`,
+      campo: campoNombre,
+      nombre: form.nombre.trim(),
+      superficieHa:
+        form.superficieHa !== null && form.superficieHa !== undefined && form.superficieHa !== ("" as any)
+          ? Number(form.superficieHa)
+          : null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    agricultureData.saveLote(loteToSave);
+    onSaved();
+    onClose();
+  }
+
+  function handleDelete() {
+    if (!form.id) return;
+    const confirmDelete = window.confirm(
+      `¿Estás seguro de que deseás eliminar el lote "${form.nombre}" de ${campoNombre}?\n\nEsta acción no afectará el historial de labores pasadas, pero quitará la ficha del lote.`
+    );
+    if (confirmDelete) {
+      agricultureData.deleteLote(form.id);
+      onSaved();
+      onClose();
+    }
+  }
+
+  return (
+    <div className="modalBackdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "560px" }}>
+        <div className="modalHeader">
+          <div>
+            <p className="eyebrow" style={{ color: "var(--brand-700)", fontWeight: 700 }}>
+              Establecimiento {campoNombre}
+            </p>
+            <h2>{editingLote ? `Editar ${form.nombre}` : `Nuevo Lote en ${campoNombre}`}</h2>
+          </div>
+          <button type="button" className="iconButton" onClick={onClose} title="Cerrar">
+            ×
+          </button>
+        </div>
+
+        <div className="formSection noTopBorder">
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div>
+              <label>Nombre o Identificación del Lote *</label>
+              <input
+                className="input"
+                value={form.nombre}
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                placeholder="ej: Lote 1, Lote Norte, Bajo 2..."
+                autoFocus
+              />
+            </div>
+
+            <div className="formGrid two">
+              <div>
+                <label>Superficie (ha)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  className="input"
+                  value={form.superficieHa ?? ""}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      superficieHa: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  placeholder="ej: 38"
+                />
+              </div>
+
+              <div>
+                <label>Estado Productivo</label>
+                <select
+                  className="input"
+                  value={form.estado}
+                  onChange={(e) => setForm({ ...form, estado: e.target.value as LoteStatus })}
+                >
+                  {ESTADOS_LOTE.map((est) => (
+                    <option key={est} value={est}>
+                      {est}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label>Cultivo Actual / Uso</label>
+              <input
+                className="input"
+                value={form.cultivoActual || ""}
+                onChange={(e) => setForm({ ...form, cultivoActual: e.target.value })}
+                placeholder="ej: Maíz Grano, Soja de 2da, Alfalfa..."
+                list="cultivos-sugeridos-lote"
+              />
+              <datalist id="cultivos-sugeridos-lote">
+                {CULTIVOS_SUGERIDOS.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+
+            <div>
+              <label>Aptitud / Tipo de Suelo</label>
+              <input
+                className="input"
+                value={form.aptitudSuelo || ""}
+                onChange={(e) => setForm({ ...form, aptitudSuelo: e.target.value })}
+                placeholder="ej: Agrícola Clase I, Agrícola-Ganadero, Bajo dulce..."
+              />
+            </div>
+
+            <div>
+              <label>Observaciones y Manejo Agronómico</label>
+              <textarea
+                className="input textarea"
+                rows={3}
+                value={form.observaciones || ""}
+                onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
+                placeholder="Anotaciones particulares: drenaje, manejo de malezas (ej: Alepo), pendientes, etc."
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="modalFooter" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            {editingLote && (
+              <button
+                type="button"
+                className="thResetBtn"
+                style={{ color: "#dc2626", borderColor: "#fca5a5", fontWeight: 700, padding: "8px 16px" }}
+                onClick={handleDelete}
+                title="Eliminar este lote"
+              >
+                🗑️ Eliminar Lote
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button type="button" className="secondaryButton" onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="button" className="primaryButton" onClick={handleSave}>
+              {editingLote ? "Guardar cambios" : "Crear Lote"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function LotesPanel({
@@ -54,57 +245,20 @@ export default function LotesPanel({
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingLote, setEditingLote] = useState<Lote | null>(null);
-  const [form, setForm] = useState<Lote>(emptyLote(campoNombre));
 
   function openCreate() {
     setEditingLote(null);
-    setForm(emptyLote(campoNombre));
     setModalOpen(true);
   }
 
   function openEdit(lote: Lote) {
     setEditingLote(lote);
-    setForm({ ...lote });
     setModalOpen(true);
   }
 
   function closeModal() {
     setModalOpen(false);
     setEditingLote(null);
-  }
-
-  function handleSave() {
-    if (!form.nombre.trim()) {
-      alert("Por favor ingresá un nombre o identificación para el lote.");
-      return;
-    }
-
-    const loteToSave: Lote = {
-      ...form,
-      id: form.id || `lote-${campoNombre.toLowerCase()}-${Date.now()}`,
-      campo: campoNombre,
-      nombre: form.nombre.trim(),
-      superficieHa: form.superficieHa !== null && form.superficieHa !== undefined && form.superficieHa !== ("" as any)
-        ? Number(form.superficieHa)
-        : null,
-      updatedAt: new Date().toISOString(),
-    };
-
-    agricultureData.saveLote(loteToSave);
-    onChanged();
-    closeModal();
-  }
-
-  function handleDelete() {
-    if (!form.id) return;
-    const confirmDelete = window.confirm(
-      `¿Estás seguro de que deseás eliminar el lote "${form.nombre}" de ${campoNombre}?\n\nEsta acción no afectará el historial de labores pasadas, pero quitará la ficha del lote.`
-    );
-    if (confirmDelete) {
-      agricultureData.deleteLote(form.id);
-      onChanged();
-      closeModal();
-    }
   }
 
   // Métricas resumidas de los lotes de este campo
@@ -161,7 +315,6 @@ export default function LotesPanel({
       ) : (
         <div className="fieldCardsGrid">
           {lotes.map((lote) => {
-            // Contar labores históricas asociadas a este lote
             const countLabores = activities.filter((act) => {
               const matchesLote = (act.lote || "").toLowerCase() === lote.nombre.toLowerCase();
               const matchesGrupal = act.esGrupal && act.lotesAfectados?.some(
@@ -173,7 +326,6 @@ export default function LotesPanel({
             return (
               <div key={lote.id} className="fieldCardModern borderActive" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                 <div>
-                  {/* Encabezado tarjeta */}
                   <div className="fieldCardTop">
                     <span className="fieldName" style={{ fontSize: "16px", fontWeight: 700 }}>
                       {lote.nombre}
@@ -194,12 +346,10 @@ export default function LotesPanel({
                     </span>
                   </div>
 
-                  {/* Superficie */}
                   <div className="fieldSuperficie" style={{ fontSize: "20px", margin: "4px 0 8px 0" }}>
                     {lote.superficieHa ? `${lote.superficieHa} ha` : "— ha"}
                   </div>
 
-                  {/* Detalles agronómicos */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", color: "var(--slate-700)", marginBottom: "12px" }}>
                     <div>
                       <strong style={{ color: "var(--slate-900)" }}>Cultivo actual: </strong>
@@ -239,7 +389,6 @@ export default function LotesPanel({
                   </div>
                 </div>
 
-                {/* Pie de tarjeta con botón Editar */}
                 <div style={{ borderTop: "1px solid var(--line)", paddingTop: "12px", display: "flex", justifyContent: "flex-end" }}>
                   <button
                     type="button"
@@ -256,135 +405,14 @@ export default function LotesPanel({
         </div>
       )}
 
-      {/* Modal de Alta / Edición de Lote */}
-      {modalOpen && (
-        <div className="modalBackdrop" onClick={closeModal}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "560px" }}>
-            <div className="modalHeader">
-              <div>
-                <p className="eyebrow" style={{ color: "var(--brand-700)", fontWeight: 700 }}>
-                  Establecimiento {campoNombre}
-                </p>
-                <h2>{editingLote ? `Editar ${form.nombre}` : `Nuevo Lote en ${campoNombre}`}</h2>
-              </div>
-              <button type="button" className="iconButton" onClick={closeModal} title="Cerrar">
-                ×
-              </button>
-            </div>
-
-            <div className="formSection noTopBorder">
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                <div>
-                  <label>Nombre o Identificación del Lote *</label>
-                  <input
-                    className="input"
-                    value={form.nombre}
-                    onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                    placeholder="ej: Lote 1, Lote Norte, Bajo 2..."
-                    autoFocus
-                  />
-                </div>
-
-                <div className="formGrid two">
-                  <div>
-                    <label>Superficie (ha)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      className="input"
-                      value={form.superficieHa ?? ""}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          superficieHa: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                      placeholder="ej: 38"
-                    />
-                  </div>
-
-                  <div>
-                    <label>Estado Productivo</label>
-                    <select
-                      className="input"
-                      value={form.estado}
-                      onChange={(e) => setForm({ ...form, estado: e.target.value as LoteStatus })}
-                    >
-                      {ESTADOS_LOTE.map((est) => (
-                        <option key={est} value={est}>
-                          {est}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label>Cultivo Actual / Uso</label>
-                  <input
-                    className="input"
-                    value={form.cultivoActual || ""}
-                    onChange={(e) => setForm({ ...form, cultivoActual: e.target.value })}
-                    placeholder="ej: Maíz Grano, Soja de 2da, Alfalfa..."
-                    list="cultivos-sugeridos-lote"
-                  />
-                  <datalist id="cultivos-sugeridos-lote">
-                    {CULTIVOS_SUGERIDOS.map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                </div>
-
-                <div>
-                  <label>Aptitud / Tipo de Suelo</label>
-                  <input
-                    className="input"
-                    value={form.aptitudSuelo || ""}
-                    onChange={(e) => setForm({ ...form, aptitudSuelo: e.target.value })}
-                    placeholder="ej: Agrícola Clase I, Agrícola-Ganadero, Bajo dulce..."
-                  />
-                </div>
-
-                <div>
-                  <label>Observaciones y Manejo Agronómico</label>
-                  <textarea
-                    className="input textarea"
-                    rows={3}
-                    value={form.observaciones || ""}
-                    onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
-                    placeholder="Anotaciones particulares: drenaje, manejo de malezas (ej: Alepo), pendientes, etc."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="modalFooter" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                {editingLote && (
-                  <button
-                    type="button"
-                    className="thResetBtn"
-                    style={{ color: "#dc2626", borderColor: "#fca5a5", fontWeight: 700, padding: "8px 16px" }}
-                    onClick={handleDelete}
-                    title="Eliminar este lote"
-                  >
-                    🗑️ Eliminar Lote
-                  </button>
-                )}
-              </div>
-
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button type="button" className="secondaryButton" onClick={closeModal}>
-                  Cancelar
-                </button>
-                <button type="button" className="primaryButton" onClick={handleSave}>
-                  {editingLote ? "Guardar cambios" : "Crear Lote"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal Lote */}
+      <LoteModal
+        open={modalOpen}
+        onClose={closeModal}
+        campoNombre={campoNombre}
+        editingLote={editingLote}
+        onSaved={onChanged}
+      />
     </div>
   );
 }

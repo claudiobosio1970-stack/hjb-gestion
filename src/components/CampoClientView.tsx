@@ -10,7 +10,7 @@ import ActivityTable from "@/components/ActivityTable";
 import InputsPanel from "@/components/InputsPanel";
 import SoilPanel from "@/components/SoilPanel";
 import DocumentsPanel from "@/components/DocumentsPanel";
-import LotesPanel from "@/components/LotesPanel";
+import LotesPanel, { LoteModal } from "@/components/LotesPanel";
 import {
   Activity,
   DocumentRecord,
@@ -38,6 +38,11 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
   const [tab, setTab] = useState<Tab>("Actividades");
   const [openModal, setOpenModal] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+
+  // Estados para botón "Editar Lote" del encabezado
+  const [headerLoteModalOpen, setHeaderLoteModalOpen] = useState(false);
+  const [headerLoteToEdit, setHeaderLoteToEdit] = useState<Lote | null>(null);
+  const [headerSelectorOpen, setHeaderSelectorOpen] = useState(false);
 
   const [activities, setActivities] = useState<Activity[]>([]);
   const [lotes, setLotes] = useState<Lote[]>([]);
@@ -91,6 +96,18 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
     setOpenModal(true);
   }
 
+  function openHeaderLoteEdit() {
+    if (lotes.length === 1) {
+      setHeaderLoteToEdit(lotes[0]);
+      setHeaderLoteModalOpen(true);
+    } else if (lotes.length > 1) {
+      setHeaderSelectorOpen(true);
+    } else {
+      setHeaderLoteToEdit(null);
+      setHeaderLoteModalOpen(true);
+    }
+  }
+
   return (
     <AppShell active="Agricultura">
       {/* Breadcrumb */}
@@ -113,7 +130,32 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
             Historial agrícola completo: rotaciones, siembras, fertilizaciones, biofertilizaciones, fumigaciones y cosechas.
           </p>
         </div>
-        <button className="primaryButton" onClick={startNew}>+ Registrar labor</button>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", minWidth: "175px" }}>
+          <button className="primaryButton" onClick={startNew}>
+            + Registrar labor
+          </button>
+          <button
+            type="button"
+            className="tableAction"
+            style={{
+              padding: "8px 14px",
+              fontWeight: 700,
+              borderColor: "var(--brand-600)",
+              color: "var(--brand-800)",
+              background: "#ffffff",
+              textAlign: "center",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              boxShadow: "var(--shadow-sm)",
+            }}
+            onClick={openHeaderLoteEdit}
+            title="Editar los datos de los lotes de este campo"
+          >
+            ✏️ Editar Lote
+          </button>
+        </div>
       </div>
 
       {/* Métricas del Campo */}
@@ -280,6 +322,122 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
         fixedLote={undefined}
         fixedCampana={undefined}
         editingActivity={editingActivity}
+      />
+
+      {/* Modal Selector de Lote para Editar (cuando hay múltiples lotes) */}
+      {headerSelectorOpen && (
+        <div className="modalBackdrop" onClick={() => setHeaderSelectorOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "520px" }}>
+            <div className="modalHeader">
+              <div>
+                <p className="eyebrow" style={{ color: "var(--brand-700)", fontWeight: 700 }}>
+                  Establecimiento {campoNombre}
+                </p>
+                <h2>Seleccionar Lote para Editar</h2>
+              </div>
+              <button
+                type="button"
+                className="iconButton"
+                onClick={() => setHeaderSelectorOpen(false)}
+                title="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="formSection noTopBorder">
+              <p className="muted" style={{ marginBottom: "14px", fontSize: "13px" }}>
+                Elegí el lote que deseás modificar o creá uno nuevo:
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "380px", overflowY: "auto" }}>
+                {lotes.map((l) => (
+                  <div
+                    key={l.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "12px 16px",
+                      background: "var(--slate-50)",
+                      borderRadius: "8px",
+                      border: "1px solid var(--line)",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <strong style={{ fontSize: "15px", color: "var(--slate-900)" }}>{l.nombre}</strong>
+                        <span
+                          className={`pill ${
+                            l.estado === "En producción"
+                              ? "badgeGreen"
+                              : l.estado === "Pastoreo"
+                              ? "badgeTeal"
+                              : "badgeSlate"
+                          }`}
+                          style={{ fontSize: "11px" }}
+                        >
+                          {l.estado}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "12.5px", color: "var(--muted)", marginTop: "4px" }}>
+                        {l.superficieHa ? `${l.superficieHa} ha` : "Superficie a definir"} · Cultivo: {l.cultivoActual || "Sin asignar"}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="tableAction"
+                      style={{ padding: "6px 14px", fontWeight: 600 }}
+                      onClick={() => {
+                        setHeaderSelectorOpen(false);
+                        setHeaderLoteToEdit(l);
+                        setHeaderLoteModalOpen(true);
+                      }}
+                    >
+                      ✏️ Editar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="modalFooter" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => {
+                  setHeaderSelectorOpen(false);
+                  setTab("Lotes");
+                }}
+              >
+                Ver todos en pestaña Lotes →
+              </button>
+              <button
+                type="button"
+                className="primaryButton"
+                onClick={() => {
+                  setHeaderSelectorOpen(false);
+                  setHeaderLoteToEdit(null);
+                  setHeaderLoteModalOpen(true);
+                }}
+              >
+                + Nuevo Lote
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Lote invocado desde el Header */}
+      <LoteModal
+        open={headerLoteModalOpen}
+        onClose={() => {
+          setHeaderLoteModalOpen(false);
+          setHeaderLoteToEdit(null);
+        }}
+        campoNombre={campoNombre}
+        editingLote={headerLoteToEdit}
+        onSaved={refresh}
       />
     </AppShell>
   );
