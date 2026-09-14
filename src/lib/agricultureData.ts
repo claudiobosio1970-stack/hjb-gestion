@@ -48,6 +48,21 @@ export type Activity = {
   updatedAt: string;
 };
 
+export type LoteStatus = "En producción" | "Barbecho / Descanso" | "Pastoreo" | "Implantación" | "Planificado";
+
+export type Lote = {
+  id: string;
+  campo: string;
+  nombre: string;
+  superficieHa: number | null;
+  cultivoActual?: string;
+  estado: LoteStatus;
+  aptitudSuelo?: string;
+  observaciones?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type SoilParameter = {
   id: string;
   nombre: string;
@@ -83,6 +98,9 @@ export interface AgricultureRepository {
   listActivities(): Activity[];
   saveActivity(activity: Activity): void;
   deleteActivity(id: string): void;
+  listLotes(campo?: string): Lote[];
+  saveLote(lote: Lote): void;
+  deleteLote(id: string): void;
   listSoilAnalyses(): SoilAnalysis[];
   saveSoilAnalysis(analysis: SoilAnalysis): void;
   listDocuments(): DocumentRecord[];
@@ -91,12 +109,191 @@ export interface AgricultureRepository {
 
 const KEYS = {
   activities: "hjb_agriculture_activities_v06",
+  lotes: "hjb_agriculture_lotes_v01",
   soils: "hjb_agriculture_soils_v04",
   documents: "hjb_agriculture_documents_v04",
   migrated: "hjb_agriculture_migrated_v06",
 };
 
 const LEGACY_V04_KEY = "hjb_agriculture_activities_v04";
+
+export const INITIAL_LOTES: Lote[] = [
+  // Aguilera
+  {
+    id: "aguilera-lote-unico",
+    campo: "Aguilera",
+    nombre: "Lote Único",
+    superficieHa: 120,
+    cultivoActual: "Maíz Grano",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola Clase I-II",
+    observaciones: "Rotación Maíz / Girasol histórica",
+  },
+  // Racca
+  {
+    id: "racca-lote-1",
+    campo: "Racca",
+    nombre: "Lote 1",
+    superficieHa: 38,
+    cultivoActual: "Maíz Grano",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola de alta productividad",
+    observaciones: "Trigo -> Soja 2da -> Maíz Stine 9939",
+  },
+  {
+    id: "racca-lote-2",
+    campo: "Racca",
+    nombre: "Lote 2",
+    superficieHa: 32,
+    cultivoActual: "Soja de 2da",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola",
+    observaciones: "Manejo específico Alepo con doble golpe",
+  },
+  {
+    id: "racca-lote-3",
+    campo: "Racca",
+    nombre: "Lote 3",
+    superficieHa: 25,
+    cultivoActual: "Avena para Rollos",
+    estado: "Pastoreo",
+    aptitudSuelo: "Agrícola-Forrajero",
+    observaciones: "Maíz Grano / Avena rollos (234 rollos)",
+  },
+  // Keuneke
+  {
+    id: "keuneke-lote-1",
+    campo: "Keuneke",
+    nombre: "Lote 1",
+    superficieHa: 45,
+    cultivoActual: "Avena / Soja",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola Clase I",
+    observaciones: "Trigo Catalpa -> Soja de 2da (45,59 qq/ha)",
+  },
+  {
+    id: "keuneke-lote-2",
+    campo: "Keuneke",
+    nombre: "Lote 2",
+    superficieHa: 40,
+    cultivoActual: "Maíz Grano",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola Clase I",
+    observaciones: "Récord histórico maíz 122,49 qq/ha",
+  },
+  {
+    id: "keuneke-lote-3",
+    campo: "Keuneke",
+    nombre: "Lote 3",
+    superficieHa: 9,
+    cultivoActual: "Alfalfa Forraje Tambo",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola-Forrajero",
+    observaciones: "Alfalfa implantada con CAT",
+  },
+  // Kitty
+  {
+    id: "kitty-lote-unico",
+    campo: "Kitty",
+    nombre: "Lote Único",
+    superficieHa: 80,
+    cultivoActual: "Maíz Grano",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola de alta productividad",
+    observaciones: "Récord histórico de rinde (108,07 qq/ha)",
+  },
+  // Tambo
+  {
+    id: "tambo-lote-1",
+    campo: "Tambo",
+    nombre: "Lote 1",
+    superficieHa: 20,
+    cultivoActual: "Maíz Silo",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola-Forrajero",
+    observaciones: "Sector fertilizado con efluente líquido",
+  },
+  {
+    id: "tambo-lote-2",
+    campo: "Tambo",
+    nombre: "Lote 2",
+    superficieHa: 22,
+    cultivoActual: "Alfalfa",
+    estado: "En producción",
+    aptitudSuelo: "Forrajero Tambo",
+    observaciones: "Pastura base alfalfa en rotación",
+  },
+  {
+    id: "tambo-lote-3",
+    campo: "Tambo",
+    nombre: "Lote 3",
+    superficieHa: 18,
+    cultivoActual: "Avena Forrajera",
+    estado: "Pastoreo",
+    aptitudSuelo: "Forrajero",
+    observaciones: "Pastoreo directo rodeo lechero",
+  },
+  {
+    id: "tambo-lote-4",
+    campo: "Tambo",
+    nombre: "Lote 4",
+    superficieHa: 20,
+    cultivoActual: "Maíz Silo",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola-Forrajero",
+    observaciones: "Silaje de planta entera para reserva",
+  },
+  {
+    id: "tambo-lote-5",
+    campo: "Tambo",
+    nombre: "Lote 5",
+    superficieHa: 25,
+    cultivoActual: "Pastura Consociada",
+    estado: "Pastoreo",
+    aptitudSuelo: "Forrajero Tambo",
+    observaciones: "Rotación pastoreo intensivo",
+  },
+  {
+    id: "tambo-lote-6",
+    campo: "Tambo",
+    nombre: "Lote 6",
+    superficieHa: 20,
+    cultivoActual: "Maíz Silo",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola-Forrajero",
+    observaciones: "Aplicación de estiércol sólido Fliegl",
+  },
+  {
+    id: "tambo-lote-7",
+    campo: "Tambo",
+    nombre: "Lote 7",
+    superficieHa: 24,
+    cultivoActual: "Maíz Silo 1ra y 2da",
+    estado: "En producción",
+    aptitudSuelo: "Agrícola-Forrajero",
+    observaciones: "Rinde silo 14,86 m/ha en 1ra y 10,48 en 2da",
+  },
+  {
+    id: "tambo-lote-8",
+    campo: "Tambo",
+    nombre: "Lote 8",
+    superficieHa: 16,
+    cultivoActual: "Alfalfa",
+    estado: "En producción",
+    aptitudSuelo: "Forrajero",
+    observaciones: "Corte y confección de rollos / henificado",
+  },
+  {
+    id: "tambo-lote-9",
+    campo: "Tambo",
+    nombre: "Lote 9",
+    superficieHa: 20,
+    cultivoActual: "Avena / Forraje",
+    estado: "Pastoreo",
+    aptitudSuelo: "Forrajero",
+    observaciones: "Verdeo de invierno para tambo",
+  },
+];
 
 export function historicalToActivity(h: HistoricalActivity): Activity {
   return {
@@ -194,6 +391,30 @@ const localRepository: AgricultureRepository = {
 
   deleteActivity(id) {
     writeArray(KEYS.activities, this.listActivities().filter((x) => x.id !== id));
+  },
+
+  listLotes(campo?: string) {
+    if (typeof window === "undefined") {
+      return campo
+        ? INITIAL_LOTES.filter((x) => x.campo.toLowerCase() === campo.toLowerCase())
+        : INITIAL_LOTES;
+    }
+    const stored = readArray<Lote>(KEYS.lotes);
+    const lotes = stored.length > 0 ? stored : INITIAL_LOTES;
+    if (!campo) return lotes;
+    return lotes.filter((x) => x.campo.toLowerCase() === campo.toLowerCase());
+  },
+
+  saveLote(lote: Lote) {
+    const all = this.listLotes();
+    const index = all.findIndex((x) => x.id === lote.id);
+    if (index >= 0) all[index] = lote;
+    else all.push(lote);
+    writeArray(KEYS.lotes, all);
+  },
+
+  deleteLote(id: string) {
+    writeArray(KEYS.lotes, this.listLotes().filter((x) => x.id !== id));
   },
 
   listSoilAnalyses() {

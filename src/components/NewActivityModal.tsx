@@ -145,7 +145,8 @@ export default function NewActivityModal({
   }
 
   function handleCampoChange(nuevoCampo: string) {
-    const nuevosLotes = LOTES_POR_CAMPO[nuevoCampo] || ["Lote Único"];
+    const dynamicLots = agricultureData.listLotes(nuevoCampo).map((l) => l.nombre);
+    const nuevosLotes = dynamicLots.length > 0 ? dynamicLots : LOTES_POR_CAMPO[nuevoCampo] || ["Lote Único"];
     setForm((prev) => ({
       ...prev,
       campo: nuevoCampo,
@@ -242,7 +243,8 @@ export default function NewActivityModal({
     }
   }
 
-  const baseLotes = LOTES_POR_CAMPO[form.campo] || ["Lote Único"];
+  const dynamicLotes = agricultureData.listLotes(form.campo).map((l) => l.nombre);
+  const baseLotes = dynamicLotes.length > 0 ? dynamicLotes : LOTES_POR_CAMPO[form.campo] || ["Lote Único"];
   const allLoteOptions = Array.from(
     new Set([...baseLotes, ...(form.lote ? [form.lote] : []), "General", "Lote Único"])
   );

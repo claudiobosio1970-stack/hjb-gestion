@@ -10,9 +10,11 @@ import ActivityTable from "@/components/ActivityTable";
 import InputsPanel from "@/components/InputsPanel";
 import SoilPanel from "@/components/SoilPanel";
 import DocumentsPanel from "@/components/DocumentsPanel";
+import LotesPanel from "@/components/LotesPanel";
 import {
   Activity,
   DocumentRecord,
+  Lote,
   SoilAnalysis,
   agricultureData,
 } from "@/lib/agricultureData";
@@ -27,7 +29,7 @@ const CAMPO_NAMES: Record<string, string> = {
   keuneke: "Keuneke",
 };
 
-type Tab = "Actividades" | "Rotaciones" | "Insumos" | "Biofertilización" | "Suelos" | "Documentos";
+type Tab = "Actividades" | "Lotes" | "Rotaciones" | "Insumos" | "Biofertilización" | "Suelos" | "Documentos";
 
 export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
   const slug = campoSlug.toLowerCase();
@@ -38,12 +40,14 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
 
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [lotes, setLotes] = useState<Lote[]>([]);
   const [soils, setSoils] = useState<SoilAnalysis[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
 
   function refresh() {
     const all = agricultureData.listActivities();
     setActivities(all.filter((x) => x.campo.toLowerCase() === campoNombre.toLowerCase()));
+    setLotes(agricultureData.listLotes(campoNombre));
     setSoils(agricultureData.listSoilAnalyses().filter((x) => x.campo.toLowerCase() === campoNombre.toLowerCase()));
     setDocuments(agricultureData.listDocuments().filter((x) => x.campo.toLowerCase() === campoNombre.toLowerCase()));
   }
@@ -52,7 +56,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
     refresh();
   }, [campoNombre]);
 
-  const lotesDisponibles = LOTES_POR_CAMPO[campoNombre] || ["Lote Único"];
+  const lotesDisponibles = lotes.length > 0 ? lotes.map((l) => l.nombre) : LOTES_POR_CAMPO[campoNombre] || ["Lote Único"];
   const campoMeta = campos.find((c) => c.nombre.toLowerCase() === campoNombre.toLowerCase());
   const rotacionesCampo = ROTACIONES_HISTORICAS.filter(
     (r) => r.campo.toLowerCase() === campoNombre.toLowerCase()
@@ -122,7 +126,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
 
       {/* Selector de Pestañas */}
       <div className="tabs">
-        {(["Actividades", "Rotaciones", "Insumos", "Biofertilización", "Suelos", "Documentos"] as Tab[]).map((name) => (
+        {(["Actividades", "Lotes", "Rotaciones", "Insumos", "Biofertilización", "Suelos", "Documentos"] as Tab[]).map((name) => (
           <button
             key={name}
             className={tab === name ? "tab active" : "tab"}
@@ -130,6 +134,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
           >
             {name === "Biofertilización" && campoNombre === "Tambo" ? "🐄 Biofertilización" : name}
             {name === "Actividades" && ` (${activities.length})`}
+            {name === "Lotes" && ` (${lotes.length})`}
             {name === "Rotaciones" && ` (${rotacionesCampo.length})`}
           </button>
         ))}
@@ -140,6 +145,18 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
         <section className="panel">
           {/* Barra de Filtros Completa */}
           <ActivityTable activities={activities} onEdit={startEdit} onSaved={refresh} showCampo={false} />
+        </section>
+      )}
+
+      {/* PESTAÑA: LOTES */}
+      {tab === "Lotes" && (
+        <section className="panel">
+          <LotesPanel
+            campoNombre={campoNombre}
+            lotes={lotes}
+            activities={activities}
+            onChanged={refresh}
+          />
         </section>
       )}
 
