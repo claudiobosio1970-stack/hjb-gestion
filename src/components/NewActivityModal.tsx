@@ -338,9 +338,19 @@ export default function NewActivityModal({
         <div className="modalHeader">
           <div>
             <p className="eyebrow" style={{ color: "var(--brand-700)", fontWeight: 700 }}>
-              {isMultiLote ? `👥 Labor Grupal (${(form.lotesAfectados || []).length} lotes)` : `${form.campo} · ${form.lote || "Lote"}`} · Campaña {form.campana}
+              {editingActivity
+                ? (isMultiLote
+                    ? `👥 Labor Grupal (${(form.lotesAfectados || []).length} lotes) · Campaña ${form.campana}`
+                    : `📍 ${form.campo} · ${form.lote || "Lote"} · Campaña ${form.campana}`)
+                : (isMultiLote
+                    ? `👥 Labor Grupal (${(form.lotesAfectados || []).length} lotes)`
+                    : `${form.campo} · ${form.lote || "Lote"} · Campaña ${form.campana}`)}
             </p>
-            <h2>{editingActivity ? "Editar labor / actividad agrícola" : "Registrar labor agrícola"}</h2>
+            <h2>
+              {editingActivity
+                ? `Editar labor: ${form.tipo || "Labor"} · ${form.cultivo || "Cultivo"}`
+                : "Registrar labor agrícola"}
+            </h2>
           </div>
           <button type="button" className="iconButton" onClick={onClose} title="Cerrar">
             ×
@@ -348,69 +358,25 @@ export default function NewActivityModal({
         </div>
 
         {/* SECCIÓN 1: Modalidad y Ubicación */}
-        <div className="formSection noTopBorder">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
-            <h3>Ubicación y Asignación de Lotes</h3>
-
-            {/* Selector interactivo de Modo Individual vs Múltiple */}
-            <div style={{ display: "flex", gap: "8px", background: "var(--slate-100)", padding: "3px", borderRadius: "8px" }}>
-              <button
-                type="button"
-                className={!isMultiLote ? "primaryButton" : "secondaryButton"}
-                style={{
-                  padding: "5px 12px",
-                  fontSize: "12px",
-                  borderRadius: "6px",
-                  border: 0,
-                  boxShadow: !isMultiLote ? "var(--shadow-sm)" : "none",
-                }}
-                onClick={() => {
-                  setIsMultiLote(false);
-                  const c = fixedCampo || "Aguilera";
-                  const lots = LOTES_POR_CAMPO[c] || ["Lote Único"];
-                  setForm((prev) => ({
-                    ...prev,
-                    esGrupal: false,
-                    campo: c,
-                    lote: lots[0],
-                  }));
-                }}
-              >
-                📍 Lote Individual
-              </button>
-              <button
-                type="button"
-                className={isMultiLote ? "primaryButton" : "secondaryButton"}
-                style={{
-                  padding: "5px 12px",
-                  fontSize: "12px",
-                  borderRadius: "6px",
-                  border: 0,
-                  boxShadow: isMultiLote ? "var(--shadow-sm)" : "none",
-                }}
-                onClick={() => {
-                  setIsMultiLote(true);
-                  setForm((prev) => ({
-                    ...prev,
-                    esGrupal: true,
-                    lotesAfectados: prev.lotesAfectados && prev.lotesAfectados.length > 0 ? prev.lotesAfectados : [],
-                  }));
-                }}
-              >
-                👥 Múltiples Lotes / Campos
-              </button>
+        {editingActivity ? (
+          /* MODO EDICIÓN DIRECTA: Vista limpia y enfocada en este trabajo específico */
+          <div className="formSection noTopBorder">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+              <h3 style={{ margin: 0 }}>Ubicación y Cultivo</h3>
+              <span className="pill badgeNeutral" style={{ fontSize: "12px", padding: "4px 10px" }}>
+                {isMultiLote
+                  ? `👥 Multilote (${(form.lotesAfectados || []).length} lotes)`
+                  : `📍 ${form.campo} · ${form.lote || "Lote único"}`}
+              </span>
             </div>
-          </div>
 
-          {/* MODO A: Lote Individual */}
-          {!isMultiLote ? (
             <div className="formGrid fourForm">
               <div>
                 <label>Campo</label>
                 <select
                   className="input"
                   value={form.campo}
-                  disabled={Boolean(fixedCampo && !editingActivity)}
+                  disabled={isMultiLote}
                   onChange={(e) => handleCampoChange(e.target.value)}
                 >
                   {CAMPOS_HJB.map((c) => (
@@ -422,17 +388,26 @@ export default function NewActivityModal({
               </div>
               <div>
                 <label>Lote</label>
-                <select
-                  className="input"
-                  value={form.lote || allLoteOptions[0]}
-                  onChange={(e) => set("lote", e.target.value)}
-                >
-                  {allLoteOptions.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
+                {isMultiLote ? (
+                  <input
+                    className="input"
+                    value={form.lote || "Múltiples lotes"}
+                    disabled
+                    title="Labor aplicada a múltiples lotes"
+                  />
+                ) : (
+                  <select
+                    className="input"
+                    value={form.lote || allLoteOptions[0]}
+                    onChange={(e) => set("lote", e.target.value)}
+                  >
+                    {allLoteOptions.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label>Campaña</label>
@@ -464,10 +439,112 @@ export default function NewActivityModal({
                 </datalist>
               </div>
             </div>
-          ) : (
-            /* MODO B: Múltiples Lotes / Campos con Checkboxes */
-            <div>
-              <div className="formGrid two" style={{ marginBottom: "14px" }}>
+
+            {isMultiLote && (form.lotesAfectados || []).length > 0 && (
+              <div
+                style={{
+                  marginTop: "12px",
+                  padding: "8px 12px",
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "6px",
+                  fontSize: "12.5px",
+                  color: "#166534",
+                }}
+              >
+                <strong>✓ Lotes asignados a esta labor: </strong>
+                {(form.lotesAfectados || []).join(" · ")}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* MODO CREACIÓN NUEVA LABOR: Selección de Lote Individual o Múltiples Lotes / Campos */
+          <div className="formSection noTopBorder">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+              <h3>Ubicación y Asignación de Lotes</h3>
+
+              {/* Selector interactivo de Modo Individual vs Múltiple */}
+              <div style={{ display: "flex", gap: "8px", background: "var(--slate-100)", padding: "3px", borderRadius: "8px" }}>
+                <button
+                  type="button"
+                  className={!isMultiLote ? "primaryButton" : "secondaryButton"}
+                  style={{
+                    padding: "5px 12px",
+                    fontSize: "12px",
+                    borderRadius: "6px",
+                    border: 0,
+                    boxShadow: !isMultiLote ? "var(--shadow-sm)" : "none",
+                  }}
+                  onClick={() => {
+                    setIsMultiLote(false);
+                    const c = fixedCampo || "Aguilera";
+                    const lots = LOTES_POR_CAMPO[c] || ["Lote Único"];
+                    setForm((prev) => ({
+                      ...prev,
+                      esGrupal: false,
+                      campo: c,
+                      lote: lots[0],
+                    }));
+                  }}
+                >
+                  📍 Lote Individual
+                </button>
+                <button
+                  type="button"
+                  className={isMultiLote ? "primaryButton" : "secondaryButton"}
+                  style={{
+                    padding: "5px 12px",
+                    fontSize: "12px",
+                    borderRadius: "6px",
+                    border: 0,
+                    boxShadow: isMultiLote ? "var(--shadow-sm)" : "none",
+                  }}
+                  onClick={() => {
+                    setIsMultiLote(true);
+                    setForm((prev) => ({
+                      ...prev,
+                      esGrupal: true,
+                      lotesAfectados: prev.lotesAfectados && prev.lotesAfectados.length > 0 ? prev.lotesAfectados : [],
+                    }));
+                  }}
+                >
+                  👥 Múltiples Lotes / Campos
+                </button>
+              </div>
+            </div>
+
+            {/* MODO A: Lote Individual */}
+            {!isMultiLote ? (
+              <div className="formGrid fourForm">
+                <div>
+                  <label>Campo</label>
+                  <select
+                    className="input"
+                    value={form.campo}
+                    disabled={Boolean(fixedCampo)}
+                    onChange={(e) => handleCampoChange(e.target.value)}
+                  >
+                    {CAMPOS_HJB.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label>Lote</label>
+                  <select
+                    className="input"
+                    value={form.lote || allLoteOptions[0]}
+                    onChange={(e) => set("lote", e.target.value)}
+                  >
+                    {allLoteOptions.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label>Campaña</label>
                   <select
@@ -483,154 +560,189 @@ export default function NewActivityModal({
                   </select>
                 </div>
                 <div>
-                  <label>Cultivo objetivo o destino</label>
+                  <label>Cultivo</label>
                   <input
                     className="input"
                     value={form.cultivo}
                     onChange={(e) => set("cultivo", e.target.value)}
-                    placeholder="ej: Barbecho químico, Maíz, Soja..."
+                    placeholder="ej: Maíz, Soja 2da..."
                     list="cultivos-preset"
                   />
+                  <datalist id="cultivos-preset">
+                    {CULTIVOS_PRESET.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
-
-              {/* Selector interactivo organizado por campos */}
-              <div
-                style={{
-                  padding: "14px",
-                  background: "var(--slate-50)",
-                  borderRadius: "10px",
-                  border: "1px solid var(--line)",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            ) : (
+              /* MODO B: Múltiples Lotes / Campos con Checkboxes */
+              <div>
+                <div className="formGrid two" style={{ marginBottom: "14px" }}>
                   <div>
-                    <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>
-                      Seleccioná los lotes a tratar conjuntamente:
-                    </strong>
-                    <span style={{ fontSize: "12px", color: "var(--muted)", display: "block" }}>
-                      Podés tildar lotes de diferentes campos. Las hectáreas se sumarán automáticamente.
-                    </span>
+                    <label>Campaña</label>
+                    <select
+                      className="input"
+                      value={form.campana}
+                      onChange={(e) => set("campana", e.target.value)}
+                    >
+                      {CAMPANAS_HJB.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <span className="pill badgeGreen" style={{ fontSize: "12px", padding: "4px 10px", fontWeight: 700 }}>
-                    {(form.lotesAfectados || []).length} lotes seleccionados
-                  </span>
+                  <div>
+                    <label>Cultivo objetivo o destino</label>
+                    <input
+                      className="input"
+                      value={form.cultivo}
+                      onChange={(e) => set("cultivo", e.target.value)}
+                      placeholder="ej: Barbecho químico, Maíz, Soja..."
+                      list="cultivos-preset"
+                    />
+                  </div>
                 </div>
 
+                {/* Selector interactivo organizado por campos */}
                 <div
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                    gap: "12px",
+                    padding: "14px",
+                    background: "var(--slate-50)",
+                    borderRadius: "10px",
+                    border: "1px solid var(--line)",
                   }}
                 >
-                  {CAMPOS_HJB.map((cName) => {
-                    const cLotes = allLotes.filter((l) => l.campo.toLowerCase() === cName.toLowerCase());
-                    const cKeys = cLotes.map((l) => `${l.campo} - ${l.nombre}`);
-                    const allChecked = cKeys.length > 0 && cKeys.every((k) => (form.lotesAfectados || []).includes(k));
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <div>
+                      <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>
+                        Seleccioná los lotes a tratar conjuntamente:
+                      </strong>
+                      <span style={{ fontSize: "12px", color: "var(--muted)", display: "block" }}>
+                        Podés tildar lotes de diferentes campos. Las hectáreas se sumarán automáticamente.
+                      </span>
+                    </div>
+                    <span className="pill badgeGreen" style={{ fontSize: "12px", padding: "4px 10px", fontWeight: 700 }}>
+                      {(form.lotesAfectados || []).length} lotes seleccionados
+                    </span>
+                  </div>
 
-                    return (
-                      <div
-                        key={cName}
-                        style={{
-                          background: "#ffffff",
-                          padding: "10px",
-                          borderRadius: "8px",
-                          border: "1px solid var(--line)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "6px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            borderBottom: "1px solid var(--slate-100)",
-                            paddingBottom: "4px",
-                          }}
-                        >
-                          <strong style={{ fontSize: "13px", color: "var(--brand-800)" }}>{cName}</strong>
-                          <button
-                            type="button"
-                            className="thResetBtn"
-                            style={{ fontSize: "10.5px", padding: "1px 4px" }}
-                            onClick={() => selectAllCampo(cName)}
-                          >
-                            {allChecked ? "Desmarcar" : "Tildar todos"}
-                          </button>
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "160px", overflowY: "auto" }}>
-                          {cLotes.map((lote) => {
-                            const key = `${lote.campo} - ${lote.nombre}`;
-                            const checked = (form.lotesAfectados || []).includes(key);
-
-                            return (
-                              <label
-                                key={key}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "6px",
-                                  fontSize: "12px",
-                                  cursor: "pointer",
-                                  color: checked ? "var(--slate-900)" : "var(--slate-600)",
-                                  fontWeight: checked ? 700 : 400,
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleLoteAfectado(key)}
-                                  style={{ cursor: "pointer" }}
-                                />
-                                <span>{lote.nombre}</span>
-                                {lote.superficieHa && (
-                                  <small style={{ color: "var(--muted)", marginLeft: "auto" }}>
-                                    {lote.superficieHa} ha
-                                  </small>
-                                )}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {(form.lotesAfectados || []).length > 0 && (
                   <div
                     style={{
-                      marginTop: "12px",
-                      padding: "8px 12px",
-                      background: "#f0fdf4",
-                      border: "1px solid #bbf7d0",
-                      borderRadius: "6px",
-                      fontSize: "12.5px",
-                      color: "#166534",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      flexWrap: "wrap",
-                      gap: "8px",
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                      gap: "12px",
                     }}
                   >
-                    <div>
-                      <strong>✓ Lotes afectados: </strong>
-                      {(form.lotesAfectados || []).join(" · ")}
-                    </div>
-                    <strong>
-                      Superficie acumulada: {form.superficiePlanificada || form.superficieReal || 0} ha
-                    </strong>
+                    {CAMPOS_HJB.map((cName) => {
+                      const cLotes = allLotes.filter((l) => l.campo.toLowerCase() === cName.toLowerCase());
+                      const cKeys = cLotes.map((l) => `${l.campo} - ${l.nombre}`);
+                      const allChecked = cKeys.length > 0 && cKeys.every((k) => (form.lotesAfectados || []).includes(k));
+
+                      return (
+                        <div
+                          key={cName}
+                          style={{
+                            background: "#ffffff",
+                            padding: "10px",
+                            borderRadius: "8px",
+                            border: "1px solid var(--line)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              borderBottom: "1px solid var(--slate-100)",
+                              paddingBottom: "4px",
+                            }}
+                          >
+                            <strong style={{ fontSize: "13px", color: "var(--brand-800)" }}>{cName}</strong>
+                            <button
+                              type="button"
+                              className="thResetBtn"
+                              style={{ fontSize: "10.5px", padding: "1px 4px" }}
+                              onClick={() => selectAllCampo(cName)}
+                            >
+                              {allChecked ? "Desmarcar" : "Tildar todos"}
+                            </button>
+                          </div>
+
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "160px", overflowY: "auto" }}>
+                            {cLotes.map((lote) => {
+                              const key = `${lote.campo} - ${lote.nombre}`;
+                              const checked = (form.lotesAfectados || []).includes(key);
+
+                              return (
+                                <label
+                                  key={key}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    fontSize: "12px",
+                                    cursor: "pointer",
+                                    color: checked ? "var(--slate-900)" : "var(--slate-600)",
+                                    fontWeight: checked ? 700 : 400,
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleLoteAfectado(key)}
+                                    style={{ cursor: "pointer" }}
+                                  />
+                                  <span>{lote.nombre}</span>
+                                  {lote.superficieHa && (
+                                    <small style={{ color: "var(--muted)", marginLeft: "auto" }}>
+                                      {lote.superficieHa} ha
+                                    </small>
+                                  )}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
+
+                  {(form.lotesAfectados || []).length > 0 && (
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        padding: "8px 12px",
+                        background: "#f0fdf4",
+                        border: "1px solid #bbf7d0",
+                        borderRadius: "6px",
+                        fontSize: "12.5px",
+                        color: "#166534",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                      }}
+                    >
+                      <div>
+                        <strong>✓ Lotes afectados: </strong>
+                        {(form.lotesAfectados || []).join(" · ")}
+                      </div>
+                      <strong>
+                        Superficie acumulada: {form.superficiePlanificada || form.superficieReal || 0} ha
+                      </strong>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* SECCIÓN 2: Labor, Estado y Método */}
         <div className="formSection">
