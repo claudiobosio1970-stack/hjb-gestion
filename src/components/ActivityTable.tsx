@@ -388,10 +388,15 @@ export default function ActivityTable({
                         ) : null}
                         {activity.esGrupal && (
                           <span className="groupBadge" title={activity.lotesAfectados?.join(", ")}>
-                            👥 Grupal
+                            👥 Grupal ({activity.lotesAfectados?.length || 0} lotes)
                           </span>
                         )}
                       </div>
+                      {activity.esGrupal && activity.lotesAfectados && activity.lotesAfectados.length > 0 && (
+                        <div style={{ fontSize: "11px", color: "var(--brand-700)", marginTop: "2px", lineHeight: 1.25 }}>
+                          {activity.lotesAfectados.join(" · ")}
+                        </div>
+                      )}
                     </td>
 
                     {/* Cultivo */}

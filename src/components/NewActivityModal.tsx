@@ -110,6 +110,10 @@ export default function NewActivityModal({
 
   const [form, setForm] = useState<Activity>(emptyActivity(initialCampo, initialLote, initialCampana));
   const [showProduccion, setShowProduccion] = useState(false);
+  const [isMultiLote, setIsMultiLote] = useState(false);
+
+  // Lista de todos los lotes configurados en la app
+  const allLotes = agricultureData.listLotes();
 
   useEffect(() => {
     if (!open) return;
@@ -118,6 +122,11 @@ export default function NewActivityModal({
         ...editingActivity,
         insumos: editingActivity.insumos || [],
       });
+      const isGroup = Boolean(
+        editingActivity.esGrupal ||
+        (editingActivity.lotesAfectados && editingActivity.lotesAfectados.length > 1)
+      );
+      setIsMultiLote(isGroup);
       setShowProduccion(
         Boolean(
           editingActivity.produccion &&
@@ -132,6 +141,7 @@ export default function NewActivityModal({
       const lots = LOTES_POR_CAMPO[c] || ["Lote Único"];
       const newAct = emptyActivity(c, fixedLote || lots[0], fixedCampana || "2026/27");
       setForm(newAct);
+      setIsMultiLote(false);
       setShowProduccion(false);
     }
   }, [open, fixedCampo, fixedLote, fixedCampana, editingActivity]);
@@ -152,6 +162,67 @@ export default function NewActivityModal({
       campo: nuevoCampo,
       lote: nuevosLotes[0],
       cultivo: nuevoCampo === "Tambo" ? "Maíz Silo" : prev.cultivo || "Maíz",
+    }));
+  }
+
+  // Lógica interactiva de selección de múltiples lotes
+  function toggleLoteAfectado(loteKey: string) {
+    const current = form.lotesAfectados || [];
+    const exists = current.includes(loteKey);
+    const updated = exists ? current.filter((k) => k !== loteKey) : [...current, loteKey];
+
+    const totalHa = updated.reduce((sum, key) => {
+      const match = allLotes.find((l) => `${l.campo} - ${l.nombre}` === key);
+      return sum + (match?.superficieHa || 0);
+    }, 0);
+
+    const camposInvolucrados = Array.from(new Set(updated.map((k) => k.split(" - ")[0])));
+    const campoLabel = camposInvolucrados.length === 1 ? camposInvolucrados[0] : "Multicampo";
+    const lotesLabel = updated.map((k) => k.replace(" - ", " ")).join(", ");
+
+    setForm((prev) => ({
+      ...prev,
+      esGrupal: true,
+      lotesAfectados: updated,
+      campo: campoLabel || prev.campo,
+      lote: lotesLabel || "Múltiples Lotes",
+      superficiePlanificada: totalHa > 0 ? totalHa : prev.superficiePlanificada,
+      superficieReal: prev.estado === "Realizada" && totalHa > 0 ? totalHa : prev.superficieReal,
+      superficieNota: updated.length > 0 ? `Multilote (${updated.length} lotes: ${camposInvolucrados.join(", ")})` : "",
+    }));
+  }
+
+  function selectAllCampo(campoName: string) {
+    const lotesDeEsteCampo = allLotes.filter((l) => l.campo.toLowerCase() === campoName.toLowerCase());
+    const keysDeEsteCampo = lotesDeEsteCampo.map((l) => `${l.campo} - ${l.nombre}`);
+    const current = form.lotesAfectados || [];
+    const allSelected = keysDeEsteCampo.length > 0 && keysDeEsteCampo.every((k) => current.includes(k));
+
+    let updated: string[];
+    if (allSelected) {
+      updated = current.filter((k) => !keysDeEsteCampo.includes(k));
+    } else {
+      updated = Array.from(new Set([...current, ...keysDeEsteCampo]));
+    }
+
+    const totalHa = updated.reduce((sum, key) => {
+      const match = allLotes.find((l) => `${l.campo} - ${l.nombre}` === key);
+      return sum + (match?.superficieHa || 0);
+    }, 0);
+
+    const camposInvolucrados = Array.from(new Set(updated.map((k) => k.split(" - ")[0])));
+    const campoLabel = camposInvolucrados.length === 1 ? camposInvolucrados[0] : "Multicampo";
+    const lotesLabel = updated.map((k) => k.replace(" - ", " ")).join(", ");
+
+    setForm((prev) => ({
+      ...prev,
+      esGrupal: true,
+      lotesAfectados: updated,
+      campo: campoLabel || prev.campo,
+      lote: lotesLabel || "Múltiples Lotes",
+      superficiePlanificada: totalHa > 0 ? totalHa : prev.superficiePlanificada,
+      superficieReal: prev.estado === "Realizada" && totalHa > 0 ? totalHa : prev.superficieReal,
+      superficieNota: updated.length > 0 ? `Multilote (${updated.length} lotes: ${camposInvolucrados.join(", ")})` : "",
     }));
   }
 
@@ -205,6 +276,11 @@ export default function NewActivityModal({
       return;
     }
 
+    if (isMultiLote && (!form.lotesAfectados || form.lotesAfectados.length === 0)) {
+      alert("Por favor marcá al menos un lote para la labor grupal.");
+      return;
+    }
+
     const activeSup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
     if (activeSup === null && form.superficieReal === null && form.superficiePlanificada === null) {
       alert("Por favor ingresá la superficie trabajada (en hectáreas).");
@@ -215,8 +291,10 @@ export default function NewActivityModal({
     const activityToSave: Activity = {
       ...form,
       id: form.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `act-${Date.now()}`),
-      campo: form.campo,
-      lote: form.lote || "Lote Único",
+      campo: isMultiLote ? (form.campo || "Multicampo") : form.campo,
+      lote: isMultiLote ? (form.lote || (form.lotesAfectados || []).join(", ")) : (form.lote || "Lote Único"),
+      esGrupal: isMultiLote ? true : false,
+      lotesAfectados: isMultiLote ? form.lotesAfectados : undefined,
       fechaPlanificada: form.fechaPlanificada || form.fechaReal || "",
       fechaReal: isReal ? (form.fechaReal || form.fechaPlanificada) : form.fechaReal,
       superficiePlanificada: form.superficiePlanificada ?? form.superficieReal ?? null,
@@ -260,78 +338,298 @@ export default function NewActivityModal({
         <div className="modalHeader">
           <div>
             <p className="eyebrow" style={{ color: "var(--brand-700)", fontWeight: 700 }}>
-              {form.campo} · {form.lote || "Lote"} · Campaña {form.campana}
+              {isMultiLote ? `👥 Labor Grupal (${(form.lotesAfectados || []).length} lotes)` : `${form.campo} · ${form.lote || "Lote"}`} · Campaña {form.campana}
             </p>
-            <h2>{editingActivity ? "Editar labor / actividad agrícola" : "Registrar nueva labor / actividad"}</h2>
+            <h2>{editingActivity ? "Editar labor / actividad agrícola" : "Registrar labor agrícola"}</h2>
           </div>
           <button type="button" className="iconButton" onClick={onClose} title="Cerrar">
             ×
           </button>
         </div>
 
-        {/* SECCIÓN 1: Ubicación, Campaña y Cultivo */}
+        {/* SECCIÓN 1: Modalidad y Ubicación */}
         <div className="formSection noTopBorder">
-          <h3>Ubicación y Período</h3>
-          <div className="formGrid fourForm">
-            <div>
-              <label>Campo</label>
-              <select
-                className="input"
-                value={form.campo}
-                disabled={Boolean(fixedCampo && !editingActivity)}
-                onChange={(e) => handleCampoChange(e.target.value)}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+            <h3>Ubicación y Asignación de Lotes</h3>
+
+            {/* Selector interactivo de Modo Individual vs Múltiple */}
+            <div style={{ display: "flex", gap: "8px", background: "var(--slate-100)", padding: "3px", borderRadius: "8px" }}>
+              <button
+                type="button"
+                className={!isMultiLote ? "primaryButton" : "secondaryButton"}
+                style={{
+                  padding: "5px 12px",
+                  fontSize: "12px",
+                  borderRadius: "6px",
+                  border: 0,
+                  boxShadow: !isMultiLote ? "var(--shadow-sm)" : "none",
+                }}
+                onClick={() => {
+                  setIsMultiLote(false);
+                  const c = fixedCampo || "Aguilera";
+                  const lots = LOTES_POR_CAMPO[c] || ["Lote Único"];
+                  setForm((prev) => ({
+                    ...prev,
+                    esGrupal: false,
+                    campo: c,
+                    lote: lots[0],
+                  }));
+                }}
               >
-                {CAMPOS_HJB.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label>Lote</label>
-              <select
-                className="input"
-                value={form.lote || allLoteOptions[0]}
-                onChange={(e) => set("lote", e.target.value)}
+                📍 Lote Individual
+              </button>
+              <button
+                type="button"
+                className={isMultiLote ? "primaryButton" : "secondaryButton"}
+                style={{
+                  padding: "5px 12px",
+                  fontSize: "12px",
+                  borderRadius: "6px",
+                  border: 0,
+                  boxShadow: isMultiLote ? "var(--shadow-sm)" : "none",
+                }}
+                onClick={() => {
+                  setIsMultiLote(true);
+                  setForm((prev) => ({
+                    ...prev,
+                    esGrupal: true,
+                    lotesAfectados: prev.lotesAfectados && prev.lotesAfectados.length > 0 ? prev.lotesAfectados : [],
+                  }));
+                }}
               >
-                {allLoteOptions.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label>Campaña</label>
-              <select
-                className="input"
-                value={form.campana}
-                onChange={(e) => set("campana", e.target.value)}
-              >
-                {CAMPANAS_HJB.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label>Cultivo</label>
-              <input
-                className="input"
-                value={form.cultivo}
-                onChange={(e) => set("cultivo", e.target.value)}
-                placeholder="ej: Maíz, Soja 2da..."
-                list="cultivos-preset"
-              />
-              <datalist id="cultivos-preset">
-                {CULTIVOS_PRESET.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
+                👥 Múltiples Lotes / Campos
+              </button>
             </div>
           </div>
+
+          {/* MODO A: Lote Individual */}
+          {!isMultiLote ? (
+            <div className="formGrid fourForm">
+              <div>
+                <label>Campo</label>
+                <select
+                  className="input"
+                  value={form.campo}
+                  disabled={Boolean(fixedCampo && !editingActivity)}
+                  onChange={(e) => handleCampoChange(e.target.value)}
+                >
+                  {CAMPOS_HJB.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label>Lote</label>
+                <select
+                  className="input"
+                  value={form.lote || allLoteOptions[0]}
+                  onChange={(e) => set("lote", e.target.value)}
+                >
+                  {allLoteOptions.map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label>Campaña</label>
+                <select
+                  className="input"
+                  value={form.campana}
+                  onChange={(e) => set("campana", e.target.value)}
+                >
+                  {CAMPANAS_HJB.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label>Cultivo</label>
+                <input
+                  className="input"
+                  value={form.cultivo}
+                  onChange={(e) => set("cultivo", e.target.value)}
+                  placeholder="ej: Maíz, Soja 2da..."
+                  list="cultivos-preset"
+                />
+                <datalist id="cultivos-preset">
+                  {CULTIVOS_PRESET.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+          ) : (
+            /* MODO B: Múltiples Lotes / Campos con Checkboxes */
+            <div>
+              <div className="formGrid two" style={{ marginBottom: "14px" }}>
+                <div>
+                  <label>Campaña</label>
+                  <select
+                    className="input"
+                    value={form.campana}
+                    onChange={(e) => set("campana", e.target.value)}
+                  >
+                    {CAMPANAS_HJB.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label>Cultivo objetivo o destino</label>
+                  <input
+                    className="input"
+                    value={form.cultivo}
+                    onChange={(e) => set("cultivo", e.target.value)}
+                    placeholder="ej: Barbecho químico, Maíz, Soja..."
+                    list="cultivos-preset"
+                  />
+                </div>
+              </div>
+
+              {/* Selector interactivo organizado por campos */}
+              <div
+                style={{
+                  padding: "14px",
+                  background: "var(--slate-50)",
+                  borderRadius: "10px",
+                  border: "1px solid var(--line)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <div>
+                    <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>
+                      Seleccioná los lotes a tratar conjuntamente:
+                    </strong>
+                    <span style={{ fontSize: "12px", color: "var(--muted)", display: "block" }}>
+                      Podés tildar lotes de diferentes campos. Las hectáreas se sumarán automáticamente.
+                    </span>
+                  </div>
+                  <span className="pill badgeGreen" style={{ fontSize: "12px", padding: "4px 10px", fontWeight: 700 }}>
+                    {(form.lotesAfectados || []).length} lotes seleccionados
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                    gap: "12px",
+                  }}
+                >
+                  {CAMPOS_HJB.map((cName) => {
+                    const cLotes = allLotes.filter((l) => l.campo.toLowerCase() === cName.toLowerCase());
+                    const cKeys = cLotes.map((l) => `${l.campo} - ${l.nombre}`);
+                    const allChecked = cKeys.length > 0 && cKeys.every((k) => (form.lotesAfectados || []).includes(k));
+
+                    return (
+                      <div
+                        key={cName}
+                        style={{
+                          background: "#ffffff",
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--line)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            borderBottom: "1px solid var(--slate-100)",
+                            paddingBottom: "4px",
+                          }}
+                        >
+                          <strong style={{ fontSize: "13px", color: "var(--brand-800)" }}>{cName}</strong>
+                          <button
+                            type="button"
+                            className="thResetBtn"
+                            style={{ fontSize: "10.5px", padding: "1px 4px" }}
+                            onClick={() => selectAllCampo(cName)}
+                          >
+                            {allChecked ? "Desmarcar" : "Tildar todos"}
+                          </button>
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "160px", overflowY: "auto" }}>
+                          {cLotes.map((lote) => {
+                            const key = `${lote.campo} - ${lote.nombre}`;
+                            const checked = (form.lotesAfectados || []).includes(key);
+
+                            return (
+                              <label
+                                key={key}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  fontSize: "12px",
+                                  cursor: "pointer",
+                                  color: checked ? "var(--slate-900)" : "var(--slate-600)",
+                                  fontWeight: checked ? 700 : 400,
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleLoteAfectado(key)}
+                                  style={{ cursor: "pointer" }}
+                                />
+                                <span>{lote.nombre}</span>
+                                {lote.superficieHa && (
+                                  <small style={{ color: "var(--muted)", marginLeft: "auto" }}>
+                                    {lote.superficieHa} ha
+                                  </small>
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {(form.lotesAfectados || []).length > 0 && (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      padding: "8px 12px",
+                      background: "#f0fdf4",
+                      border: "1px solid #bbf7d0",
+                      borderRadius: "6px",
+                      fontSize: "12.5px",
+                      color: "#166534",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: "8px",
+                    }}
+                  >
+                    <div>
+                      <strong>✓ Lotes afectados: </strong>
+                      {(form.lotesAfectados || []).join(" · ")}
+                    </div>
+                    <strong>
+                      Superficie acumulada: {form.superficiePlanificada || form.superficieReal || 0} ha
+                    </strong>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* SECCIÓN 2: Labor, Estado y Método */}
@@ -406,7 +704,7 @@ export default function NewActivityModal({
 
         {/* SECCIÓN 3: Fechas y Superficie */}
         <div className="formSection">
-          <h3>Fechas y Superficie</h3>
+          <h3>Fechas y Superficie Total</h3>
           <div className="formGrid two">
             {/* Campo Fecha Flexible */}
             <div>
@@ -460,6 +758,7 @@ export default function NewActivityModal({
             <div>
               <label>
                 Superficie {isReal ? "Realizada (ha)" : "Planificada (ha)"}
+                {isMultiLote && " — Suma de lotes"}
               </label>
               <input
                 type="number"
@@ -477,7 +776,7 @@ export default function NewActivityModal({
                     set("superficiePlanificada", val);
                   }
                 }}
-                placeholder="Hectáreas"
+                placeholder="Hectáreas totales"
               />
 
               <input
@@ -486,7 +785,7 @@ export default function NewActivityModal({
                 style={{ marginTop: "6px", fontSize: "12px" }}
                 value={form.superficieNota || ""}
                 onChange={(e) => set("superficieNota", e.target.value)}
-                placeholder="Aclaración de superficie (opc, ej: 'Estimado sobre 45 ha')"
+                placeholder="Aclaración de superficie (ej: 'Multilote', 'Cabeceras', etc.)"
               />
             </div>
           </div>
@@ -531,7 +830,7 @@ export default function NewActivityModal({
             <div>
               <h3>Insumos y Dosis</h3>
               <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
-                Productos, fertilizantes, semillas o agroquímicos aplicados.
+                Productos, fertilizantes, semillas o agroquímicos aplicados sobre la superficie seleccionada.
               </p>
             </div>
             <button type="button" className="secondaryButton smallButton" onClick={addInput}>
@@ -545,108 +844,135 @@ export default function NewActivityModal({
             </div>
           ) : (
             <div className="inputLines">
-              {form.insumos.map((input, idx) => (
-                <div key={input.id} className="inputLineCard">
-                  <div className="inputLineHeader">
-                    <strong>Insumo #{idx + 1}</strong>
-                    <button
-                      type="button"
-                      className="textDanger"
-                      onClick={() => removeInput(input.id)}
-                      title="Eliminar este insumo"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
+              {form.insumos.map((input, idx) => {
+                const supActiva = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                const dosisActiva = isReal ? (input.dosisReal ?? input.dosisPlanificada) : input.dosisPlanificada;
+                const calculoSugerido = supActiva && dosisActiva ? (supActiva * dosisActiva).toFixed(1) : null;
 
-                  <div className="formGrid fourForm">
-                    <div>
-                      <label>Producto / Semilla / Fertilizante</label>
-                      <input
-                        className="input"
-                        value={input.producto}
-                        onChange={(e) => updateInput(input.id, { producto: e.target.value })}
-                        placeholder="Nombre producto"
-                        list="productos-preset"
-                      />
-                    </div>
-                    <div>
-                      <label>Dosis por ha</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="input"
-                        value={
-                          (isReal ? input.dosisReal ?? input.dosisPlanificada : input.dosisPlanificada) ?? ""
-                        }
-                        onChange={(e) => {
-                          const val = e.target.value ? Number(e.target.value) : null;
-                          if (isReal) {
-                            updateInput(input.id, { dosisReal: val, dosisPlanificada: input.dosisPlanificada ?? val });
-                          } else {
-                            updateInput(input.id, { dosisPlanificada: val });
-                          }
-                        }}
-                        placeholder="Dosis"
-                      />
-                    </div>
-                    <div>
-                      <label>Unidad de dosis</label>
-                      <select
-                        className="input"
-                        value={input.unidad}
-                        onChange={(e) => updateInput(input.id, { unidad: e.target.value })}
+                return (
+                  <div key={input.id} className="inputLineCard">
+                    <div className="inputLineHeader">
+                      <strong>Insumo #{idx + 1}</strong>
+                      <button
+                        type="button"
+                        className="textDanger"
+                        onClick={() => removeInput(input.id)}
+                        title="Eliminar este insumo"
                       >
-                        <option value="kg/ha">kg/ha</option>
-                        <option value="L/ha">L/ha</option>
-                        <option value="kL/ha">kL/ha (Efluente líq.)</option>
-                        <option value="t/ha">t/ha (Estiércol sól.)</option>
-                        <option value="g/ha">g/ha</option>
-                        <option value="cc/ha">cc/ha</option>
-                        <option value="bolsas/ha">bolsas/ha</option>
-                      </select>
+                        Eliminar
+                      </button>
                     </div>
-                    <div>
-                      <label>Cantidad Total (opcional)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="input"
-                        value={input.cantidadTotal ?? ""}
-                        onChange={(e) => updateInput(input.id, { cantidadTotal: e.target.value ? Number(e.target.value) : null })}
-                        placeholder="Total aplicado"
-                      />
-                    </div>
-                  </div>
 
-                  <div className="formGrid two" style={{ marginTop: "8px" }}>
-                    <div>
-                      <label style={{ fontSize: "11px", color: "var(--slate-600)" }}>
-                        Observación del insumo (opcional)
-                      </label>
-                      <input
-                        className="input"
-                        value={input.observacion || ""}
-                        onChange={(e) => updateInput(input.id, { observacion: e.target.value })}
-                        placeholder="ej: Dosis calculada s/análisis, en cabeceras..."
-                        style={{ fontSize: "12px" }}
-                      />
+                    <div className="formGrid fourForm">
+                      <div>
+                        <label>Producto / Semilla / Fertilizante</label>
+                        <input
+                          className="input"
+                          value={input.producto}
+                          onChange={(e) => updateInput(input.id, { producto: e.target.value })}
+                          placeholder="Nombre producto"
+                          list="productos-preset"
+                        />
+                      </div>
+                      <div>
+                        <label>Dosis por ha</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input"
+                          value={
+                            (isReal ? input.dosisReal ?? input.dosisPlanificada : input.dosisPlanificada) ?? ""
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value ? Number(e.target.value) : null;
+                            const totalSugerido = val && supActiva ? Number((val * supActiva).toFixed(2)) : input.cantidadTotal;
+                            if (isReal) {
+                              updateInput(input.id, {
+                                dosisReal: val,
+                                dosisPlanificada: input.dosisPlanificada ?? val,
+                                cantidadTotal: totalSugerido,
+                              });
+                            } else {
+                              updateInput(input.id, {
+                                dosisPlanificada: val,
+                                cantidadTotal: totalSugerido,
+                              });
+                            }
+                          }}
+                          placeholder="Dosis"
+                        />
+                      </div>
+                      <div>
+                        <label>Unidad de dosis</label>
+                        <select
+                          className="input"
+                          value={input.unidad}
+                          onChange={(e) => updateInput(input.id, { unidad: e.target.value })}
+                        >
+                          <option value="kg/ha">kg/ha</option>
+                          <option value="L/ha">L/ha</option>
+                          <option value="kL/ha">kL/ha (Efluente líq.)</option>
+                          <option value="t/ha">t/ha (Estiércol sól.)</option>
+                          <option value="g/ha">g/ha</option>
+                          <option value="cc/ha">cc/ha</option>
+                          <option value="bolsas/ha">bolsas/ha</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <label style={{ margin: 0 }}>Cantidad Total</label>
+                          {calculoSugerido && (
+                            <button
+                              type="button"
+                              className="thResetBtn"
+                              style={{ fontSize: "10px", padding: "1px 4px" }}
+                              onClick={() => updateInput(input.id, { cantidadTotal: Number(calculoSugerido) })}
+                              title="Calcular dosis × superficie total"
+                            >
+                              = {calculoSugerido}
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="input"
+                          value={input.cantidadTotal ?? ""}
+                          onChange={(e) => updateInput(input.id, { cantidadTotal: e.target.value ? Number(e.target.value) : null })}
+                          placeholder="Total aplicado"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ fontSize: "11px", color: "var(--slate-600)" }}>
-                        Unidad de cantidad total (opcional)
-                      </label>
-                      <input
-                        className="input"
-                        value={input.unidadTotal || ""}
-                        onChange={(e) => updateInput(input.id, { unidadTotal: e.target.value })}
-                        placeholder="ej: kg, L, litros, bolsas, tn"
-                        style={{ fontSize: "12px" }}
-                      />
+
+                    <div className="formGrid two" style={{ marginTop: "8px" }}>
+                      <div>
+                        <label style={{ fontSize: "11px", color: "var(--slate-600)" }}>
+                          Observación del insumo (opcional)
+                        </label>
+                        <input
+                          className="input"
+                          value={input.observacion || ""}
+                          onChange={(e) => updateInput(input.id, { observacion: e.target.value })}
+                          placeholder="ej: Dosis calculada s/análisis, en cabeceras..."
+                          style={{ fontSize: "12px" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "11px", color: "var(--slate-600)" }}>
+                          Unidad de cantidad total (opcional)
+                        </label>
+                        <input
+                          className="input"
+                          value={input.unidadTotal || ""}
+                          onChange={(e) => updateInput(input.id, { unidadTotal: e.target.value })}
+                          placeholder="ej: kg, L, litros, bolsas, tn"
+                          style={{ fontSize: "12px" }}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

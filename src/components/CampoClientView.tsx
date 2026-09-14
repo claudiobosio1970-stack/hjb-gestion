@@ -51,10 +51,17 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
 
   function refresh() {
     const all = agricultureData.listActivities();
-    setActivities(all.filter((x) => x.campo.toLowerCase() === campoNombre.toLowerCase()));
+    const cLower = campoNombre.toLowerCase();
+    setActivities(
+      all.filter((x) => {
+        if (x.campo.toLowerCase() === cLower) return true;
+        if (x.esGrupal && x.lotesAfectados?.some((la) => la.toLowerCase().includes(cLower))) return true;
+        return false;
+      })
+    );
     setLotes(agricultureData.listLotes(campoNombre));
-    setSoils(agricultureData.listSoilAnalyses().filter((x) => x.campo.toLowerCase() === campoNombre.toLowerCase()));
-    setDocuments(agricultureData.listDocuments().filter((x) => x.campo.toLowerCase() === campoNombre.toLowerCase()));
+    setSoils(agricultureData.listSoilAnalyses().filter((x) => x.campo.toLowerCase() === cLower));
+    setDocuments(agricultureData.listDocuments().filter((x) => x.campo.toLowerCase() === cLower));
   }
 
   useEffect(() => {
