@@ -1,10 +1,12 @@
 "use client";
 
 export type CategoriaValor =
-  | "Macro & Combustibles"
-  | "Granos & Concentrados"
+  | "Granos"
+  | "Pellets & Concentrados"
+  | "Líquidos de Fumigación"
   | "Ensilajes & Pasturas"
-  | "Rollos Forrajeros";
+  | "Rollos Forrajeros"
+  | "Macro & Combustibles";
 
 export type FuenteValor =
   | "API DolarApi"
@@ -44,69 +46,81 @@ function toArs(usd: number | null, tc: number, decimals: number = 2): number | n
 
 export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   // ==========================================
-  // 1. MACROECONOMÍA Y COMBUSTIBLE
+  // 1. GRANOS
   // ==========================================
   {
-    id: "inflacion",
-    nombre: "Inflación",
-    categoria: "Macro & Combustibles",
-    valorArs: 2.1,
-    valorUsd: 2.1,
-    unidadArs: "%",
-    unidadUsd: "%",
-    fuente: "API ArgentinaDatos",
+    id: "maiz",
+    nombre: "Maíz",
+    categoria: "Granos",
+    valorArs: 295200,
+    valorUsd: 197.13,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
     esEditableManual: true,
-    nota: "Índice de Precios al Consumidor (IPC)",
-    fechaActualizacion: "18/8/26",
+    nota: "Equiv: $295,20 / kg para mixer",
+    fechaActualizacion: "14/9/26",
   },
   {
-    id: "dolar-bna",
-    nombre: "Dólar BNA (Divisas venta)",
-    categoria: "Macro & Combustibles",
-    valorArs: 1495,
-    valorUsd: 1.0,
-    unidadArs: "$",
-    unidadUsd: "USD",
-    fuente: "API DolarApi",
+    id: "soja",
+    nombre: "Soja",
+    categoria: "Granos",
+    valorArs: 555000,
+    valorUsd: 370.62,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
     esEditableManual: true,
-    nota: "Tipo de cambio oficial BNA para liquidaciones y paridad",
-    fechaActualizacion: "18/8/26",
+    nota: "Equiv: $555 / kg",
+    fechaActualizacion: "14/9/26",
   },
   {
-    id: "gasoil",
-    nombre: "Gas oil",
-    categoria: "Macro & Combustibles",
-    valorArs: 2200,
-    valorUsd: toUsd(2200, BASE_TC, 2),
-    unidadArs: "$/lt",
-    unidadUsd: "USD/lt",
-    fuente: "API Secretaría de Energía",
+    id: "trigo",
+    nombre: "Trigo",
+    categoria: "Granos",
+    valorArs: 344655,
+    valorUsd: 230.15,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
     esEditableManual: true,
-    nota: "Gas Oil Grado 2 para maquinaria y laboreos",
-    fechaActualizacion: "18/8/26",
+    nota: "Equiv: $344,65 / kg",
+    fechaActualizacion: "14/9/26",
+  },
+  {
+    id: "sorgo",
+    nombre: "Sorgo",
+    categoria: "Granos",
+    valorArs: 275700,
+    valorUsd: 184.11,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
+    esEditableManual: true,
+    nota: "Equiv: $275,70 / kg",
+    fechaActualizacion: "14/9/26",
+  },
+  {
+    id: "girasol",
+    nombre: "Girasol",
+    categoria: "Granos",
+    valorArs: 756743,
+    valorUsd: 505.34,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
+    esEditableManual: true,
+    nota: "Equiv: $756,74 / kg",
+    fechaActualizacion: "14/9/26",
   },
 
   // ==========================================
-  // 2. GRANOS & CONCENTRADOS (DIETAS Y PIZARRA)
-  // Cada insumo figura UNA SOLA VEZ
+  // 2. PELLETS & CONCENTRADOS
   // ==========================================
-  {
-    id: "maiz-kg",
-    nombre: "Maíz (Mixer)",
-    categoria: "Granos & Concentrados",
-    valorArs: 273,
-    valorUsd: toUsd(273, BASE_TC, 3),
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Grano de maíz puesto en mixer",
-    fechaActualizacion: "18/8/26",
-  },
   {
     id: "pellet-soja",
     nombre: "Pellet de soja",
-    categoria: "Granos & Concentrados",
+    categoria: "Pellets & Concentrados",
     valorArs: 404,
     valorUsd: 0.27,
     unidadArs: "$/kg",
@@ -119,7 +133,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   {
     id: "pellet-trigo",
     nombre: "Pellet de trigo",
-    categoria: "Granos & Concentrados",
+    categoria: "Pellets & Concentrados",
     valorArs: 222,
     valorUsd: toUsd(222, BASE_TC, 3),
     unidadArs: "$/kg",
@@ -133,7 +147,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   {
     id: "semilla-algodon",
     nombre: "Semilla de algodón",
-    categoria: "Granos & Concentrados",
+    categoria: "Pellets & Concentrados",
     valorArs: 255,
     valorUsd: toUsd(255, BASE_TC, 3),
     unidadArs: "$/kg",
@@ -143,75 +157,104 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     nota: "Semilla de algodón puesta en tambo con flete incluido (Equiv. $255.000 / Tn)",
     fechaActualizacion: "18/8/26",
   },
+
+  // ==========================================
+  // 3. LÍQUIDOS DE FUMIGACIÓN
+  // ==========================================
   {
-    id: "soja-pizarra",
-    nombre: "Soja Rosario (Pizarra BCR)",
-    categoria: "Granos & Concentrados",
-    valorArs: 555000,
-    valorUsd: 370.62,
-    unidadArs: "$/Tn",
-    unidadUsd: "USD/Tn",
-    fuente: "API Granos.ar (Pizarra BCR)",
+    id: "glifosato",
+    nombre: "Glifosato",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 7475,
+    valorUsd: 5.0,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
-    fechaActualizacion: "14/9/26",
+    nota: "Herbicida sistémico concentrado soluble",
+    fechaActualizacion: "18/8/26",
   },
   {
-    id: "maiz-pizarra",
-    nombre: "Maíz Rosario (Pizarra BCR)",
-    categoria: "Granos & Concentrados",
-    valorArs: 295200,
-    valorUsd: 197.13,
-    unidadArs: "$/Tn",
-    unidadUsd: "USD/Tn",
-    fuente: "API Granos.ar (Pizarra BCR)",
+    id: "atrazina",
+    nombre: "Atrazina",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 8225,
+    valorUsd: 5.5,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
-    fechaActualizacion: "14/9/26",
+    nota: "Herbicida selectivo para maíz y sorgo",
+    fechaActualizacion: "18/8/26",
   },
   {
-    id: "trigo-pizarra",
-    nombre: "Trigo Rosario (Pizarra BCR)",
-    categoria: "Granos & Concentrados",
-    valorArs: 344655,
-    valorUsd: 230.15,
-    unidadArs: "$/Tn",
-    unidadUsd: "USD/Tn",
-    fuente: "API Granos.ar (Pizarra BCR)",
+    id: "dos-cuatro-d",
+    nombre: "2,4-D",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 8970,
+    valorUsd: 6.0,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
-    fechaActualizacion: "14/9/26",
+    nota: "Herbicida hormonal para hoja ancha",
+    fechaActualizacion: "18/8/26",
   },
   {
-    id: "sorgo-pizarra",
-    nombre: "Sorgo Rosario (Pizarra BCR)",
-    categoria: "Granos & Concentrados",
-    valorArs: 275700,
-    valorUsd: 184.11,
-    unidadArs: "$/Tn",
-    unidadUsd: "USD/Tn",
-    fuente: "API Granos.ar (Pizarra BCR)",
+    id: "coadyuvante",
+    nombre: "Coadyuvante",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 5230,
+    valorUsd: 3.5,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
-    fechaActualizacion: "14/9/26",
+    nota: "Tensioactivo / humectante / antievaporante",
+    fechaActualizacion: "18/8/26",
   },
   {
-    id: "girasol-pizarra",
-    nombre: "Girasol Rosario (Pizarra BCR)",
-    categoria: "Granos & Concentrados",
-    valorArs: 756743,
-    valorUsd: 505.34,
-    unidadArs: "$/Tn",
-    unidadUsd: "USD/Tn",
-    fuente: "API Granos.ar (Pizarra BCR)",
+    id: "cletodim",
+    nombre: "Cletodim",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 14950,
+    valorUsd: 10.0,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
-    fechaActualizacion: "14/9/26",
+    nota: "Graminicida para control en hoja ancha",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "insecticida",
+    nombre: "Insecticida",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 17940,
+    valorUsd: 12.0,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Control de orugas y chinches en lote",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "fungicida",
+    nombre: "Fungicida",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 22425,
+    valorUsd: 15.0,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Control de royas y tizón foliar",
+    fechaActualizacion: "18/8/26",
   },
 
   // ==========================================
-  // 3. ENSILAJES Y PASTURAS (DIETAS)
-  // Cada insumo figura UNA SOLA VEZ
+  // 4. ENSILAJES Y PASTURAS
   // ==========================================
   {
     id: "silo-maiz-kg",
@@ -267,8 +310,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
 
   // ==========================================
-  // 4. ROLLOS FORRAJEROS
-  // Cada rollo figura UNA SOLA VEZ
+  // 5. ROLLOS FORRAJEROS
   // ==========================================
   {
     id: "rollo-alfalfa",
@@ -311,7 +353,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "rollo-gramineas",
-    nombre: "Rollo de gramíneas",
+    nombre: "Rollo de pasto consociado",
     categoria: "Rollos Forrajeros",
     valorArs: 20150,
     valorUsd: toUsd(20150, BASE_TC, 1),
@@ -322,9 +364,52 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     nota: "Rollo de pasto consociado / gramíneas (Equiv. $40 / kg en ~500 kg)",
     fechaActualizacion: "18/8/26",
   },
+
+  // ==========================================
+  // 6. MACROECONOMÍA Y COMBUSTIBLE
+  // ==========================================
+  {
+    id: "dolar-bna",
+    nombre: "Dólar BNA (Divisas venta)",
+    categoria: "Macro & Combustibles",
+    valorArs: 1495,
+    valorUsd: 1.0,
+    unidadArs: "$",
+    unidadUsd: "USD",
+    fuente: "API DolarApi",
+    esEditableManual: true,
+    nota: "Tipo de cambio oficial BNA para liquidaciones y paridad",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "inflacion",
+    nombre: "Inflación",
+    categoria: "Macro & Combustibles",
+    valorArs: 2.1,
+    valorUsd: 2.1,
+    unidadArs: "%",
+    unidadUsd: "%",
+    fuente: "API ArgentinaDatos",
+    esEditableManual: true,
+    nota: "Índice de Precios al Consumidor (IPC)",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "gasoil",
+    nombre: "Gas oil",
+    categoria: "Macro & Combustibles",
+    valorArs: 2200,
+    valorUsd: toUsd(2200, BASE_TC, 2),
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "API Secretaría de Energía",
+    esEditableManual: true,
+    nota: "Gas Oil Grado 2 para maquinaria y laboreos",
+    fechaActualizacion: "18/8/26",
+  },
 ];
 
-const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v05";
+const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v06";
 const LAST_SYNC_KEY = "hjb_valores_moviles_last_sync";
 
 export function getValoresMoviles(): ValorMovil[] {
@@ -420,6 +505,16 @@ function updateNotesAfterEdit(item: ValorMovil) {
   } else if (item.id === "semilla-algodon") {
     const tnArs = Math.round(item.valorArs * 1000);
     item.nota = `Semilla de algodón puesta en tambo con flete incluido (Equiv. $${tnArs.toLocaleString("es-AR")} / Tn)`;
+  } else if (item.id === "maiz") {
+    item.nota = `Equiv: $${(item.valorArs / 1000).toFixed(2)} / kg para mixer`;
+  } else if (item.id === "soja") {
+    item.nota = `Equiv: $${Math.round(item.valorArs / 1000)} / kg`;
+  } else if (item.id === "trigo") {
+    item.nota = `Equiv: $${(item.valorArs / 1000).toFixed(2)} / kg`;
+  } else if (item.id === "sorgo") {
+    item.nota = `Equiv: $${(item.valorArs / 1000).toFixed(2)} / kg`;
+  } else if (item.id === "girasol") {
+    item.nota = `Equiv: $${(item.valorArs / 1000).toFixed(2)} / kg`;
   } else if (item.id === "rollo-alfalfa") {
     const kgArs = (item.valorArs / 500).toFixed(1);
     item.nota = `Rollo de primera calidad confeccionado (Equiv. $${kgArs} / kg en ~500 kg)`;
@@ -456,7 +551,7 @@ export async function syncApisLive(): Promise<{ success: boolean; updatedCount: 
           current[idx].valorUsd = 1.0;
           current[idx].fechaActualizacion = today;
           current[idx].fuente = "API DolarApi";
-          details.push(`Dólar BNA Venta: $${venta.toLocaleString("es-AR")}`);
+          details.push(`Dólar BNA: $${venta.toLocaleString("es-AR")}`);
           updatedCount++;
         }
       }
@@ -480,7 +575,7 @@ export async function syncApisLive(): Promise<{ success: boolean; updatedCount: 
             current[idx].fechaActualizacion = today;
             current[idx].nota = `Último IPC (${last.fecha})`;
             current[idx].fuente = "API ArgentinaDatos";
-            details.push(`Inflación IPC: ${last.valor}%`);
+            details.push(`Inflación: ${last.valor}%`);
             updatedCount++;
           }
         }
@@ -509,7 +604,7 @@ export async function syncApisLive(): Promise<{ success: boolean; updatedCount: 
             current[idx].valorUsd = toUsd(medianPrice, activeTc, 2);
             current[idx].fechaActualizacion = today;
             current[idx].fuente = "API Secretaría de Energía";
-            details.push(`Gas Oil Grado 2: $${medianPrice.toLocaleString("es-AR")}/lt (USD ${current[idx].valorUsd})`);
+            details.push(`Gas Oil: $${medianPrice.toLocaleString("es-AR")}/lt`);
             updatedCount++;
           }
         }
@@ -533,18 +628,19 @@ export async function syncApisLive(): Promise<{ success: boolean; updatedCount: 
             current[idx].valorUsd = g.usd_tn;
             current[idx].fechaActualizacion = today;
             current[idx].fuente = "API Granos.ar (Pizarra BCR)";
+            updateNotesAfterEdit(current[idx]);
             updatedCount++;
           }
         };
 
-        updatePizarraItem("soja-pizarra", granos.soja);
-        updatePizarraItem("maiz-pizarra", granos.maiz);
-        updatePizarraItem("trigo-pizarra", granos.trigo);
-        updatePizarraItem("sorgo-pizarra", granos.sorgo);
-        updatePizarraItem("girasol-pizarra", granos.girasol);
+        updatePizarraItem("soja", granos.soja);
+        updatePizarraItem("maiz", granos.maiz);
+        updatePizarraItem("trigo", granos.trigo);
+        updatePizarraItem("sorgo", granos.sorgo);
+        updatePizarraItem("girasol", granos.girasol);
 
         details.push(
-          `Pizarra Rosario: Soja $${granos.soja.ars_tn.toLocaleString("es-AR")} · Maíz $${granos.maiz.ars_tn.toLocaleString("es-AR")} · Trigo $${granos.trigo.ars_tn.toLocaleString("es-AR")}`
+          `Granos: Soja $${granos.soja.ars_tn.toLocaleString("es-AR")} · Maíz $${granos.maiz.ars_tn.toLocaleString("es-AR")} · Trigo $${granos.trigo.ars_tn.toLocaleString("es-AR")}`
         );
       }
     }
@@ -605,7 +701,12 @@ export function getPrecioReferencia(id: string, moneda: "ARS" | "USD" = "ARS"): 
   let item = items.find((x) => x.id === id);
   if (!item) {
     // Mapeo retrocompatible
-    if (id === "pellet-soja-kg" || id === "pellet-soja-tn") item = items.find((x) => x.id === "pellet-soja");
+    if (id === "maiz-kg" || id === "maiz-pizarra") item = items.find((x) => x.id === "maiz");
+    else if (id === "soja-pizarra") item = items.find((x) => x.id === "soja");
+    else if (id === "trigo-pizarra") item = items.find((x) => x.id === "trigo");
+    else if (id === "sorgo-pizarra") item = items.find((x) => x.id === "sorgo");
+    else if (id === "girasol-pizarra") item = items.find((x) => x.id === "girasol");
+    else if (id === "pellet-soja-kg" || id === "pellet-soja-tn") item = items.find((x) => x.id === "pellet-soja");
     else if (id === "pellet-trigo-kg" || id === "pellet-trigo-tn" || id === "pellet-trigo-flete-kg") item = items.find((x) => x.id === "pellet-trigo");
     else if (id === "semilla-algodon-kg" || id === "semilla-algodon-tn" || id === "semilla-algodon-flete-kg") item = items.find((x) => x.id === "semilla-algodon");
     else if (id === "rollo-alfalfa-kg") {
@@ -624,6 +725,7 @@ export function getPrecioReferencia(id: string, moneda: "ARS" | "USD" = "ARS"): 
     else if (id === "rollo-avena-rollo") item = items.find((x) => x.id === "rollo-avena");
     else if (id === "rollo-chala-maiz-rollo") item = items.find((x) => x.id === "rollo-chala-maiz");
     else if (id === "rollo-gramineas-rollo") item = items.find((x) => x.id === "rollo-gramineas");
+    else if (id === "silo-maiz-kg") item = items.find((x) => x.id === "silo-maiz-kg");
   }
   if (!item) return 0;
   if (moneda === "USD") {

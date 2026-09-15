@@ -18,28 +18,40 @@ import {
 
 const CATEGORIAS: { id: CategoriaValor; label: string; icon: string; desc: string }[] = [
   {
-    id: "Macro & Combustibles",
-    label: "Macroeconomía & Combustible",
-    icon: "💵",
-    desc: "Variables oficiales de paridad cambiaria, inflación y combustible para maquinaria.",
+    id: "Granos",
+    label: "Granos",
+    icon: "🌾",
+    desc: "Cotizaciones de cereales y oleaginosas (granos.ar / Pizarra Rosario BCR).",
   },
   {
-    id: "Granos & Concentrados",
-    label: "Granos & Concentrados (Dietas)",
-    icon: "🌾",
-    desc: "Insumos energéticos y proteicos para la formulación de raciones del tambo.",
+    id: "Pellets & Concentrados",
+    label: "Pellets & Concentrados",
+    icon: "🥣",
+    desc: "Suplementos proteicos y subproductos agroindustriales para dietas de tambo.",
+  },
+  {
+    id: "Líquidos de Fumigación",
+    label: "Líquidos de Fumigación",
+    icon: "🧪",
+    desc: "Herbicidas, coadyuvantes, insecticidas y fungicidas para pulverización y barbecho.",
   },
   {
     id: "Ensilajes & Pasturas",
-    label: "Ensilajes & Pasturas (Tambo)",
+    label: "Ensilajes & Pasturas",
     icon: "🌿",
-    desc: "Valores por kilogramo de materia verde/ensilada consumida en pastoreo o mixer.",
+    desc: "Picado fino de forrajes y pasturas para consumo en mixer y pastoreo directo.",
   },
   {
     id: "Rollos Forrajeros",
     label: "Rollos Forrajeros",
     icon: "🚜",
-    desc: "Costo por rollo y valor equivalente por kilogramo de fibra seca henificada.",
+    desc: "Rollos henificados de reserva forrajera con peso promedio de referencia.",
+  },
+  {
+    id: "Macro & Combustibles",
+    label: "Macroeconomía & Combustible",
+    icon: "💵",
+    desc: "Tipo de cambio oficial BNA Divisas, inflación IPC y gas oil agropecuario.",
   },
 ];
 
@@ -60,7 +72,7 @@ export default function MercadosPage() {
       if (ran) {
         setItems(getValoresMoviles());
         setLastSync(getLastSyncTime());
-        setFeedback({ msg: "Se ejecutó la actualización automática diaria de las APIs.", type: "info" });
+        setFeedback({ msg: "Se sincronizaron automáticamente las cotizaciones de mercado del día.", type: "info" });
         setTimeout(() => setFeedback(null), 5000);
       }
     });
@@ -87,7 +99,7 @@ export default function MercadosPage() {
         });
       }
     } catch {
-      setFeedback({ msg: "Hubo una demora al conectar con los servidores externos. Se preservan los valores activos.", type: "info" });
+      setFeedback({ msg: "Hubo una demora al conectar con las APIs externas. Se preservan los valores locales.", type: "info" });
     } finally {
       setSyncing(false);
       setTimeout(() => setFeedback(null), 6000);
@@ -109,16 +121,27 @@ export default function MercadosPage() {
   function handleSave() {
     saveValoresMoviles(items);
     setHasUnsavedChanges(false);
-    setFeedback({ msg: "Precios de referencia guardados. Quedan activos para todo el sistema HJB.", type: "success" });
+    setFeedback({ msg: "Precios de referencia guardados correctamente para todo el sistema HJB.", type: "success" });
     setTimeout(() => setFeedback(null), 4000);
   }
 
   // Métricas destacadas
   const dolarItem = items.find((x) => x.id === "dolar-bna");
-  const inflacionItem = items.find((x) => x.id === "inflacion");
   const gasoilItem = items.find((x) => x.id === "gasoil");
-  const maizItem = items.find((x) => x.id === "maiz-kg");
-  const pelletItem = items.find((x) => x.id === "pellet-soja" || x.id === "pellet-soja-kg");
+  const maizItem = items.find((x) => x.id === "maiz");
+  const sojaItem = items.find((x) => x.id === "soja");
+  const pelletItem = items.find((x) => x.id === "pellet-soja");
+  const glifoItem = items.find((x) => x.id === "glifosato");
+
+  const filterTabs = [
+    { id: "Todas", label: `📋 Todos (${items.length} Insumos)` },
+    { id: "Granos", label: "🌾 Granos" },
+    { id: "Pellets & Concentrados", label: "🥣 Pellets & Concentrados" },
+    { id: "Líquidos de Fumigación", label: "🧪 Líquidos de Fumigación" },
+    { id: "Ensilajes & Pasturas", label: "🌿 Ensilajes & Pasturas" },
+    { id: "Rollos Forrajeros", label: "🚜 Rollos Forrajeros" },
+    { id: "Macro & Combustibles", label: "💵 Macro & Combustibles" },
+  ];
 
   return (
     <AppShell active="Valores Móviles">
@@ -135,7 +158,7 @@ export default function MercadosPage() {
           </div>
           <h1>Valores Móviles & Precios de Referencia</h1>
           <p className="muted">
-            Tabla central bimonetaria de precios e insumos. Sirve de referencia para el cálculo de dietas del tambo y labores agrícolas.
+            Tabla central de insumos y cotizaciones organizada por categorías limpias e independientes.
           </p>
         </div>
 
@@ -146,7 +169,7 @@ export default function MercadosPage() {
             style={{ display: "flex", alignItems: "center", gap: "6px" }}
             onClick={handleSyncApis}
             disabled={syncing}
-            title="Sincroniza en vivo Dólar BNA, Inflación y Gasoil"
+            title="Sincroniza en vivo granos (granos.ar), Dólar BNA, Inflación y Gasoil"
           >
             {syncing ? "⏳ Sincronizando..." : "🔄 Sincronizar APIs ahora"}
           </button>
@@ -162,7 +185,7 @@ export default function MercadosPage() {
         </div>
       </div>
 
-      {/* Banner explicativo de Paridad y Tipo de Cambio Activo */}
+      {/* Banner de Tipo de Cambio Activo y Paridad */}
       <div
         style={{
           background: "#f0fdf4",
@@ -184,7 +207,7 @@ export default function MercadosPage() {
               Tipo de Cambio Activo: 1 USD = ${tcActivo.toLocaleString("es-AR")} ARS (BNA Venta)
             </div>
             <div style={{ fontSize: "12px", color: "#15803d" }}>
-              Podés editar en el casillero de <strong>Pesos ($)</strong> o en el de <strong>Dólares (USD)</strong>; el sistema convierte automáticamente el valor opuesto.
+              Podés editar en el casillero de <strong>Pesos ($)</strong> o en el de <strong>Dólares (USD)</strong>; el sistema actualiza automáticamente el valor opuesto.
             </div>
           </div>
         </div>
@@ -233,7 +256,7 @@ export default function MercadosPage() {
             alignItems: "center",
           }}
         >
-          <span>⚠️ Tenés modificaciones manuales de precios sin guardar.</span>
+          <span>⚠️ Tenés modificaciones de precios sin guardar.</span>
           <button
             type="button"
             onClick={handleSave}
@@ -252,17 +275,12 @@ export default function MercadosPage() {
         </div>
       )}
 
-      {/* Tarjetas de Métricas Principales (Pesos + USD) */}
-      <div className="metricsGrid five">
+      {/* Tarjetas de Métricas Principales */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px", marginBottom: "20px" }}>
         <MetricCard
           label="Dólar BNA Venta"
           value={dolarItem?.valorArs ? `$${dolarItem.valorArs.toLocaleString("es-AR")}` : "—"}
           note="Oficial Divisas Venta"
-        />
-        <MetricCard
-          label="Inflación IPC"
-          value={inflacionItem?.valorArs ? `${inflacionItem.valorArs}%` : "—"}
-          note={inflacionItem?.nota || "ArgentinaDatos"}
         />
         <MetricCard
           label="Gas Oil Grado 2"
@@ -270,32 +288,42 @@ export default function MercadosPage() {
           note={gasoilItem?.valorUsd ? `USD ${gasoilItem.valorUsd} / lt` : "Por litro"}
         />
         <MetricCard
-          label="Maíz Dieta"
+          label="Maíz"
           value={maizItem?.valorArs ? `$${maizItem.valorArs.toLocaleString("es-AR")}` : "—"}
-          note={maizItem?.valorUsd ? `USD ${maizItem.valorUsd} / kg` : "Puesto en mixer"}
+          note={maizItem?.valorUsd ? `USD ${maizItem.valorUsd} / Tn` : "granos.ar"}
+        />
+        <MetricCard
+          label="Soja"
+          value={sojaItem?.valorArs ? `$${sojaItem.valorArs.toLocaleString("es-AR")}` : "—"}
+          note={sojaItem?.valorUsd ? `USD ${sojaItem.valorUsd} / Tn` : "granos.ar"}
         />
         <MetricCard
           label="Pellet Soja"
           value={pelletItem?.valorArs ? `$${pelletItem.valorArs.toLocaleString("es-AR")}` : "—"}
-          note={pelletItem?.valorUsd ? `USD ${pelletItem.valorUsd} / kg` : "Concentrado"}
+          note={pelletItem?.valorUsd ? `USD ${pelletItem.valorUsd} / Tn` : "Concentrado"}
+        />
+        <MetricCard
+          label="Glifosato"
+          value={glifoItem?.valorArs ? `$${glifoItem.valorArs.toLocaleString("es-AR")}` : "—"}
+          note={glifoItem?.valorUsd ? `USD ${glifoItem.valorUsd} / lt` : "Fitosanitario"}
         />
       </div>
 
-      {/* Filtro rápido de categorías */}
-      <div className="tabs" style={{ marginTop: "12px", marginBottom: "20px" }}>
-        {["Todas", "Macro & Combustibles", "Granos & Concentrados", "Ensilajes & Pasturas", "Rollos Forrajeros"].map((cat) => (
+      {/* Filtro por Categorías */}
+      <div className="tabs" style={{ marginTop: "4px", marginBottom: "20px" }}>
+        {filterTabs.map((tab) => (
           <button
-            key={cat}
+            key={tab.id}
             type="button"
-            className={activeFilter === cat ? "tab active" : "tab"}
-            onClick={() => setActiveFilter(cat)}
+            className={activeFilter === tab.id ? "tab active" : "tab"}
+            onClick={() => setActiveFilter(tab.id)}
           >
-            {cat === "Todas" ? `📋 Todos (${items.length} Insumos)` : cat}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Tablas por Categoría */}
+      {/* Bloques de Categorías */}
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
         {CATEGORIAS.filter((c) => activeFilter === "Todas" || activeFilter === c.id).map((cat) => {
           const categoryItems = items.filter((x) => x.categoria === cat.id);
@@ -316,12 +344,12 @@ export default function MercadosPage() {
                 <table className="dataTable">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: "220px" }}>Producto / Insumo</th>
+                      <th style={{ minWidth: "200px" }}>Insumo / Producto</th>
                       <th style={{ width: "190px", textAlign: "right" }}>Precio en Pesos ($ ARS)</th>
                       <th style={{ width: "190px", textAlign: "right" }}>Precio en Dólares (USD)</th>
-                      <th style={{ width: "90px" }}>Unidad</th>
-                      <th style={{ width: "140px" }}>Detalle / Flete</th>
-                      <th style={{ width: "160px" }}>Origen</th>
+                      <th style={{ width: "100px" }}>Unidad</th>
+                      <th style={{ width: "150px" }}>Detalle / Nota</th>
+                      <th style={{ width: "170px" }}>Origen</th>
                       <th style={{ width: "100px" }}>Fecha</th>
                     </tr>
                   </thead>
@@ -331,7 +359,7 @@ export default function MercadosPage() {
 
                       return (
                         <tr key={item.id}>
-                          {/* Nombre del Producto */}
+                          {/* Nombre del Insumo */}
                           <td>
                             <strong style={{ fontSize: "14px", color: "var(--slate-950)" }}>
                               {item.nombre}
@@ -354,7 +382,7 @@ export default function MercadosPage() {
                                   handleEditArs(item.id, isNaN(val as number) ? null : val);
                                 }}
                                 style={{
-                                  width: "100px",
+                                  width: "105px",
                                   padding: "4px 6px",
                                   borderRadius: "4px",
                                   border: "1px solid #cbd5e1",
@@ -370,13 +398,13 @@ export default function MercadosPage() {
                             </div>
                           </td>
 
-                          {/* Casillero en DÓLARES (USD U$D) */}
+                          {/* Casillero en DÓLARES (USD) */}
                           <td style={{ textAlign: "right" }}>
                             {isPercentage ? (
                               <span style={{ color: "var(--slate-400)", fontSize: "12px" }}>N/A</span>
                             ) : (
                               <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#fefce8", padding: "3px 6px", borderRadius: "6px", border: "1px solid #fef08a" }}>
-                                <span style={{ color: "#854d0e", fontWeight: 700, fontSize: "12px" }}>U$D</span>
+                                <span style={{ color: "#854d0e", fontWeight: 700, fontSize: "12px" }}>USD</span>
                                 <input
                                   type="number"
                                   step="any"
@@ -387,7 +415,7 @@ export default function MercadosPage() {
                                     handleEditUsd(item.id, isNaN(val as number) ? null : val);
                                   }}
                                   style={{
-                                    width: "90px",
+                                    width: "95px",
                                     padding: "4px 6px",
                                     borderRadius: "4px",
                                     border: "1px solid #fde047",
@@ -398,19 +426,18 @@ export default function MercadosPage() {
                                     textAlign: "right",
                                   }}
                                 />
-                                <span style={{ fontSize: "11px", color: "#a16207", fontWeight: 600 }}>USD</span>
                               </div>
                             )}
                           </td>
 
                           {/* Unidad */}
                           <td>
-                            <span style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--slate-700)" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--slate-700)" }}>
                               {item.unidadArs}
                             </span>
                           </td>
 
-                          {/* Detalle / Flete */}
+                          {/* Detalle / Nota / Flete */}
                           <td>
                             {item.fletePct ? (
                               <span
@@ -439,11 +466,13 @@ export default function MercadosPage() {
                           <td>
                             <span
                               className={
-                                item.fuente.startsWith("API")
+                                item.fuente.startsWith("API Granos")
                                 ? "pill badgeGreen"
+                                : item.fuente.startsWith("API")
+                                ? "pill badgeBlue"
                                 : item.fuente.startsWith("Derivado")
                                 ? "pill badgeSlate"
-                                : "pill badgeBlue"
+                                : "pill badgeAmber"
                               }
                               style={{ fontSize: "11px", fontWeight: 600 }}
                             >
@@ -468,14 +497,14 @@ export default function MercadosPage() {
         })}
       </div>
 
-      {/* Nota de Arquitectura: Referencia Central para todo el sistema */}
+      {/* Nota Central */}
       <section className="panel" style={{ marginTop: "24px", background: "#f8fafc", border: "1px dashed var(--line)" }}>
         <h3 style={{ fontSize: "15px", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
           <span>🏛️</span>
-          <span>Referencia Central de Costos para HJB</span>
+          <span>Referencia Central de Costos HJB</span>
         </h3>
         <p style={{ fontSize: "13px", color: "var(--slate-700)", lineHeight: 1.5, margin: 0 }}>
-          Esta sección actúa como la <strong>fuente única de verdad</strong> de precios de la empresa. Cada vez que se modifica un valor aquí (sea por la actualización automática de las APIs o porque lo editaste en pesos o dólares), el cambio se propaga de manera inmediata. Los futuros módulos de <strong>Dietas del Tambo</strong> (para valorizar kilos de ración) y <strong>Costos de Labores</strong> (consumo de gasoil e insumos en cada lote) consultan directamente estos precios.
+          Esta tabla es la fuente única de verdad de precios e insumos para la empresa. Tanto la actualización automática de las cotizaciones (APIs en vivo) como las ediciones manuales en pesos o dólares impactan de forma unificada en todo el sistema para las dietas de hacienda y costos agrícolas.
         </p>
       </section>
     </AppShell>
