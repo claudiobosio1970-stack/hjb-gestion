@@ -13,7 +13,7 @@ export interface CampoGeo {
   descripcion: string;
 }
 
-// Coordenadas iniciales de referencia en la cuenca agrícola-lechera central de Córdoba
+// Coordenadas reales calibradas de los 5 establecimientos HJB (zona Ruta Provincial 40S)
 export const DEFAULT_CAMPOS_GEO: CampoGeo[] = [
   {
     id: "aguilera",
@@ -21,8 +21,8 @@ export const DEFAULT_CAMPOS_GEO: CampoGeo[] = [
     slug: "aguilera",
     superficie: "20 ha",
     superficieHa: 20,
-    lat: -31.4285,
-    lng: -62.0820,
+    lat: -32.2166,
+    lng: -61.6031,
     color: "#15803d",
     cultivoPrincipal: "Campaña 2026/27 (Lote Único)",
     cantLotes: 1,
@@ -35,8 +35,8 @@ export const DEFAULT_CAMPOS_GEO: CampoGeo[] = [
     slug: "tambo",
     superficie: "73 ha",
     superficieHa: 73,
-    lat: -31.4420,
-    lng: -62.0950,
+    lat: -32.1773,
+    lng: -61.7697,
     color: "#2563eb",
     cultivoPrincipal: "9 lotes (Producción forrajera y lechera)",
     cantLotes: 9,
@@ -49,13 +49,13 @@ export const DEFAULT_CAMPOS_GEO: CampoGeo[] = [
     slug: "racca",
     superficie: "100 ha",
     superficieHa: 100,
-    lat: -31.4150,
-    lng: -62.0650,
+    lat: -32.2427,
+    lng: -61.6073,
     color: "#d97706",
-    cultivoPrincipal: "Campaña 2026/27 (2 lotes)",
-    cantLotes: 2,
+    cultivoPrincipal: "Campaña 2026/27 (4 lotes delimitados)",
+    cantLotes: 4,
     estado: "Planificado",
-    descripcion: "2 lotes de 50 ha cada uno a efectos de siembra (100 ha totales).",
+    descripcion: "Establecimiento de 100 ha subdividido en 4 lotes sobre Ruta Provincial 40S.",
   },
   {
     id: "kitty",
@@ -63,8 +63,8 @@ export const DEFAULT_CAMPOS_GEO: CampoGeo[] = [
     slug: "kitty",
     superficie: "29 ha",
     superficieHa: 29,
-    lat: -31.4350,
-    lng: -62.0520,
+    lat: -32.2541,
+    lng: -61.6296,
     color: "#7c3aed",
     cultivoPrincipal: "Campaña 2026/27 (Lote Único)",
     cantLotes: 1,
@@ -77,8 +77,8 @@ export const DEFAULT_CAMPOS_GEO: CampoGeo[] = [
     slug: "keuneke",
     superficie: "57 ha",
     superficieHa: 57,
-    lat: -31.4550,
-    lng: -62.0720,
+    lat: -32.2268,
+    lng: -61.7091,
     color: "#0891b2",
     cultivoPrincipal: "Campaña 2026/27 (2 lotes)",
     cantLotes: 2,
@@ -99,7 +99,7 @@ export interface LoteGeo {
   observaciones?: string;
 }
 
-// Lotes iniciales pre-configurados (ej. Racca en 4 lotes según foto operativa)
+// Lotes iniciales pre-configurados para Racca sobre Ruta Provincial 40S (según foto operativa)
 export const DEFAULT_LOTES_GEO: LoteGeo[] = [
   {
     id: "racca-lote-3a",
@@ -108,10 +108,10 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     nombre: "3a",
     superficieHa: 25,
     coordenadas: [
-      { lat: -31.4110, lng: -62.0700 },
-      { lat: -31.4110, lng: -62.0650 },
-      { lat: -31.4150, lng: -62.0650 },
-      { lat: -31.4150, lng: -62.0700 },
+      { lat: -32.2382, lng: -61.6126 },
+      { lat: -32.2382, lng: -61.6073 },
+      { lat: -32.2427, lng: -61.6073 },
+      { lat: -32.2427, lng: -61.6126 },
     ],
     color: "#22c55e",
     cultivo: "Soja 1ra",
@@ -124,10 +124,10 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     nombre: "3b",
     superficieHa: 25,
     coordenadas: [
-      { lat: -31.4110, lng: -62.0650 },
-      { lat: -31.4110, lng: -62.0600 },
-      { lat: -31.4150, lng: -62.0600 },
-      { lat: -31.4150, lng: -62.0650 },
+      { lat: -32.2382, lng: -61.6073 },
+      { lat: -32.2382, lng: -61.6020 },
+      { lat: -32.2427, lng: -61.6020 },
+      { lat: -32.2427, lng: -61.6073 },
     ],
     color: "#22c55e",
     cultivo: "Maíz",
@@ -140,10 +140,10 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     nombre: "1",
     superficieHa: 25,
     coordenadas: [
-      { lat: -31.4150, lng: -62.0700 },
-      { lat: -31.4150, lng: -62.0650 },
-      { lat: -31.4190, lng: -62.0650 },
-      { lat: -31.4190, lng: -62.0700 },
+      { lat: -32.2427, lng: -61.6126 },
+      { lat: -32.2427, lng: -61.6073 },
+      { lat: -32.2472, lng: -61.6073 },
+      { lat: -32.2472, lng: -61.6126 },
     ],
     color: "#22c55e",
     cultivo: "Soja 1ra",
@@ -156,10 +156,10 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     nombre: "2",
     superficieHa: 25,
     coordenadas: [
-      { lat: -31.4150, lng: -62.0650 },
-      { lat: -31.4150, lng: -62.0600 },
-      { lat: -31.4190, lng: -62.0600 },
-      { lat: -31.4190, lng: -62.0650 },
+      { lat: -32.2427, lng: -61.6073 },
+      { lat: -32.2427, lng: -61.6020 },
+      { lat: -32.2472, lng: -61.6020 },
+      { lat: -32.2472, lng: -61.6073 },
     ],
     color: "#22c55e",
     cultivo: "Alfalfa",
@@ -167,8 +167,8 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
   },
 ];
 
-const GEO_STORAGE_KEY = "hjb_campos_geo_coords_v1";
-const LOTES_GEO_STORAGE_KEY = "hjb_lotes_geo_polygons_v02";
+const GEO_STORAGE_KEY = "hjb_campos_geo_coords_v2";
+const LOTES_GEO_STORAGE_KEY = "hjb_lotes_geo_polygons_v03";
 
 export function getCamposGeo(): CampoGeo[] {
   if (typeof window === "undefined") return DEFAULT_CAMPOS_GEO;
