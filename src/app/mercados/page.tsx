@@ -336,16 +336,6 @@ export default function MercadosPage() {
                             <strong style={{ fontSize: "14px", color: "var(--slate-950)" }}>
                               {item.nombre}
                             </strong>
-                            {item.origenCalculo && (
-                              <small style={{ display: "block", color: "var(--brand-700)", fontSize: "11px", marginTop: "2px" }}>
-                                ↳ {item.origenCalculo}
-                              </small>
-                            )}
-                            {item.nota && (
-                              <small style={{ display: "block", color: "var(--slate-500)", fontSize: "11px", marginTop: "1px" }}>
-                                {item.nota}
-                              </small>
-                            )}
                           </td>
 
                           {/* Casillero en PESOS ($ ARS) */}
@@ -435,6 +425,10 @@ export default function MercadosPage() {
                                 }}
                               >
                                 Flete {item.fletePct}%
+                              </span>
+                            ) : item.nota ? (
+                              <span style={{ color: "var(--slate-600)", fontSize: "12px" }}>
+                                {item.nota}
                               </span>
                             ) : (
                               <span style={{ color: "var(--slate-400)", fontSize: "12px" }}>—</span>

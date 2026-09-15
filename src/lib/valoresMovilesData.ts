@@ -25,11 +25,10 @@ export interface ValorMovil {
   esEditableManual: boolean;
   origenCalculo?: string;
   nota?: string;
-  fletePct?: number | null; // ej: 6% para pellet de trigo
+  fletePct?: number | null;
   fechaActualizacion: string;
 }
 
-// Tipo de cambio BNA base de la planilla de HJB del 18/8/26: $1.495
 const BASE_TC = 1495;
 
 function toUsd(ars: number | null, tc: number, decimals: number = 3): number | null {
@@ -48,7 +47,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   // ==========================================
   {
     id: "inflacion",
-    nombre: "Inflación Mensual",
+    nombre: "Inflación",
     categoria: "Macro & Combustibles",
     valorArs: 2.1,
     valorUsd: 2.1,
@@ -61,7 +60,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "dolar-bna",
-    nombre: "Cambio BNA (Divisas venta)",
+    nombre: "Dólar BNA (Divisas venta)",
     categoria: "Macro & Combustibles",
     valorArs: 1495,
     valorUsd: 1.0,
@@ -74,10 +73,10 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "gasoil",
-    nombre: "Precio gas oil",
+    nombre: "Gas oil",
     categoria: "Macro & Combustibles",
     valorArs: 2200,
-    valorUsd: toUsd(2200, BASE_TC, 2), // ~1.47 USD/lt
+    valorUsd: toUsd(2200, BASE_TC, 2),
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
     fuente: "API Secretaría de Energía",
@@ -91,10 +90,10 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   // ==========================================
   {
     id: "maiz-kg",
-    nombre: "Precio Maíz",
+    nombre: "Maíz",
     categoria: "Granos & Concentrados",
     valorArs: 273,
-    valorUsd: toUsd(273, BASE_TC, 3), // ~0.183 USD/kg (~182.6 USD/Tn)
+    valorUsd: toUsd(273, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Manual HJB",
@@ -104,34 +103,34 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "pellet-soja-tn",
-    nombre: "Precio Pellet de soja [Tn]",
+    nombre: "Pellet de soja",
     categoria: "Granos & Concentrados",
     valorArs: 403650,
-    valorUsd: 270.0, // Referencia explícita en planilla: 270 USD
+    valorUsd: 270.0,
     unidadArs: "$/Tn",
     unidadUsd: "USD/Tn",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Concentrado proteico por tonelada",
+    nota: "Concentrado proteico",
     fechaActualizacion: "18/8/26",
   },
   {
     id: "pellet-soja-kg",
-    nombre: "Precio Pellet de soja [$/kg]",
+    nombre: "Pellet de soja",
     categoria: "Granos & Concentrados",
     valorArs: 404,
-    valorUsd: 0.27, // 270 USD / 1000
+    valorUsd: 0.27,
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de Pellet Tn ($403.650 / 1000 = $404)",
+    origenCalculo: "Derivado de Pellet Tn / 1000",
     esEditableManual: true,
     nota: "Concentrado proteico por kilo para dietas",
     fechaActualizacion: "18/8/26",
   },
   {
     id: "semilla-algodon-tn",
-    nombre: "Precio de Semilla algodón [Tn]",
+    nombre: "Semilla de algodón",
     categoria: "Granos & Concentrados",
     valorArs: null,
     valorUsd: null,
@@ -144,7 +143,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "semilla-algodon-kg",
-    nombre: "Precio de S algodón [$/kg]",
+    nombre: "Semilla de algodón",
     categoria: "Granos & Concentrados",
     valorArs: null,
     valorUsd: null,
@@ -157,10 +156,10 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "semilla-algodon-flete-kg",
-    nombre: "Precio de S algodón + flete",
+    nombre: "Semilla de algodón + flete",
     categoria: "Granos & Concentrados",
     valorArs: 255,
-    valorUsd: toUsd(255, BASE_TC, 3), // ~0.171 USD/kg
+    valorUsd: toUsd(255, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Manual HJB",
@@ -170,37 +169,37 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "pellet-trigo-tn",
-    nombre: "Precio Pellet de Trigo [Tn]",
+    nombre: "Pellet de trigo",
     categoria: "Granos & Concentrados",
     valorArs: 209300,
-    valorUsd: 140.0, // Referencia explícita en planilla: 140 USD
+    valorUsd: 140.0,
     unidadArs: "$/Tn",
     unidadUsd: "USD/Tn",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Subproducto de trigo por tonelada",
+    nota: "Subproducto de trigo",
     fechaActualizacion: "18/8/26",
   },
   {
     id: "pellet-trigo-kg",
-    nombre: "Precio Pellet de Trigo [$/kg]",
+    nombre: "Pellet de trigo",
     categoria: "Granos & Concentrados",
     valorArs: 209,
-    valorUsd: 0.14, // 140 USD / 1000
+    valorUsd: 0.14,
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de Pellet Trigo Tn ($209.300 / 1000 = $209)",
+    origenCalculo: "Derivado de Pellet Trigo Tn / 1000",
     esEditableManual: true,
     nota: "Subproducto por kilo para ración",
     fechaActualizacion: "18/8/26",
   },
   {
     id: "pellet-trigo-flete-kg",
-    nombre: "Precio Pellet Trigo + flete",
+    nombre: "Pellet de trigo + flete",
     categoria: "Granos & Concentrados",
     valorArs: 222,
-    valorUsd: toUsd(222, BASE_TC, 3), // ~0.148 USD/kg
+    valorUsd: toUsd(222, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fletePct: 6,
@@ -215,10 +214,10 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   // ==========================================
   {
     id: "silo-maiz-kg",
-    nombre: "Precio silo de maíz",
+    nombre: "Silo de maíz",
     categoria: "Ensilajes & Pasturas",
     valorArs: 39.1,
-    valorUsd: toUsd(39.1, BASE_TC, 3), // ~0.026 USD/kg
+    valorUsd: toUsd(39.1, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Manual HJB",
@@ -228,10 +227,10 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "silo-avena-kg",
-    nombre: "Precio silo de Avena",
+    nombre: "Silo de avena",
     categoria: "Ensilajes & Pasturas",
     valorArs: 34.6,
-    valorUsd: toUsd(34.6, BASE_TC, 3), // ~0.023 USD/kg
+    valorUsd: toUsd(34.6, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Manual HJB",
@@ -241,10 +240,10 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "pastura-alfalfa-kg",
-    nombre: "Pastura alfalfa",
+    nombre: "Pastura de alfalfa",
     categoria: "Ensilajes & Pasturas",
     valorArs: 13.3,
-    valorUsd: toUsd(13.3, BASE_TC, 4), // ~0.0089 USD/kg
+    valorUsd: toUsd(13.3, BASE_TC, 4),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Manual HJB",
@@ -254,10 +253,10 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "pastura-avena-kg",
-    nombre: "Pastura Avena",
+    nombre: "Pastura de avena",
     categoria: "Ensilajes & Pasturas",
     valorArs: 10.6,
-    valorUsd: toUsd(10.6, BASE_TC, 4), // ~0.0071 USD/kg
+    valorUsd: toUsd(10.6, BASE_TC, 4),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Manual HJB",
@@ -271,10 +270,10 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   // ==========================================
   {
     id: "rollo-alfalfa-rollo",
-    nombre: "Precio Rollo Alfalfa",
+    nombre: "Rollo de alfalfa",
     categoria: "Rollos Forrajeros",
     valorArs: 80600,
-    valorUsd: toUsd(80600, BASE_TC, 1), // ~53.9 USD/Rollo
+    valorUsd: toUsd(80600, BASE_TC, 1),
     unidadArs: "$/Rollo",
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
@@ -284,24 +283,24 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "rollo-alfalfa-kg",
-    nombre: "Precio Rollo Alfalfa [$/kg]",
+    nombre: "Rollo de alfalfa",
     categoria: "Rollos Forrajeros",
     valorArs: 161,
-    valorUsd: toUsd(161, BASE_TC, 3), // ~0.108 USD/kg
+    valorUsd: toUsd(161, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de $80.600 / ~500 kg = $161",
+    origenCalculo: "Derivado de $80.600 / ~500 kg",
     esEditableManual: true,
     nota: "Costo por kg de materia henificada",
     fechaActualizacion: "18/8/26",
   },
   {
     id: "rollo-avena-rollo",
-    nombre: "Precio Rollo Avena",
+    nombre: "Rollo de avena",
     categoria: "Rollos Forrajeros",
     valorArs: 56420,
-    valorUsd: toUsd(56420, BASE_TC, 1), // ~37.7 USD/Rollo
+    valorUsd: toUsd(56420, BASE_TC, 1),
     unidadArs: "$/Rollo",
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
@@ -311,24 +310,24 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "rollo-avena-kg",
-    nombre: "Precio Rollo Avena [$/kg]",
+    nombre: "Rollo de avena",
     categoria: "Rollos Forrajeros",
     valorArs: 113,
-    valorUsd: toUsd(113, BASE_TC, 3), // ~0.076 USD/kg
+    valorUsd: toUsd(113, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de $56.420 / ~500 kg = $113",
+    origenCalculo: "Derivado de $56.420 / ~500 kg",
     esEditableManual: true,
     nota: "Fibra forrajera avena por kilo",
     fechaActualizacion: "18/8/26",
   },
   {
     id: "rollo-chala-maiz-rollo",
-    nombre: "Precio rollo chala maíz",
+    nombre: "Rollo de chala de maíz",
     categoria: "Rollos Forrajeros",
     valorArs: 22000,
-    valorUsd: toUsd(22000, BASE_TC, 1), // ~14.7 USD/Rollo
+    valorUsd: toUsd(22000, BASE_TC, 1),
     unidadArs: "$/Rollo",
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
@@ -338,24 +337,24 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "rollo-chala-maiz-kg",
-    nombre: "Precio Rollo chala [$/kg]",
+    nombre: "Rollo de chala de maíz",
     categoria: "Rollos Forrajeros",
     valorArs: 55,
-    valorUsd: toUsd(55, BASE_TC, 3), // ~0.037 USD/kg
+    valorUsd: toUsd(55, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de $22.000 / ~400 kg = $55",
+    origenCalculo: "Derivado de $22.000 / ~400 kg",
     esEditableManual: true,
     nota: "Fibra de volumen seco por kilo",
     fechaActualizacion: "18/8/26",
   },
   {
     id: "rollo-gramineas-rollo",
-    nombre: "Precio rollo Gramíneas",
+    nombre: "Rollo de gramíneas",
     categoria: "Rollos Forrajeros",
     valorArs: 20150,
-    valorUsd: toUsd(20150, BASE_TC, 1), // ~13.5 USD/Rollo
+    valorUsd: toUsd(20150, BASE_TC, 1),
     unidadArs: "$/Rollo",
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
@@ -365,21 +364,21 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
   {
     id: "rollo-gramineas-kg",
-    nombre: "Precio Rollo Gramíneas [$/kg]",
+    nombre: "Rollo de gramíneas",
     categoria: "Rollos Forrajeros",
     valorArs: 40,
-    valorUsd: toUsd(40, BASE_TC, 3), // ~0.027 USD/kg
+    valorUsd: toUsd(40, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de $20.150 / ~500 kg = $40",
+    origenCalculo: "Derivado de $20.150 / ~500 kg",
     esEditableManual: true,
     nota: "Henificado de gramíneas por kilo",
     fechaActualizacion: "18/8/26",
   },
 ];
 
-const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v02";
+const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v03";
 const LAST_SYNC_KEY = "hjb_valores_moviles_last_sync";
 
 export function getValoresMoviles(): ValorMovil[] {
@@ -399,18 +398,12 @@ export function saveValoresMoviles(items: ValorMovil[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-/**
- * Obtiene el tipo de cambio oficial BNA venta activo del sistema
- */
 export function getDolarBnaVenta(): number {
   const items = getValoresMoviles();
   const found = items.find((x) => x.id === "dolar-bna");
   return found && typeof found.valorArs === "number" && found.valorArs > 0 ? found.valorArs : BASE_TC;
 }
 
-/**
- * Actualiza un valor en Pesos ($ ARS) y recalcula su paridad en Dólares (USD)
- */
 export function updateFromArs(items: ValorMovil[], id: string, nuevoArs: number | null): ValorMovil[] {
   const tc = getDolarBnaVenta();
   const copy = [...items];
@@ -424,7 +417,6 @@ export function updateFromArs(items: ValorMovil[], id: string, nuevoArs: number 
     return copy;
   }
 
-  // Si se modifica el Dólar BNA, actualiza la cotización
   if (id === "dolar-bna") {
     const tcActualizado = nuevoArs && nuevoArs > 0 ? nuevoArs : tc;
     copy[idx] = { ...copy[idx], valorArs: nuevoArs, valorUsd: 1.0, fechaActualizacion: today };
@@ -441,14 +433,10 @@ export function updateFromArs(items: ValorMovil[], id: string, nuevoArs: number 
     fechaActualizacion: today,
   };
 
-  // Recalcular derivados por kilo si se cambió la unidad mayor
   recalculateDerivatives(copy, id, tc);
   return copy;
 }
 
-/**
- * Actualiza un valor en Dólares (USD U$D) y recalcula su paridad en Pesos (ARS)
- */
 export function updateFromUsd(items: ValorMovil[], id: string, nuevoUsd: number | null): ValorMovil[] {
   const tc = getDolarBnaVenta();
   const copy = [...items];
@@ -471,7 +459,6 @@ export function updateFromUsd(items: ValorMovil[], id: string, nuevoUsd: number 
     fechaActualizacion: today,
   };
 
-  // Recalcular derivados por kilo si se cambió la unidad mayor
   recalculateDerivatives(copy, id, tc);
   return copy;
 }
@@ -499,9 +486,6 @@ function recalculateDerivatives(list: ValorMovil[], changedId: string, tc: numbe
   if (changedId === "rollo-gramineas-rollo") updatePair("rollo-gramineas-kg", 500);
 }
 
-/**
- * Consulta las APIs públicas en vivo y actualiza Dólar BNA, Inflación y Gasoil
- */
 export async function syncApisLive(): Promise<{ success: boolean; updatedCount: number; details: string[] }> {
   const current = getValoresMoviles();
   const details: string[] = [];
@@ -509,7 +493,7 @@ export async function syncApisLive(): Promise<{ success: boolean; updatedCount: 
   const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
   let activeTc = getDolarBnaVenta();
 
-  // 1. Dólar BNA vía DolarApi
+  // 1. Dólar BNA
   try {
     const res = await fetch("https://dolarapi.com/v1/ambito/dolares/bna", { cache: "no-store" });
     if (res.ok) {
@@ -532,7 +516,7 @@ export async function syncApisLive(): Promise<{ success: boolean; updatedCount: 
     console.warn("DolarApi warning:", err);
   }
 
-  // 2. Inflación vía ArgentinaDatos
+  // 2. Inflación
   try {
     const res = await fetch("https://api.argentinadatos.com/v1/finanzas/indices/inflacion", { cache: "no-store" });
     if (res.ok) {
@@ -557,7 +541,7 @@ export async function syncApisLive(): Promise<{ success: boolean; updatedCount: 
     console.warn("ArgentinaDatos warning:", err);
   }
 
-  // 3. Combustibles vía datos.energia.gob.ar
+  // 3. Combustibles
   try {
     const res = await fetch(
       "https://datos.energia.gob.ar/api/3/action/datastore_search?resource_id=80ac25de-a44a-4445-9215-090cf55cfda5&filters=%7B%22producto%22%3A%22Gas%20Oil%20Grado%202%22%7D&limit=5",
@@ -599,9 +583,6 @@ export async function syncApisLive(): Promise<{ success: boolean; updatedCount: 
   };
 }
 
-/**
- * Chequea y corre la sincronización diaria automática
- */
 export async function checkDailyAutoSync(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   const lastSyncStr = localStorage.getItem(LAST_SYNC_KEY);
@@ -637,14 +618,6 @@ export function getLastSyncTime(): string | null {
   }
 }
 
-// ========================================================================
-// SERVICIO DE REFERENCIA CENTRAL PARA TODO EL SISTEMA HJB
-// ========================================================================
-
-/**
- * Función central para consultar el precio unitario activo de cualquier insumo
- * en Pesos ($ ARS) o Dólares (USD) para dietas de vacas o costos de labores
- */
 export function getPrecioReferencia(id: string, moneda: "ARS" | "USD" = "ARS"): number {
   const items = getValoresMoviles();
   const item = items.find((x) => x.id === id);
@@ -655,9 +628,6 @@ export function getPrecioReferencia(id: string, moneda: "ARS" | "USD" = "ARS"): 
   return typeof item.valorArs === "number" ? item.valorArs : 0;
 }
 
-/**
- * Mapa completo de precios de referencia para cálculo rápido en dietas y labores
- */
 export function getPreciosReferenciaMap(): Record<string, { ars: number; usd: number; unidadArs: string; unidadUsd: string }> {
   const items = getValoresMoviles();
   const map: Record<string, { ars: number; usd: number; unidadArs: string; unidadUsd: string }> = {};
