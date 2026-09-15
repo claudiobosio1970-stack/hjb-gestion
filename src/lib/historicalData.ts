@@ -37,7 +37,7 @@ export const HISTORIAL_AGRICOLA_HJB: HistoricalActivity[] = [];
 
 export const LOTES_POR_CAMPO: Record<string, string[]> = {
   Aguilera: ["Lote Único"],
-  Racca: ["Lote 1", "Lote 2"],
+  Racca: ["Lote 1", "Lote 2", "Lote 3a", "Lote 3b"],
   Keuneke: ["Lote 1", "Lote 2"],
   Kitty: ["Lote Único"],
   Tambo: ["Lote 1", "Lote 2", "Lote 3", "Lote 4", "Lote 5", "Lote 6", "Lote 7", "Lote 8", "Lote 9"]

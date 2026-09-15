@@ -135,24 +135,42 @@ export const INITIAL_LOTES: Lote[] = [
     aptitudSuelo: "Agrícola Clase I",
     observaciones: "9 ha",
   },
-  // Racca (100 ha - 2 lotes a efectos del sistema)
+  // Racca (100 ha - 4 lotes delimitados de 25 ha)
   {
     id: "racca-lote-1",
     campo: "Racca",
     nombre: "Lote 1",
-    superficieHa: 50,
+    superficieHa: 25,
     estado: "Planificado",
     aptitudSuelo: "Agrícola de alta productividad",
-    observaciones: "Corresponde físicamente a Lotes 1 + 3A combinados",
+    observaciones: "25 ha",
   },
   {
     id: "racca-lote-2",
     campo: "Racca",
     nombre: "Lote 2",
-    superficieHa: 50,
+    superficieHa: 25,
     estado: "Planificado",
     aptitudSuelo: "Agrícola de alta productividad",
-    observaciones: "Corresponde físicamente a Lotes 2 + 3B combinados",
+    observaciones: "25 ha",
+  },
+  {
+    id: "racca-lote-3a",
+    campo: "Racca",
+    nombre: "Lote 3a",
+    superficieHa: 25,
+    estado: "Planificado",
+    aptitudSuelo: "Agrícola de alta productividad",
+    observaciones: "25 ha",
+  },
+  {
+    id: "racca-lote-3b",
+    campo: "Racca",
+    nombre: "Lote 3b",
+    superficieHa: 25,
+    estado: "Planificado",
+    aptitudSuelo: "Agrícola de alta productividad",
+    observaciones: "25 ha",
   },
   // Kitty (29 ha - 1 lote)
   {

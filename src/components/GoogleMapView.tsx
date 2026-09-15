@@ -98,9 +98,37 @@ export default function GoogleMapView() {
   useEffect(() => {
     const c = getCamposGeo();
     const l = getLotesGeo();
+    const acts = agricultureData.listActivities();
+    const agriLotes = agricultureData.listLotes();
+
+    // Sincronizar hectáreas y cultivos de lotes trazados con la base de Agricultura
+    const syncedLotes = l.map((lg) => {
+      if (lg.tipo === "perimetro_campo") {
+        const campoAgri = c.find((camp) => camp.id === lg.campoId);
+        return {
+          ...lg,
+          superficieHa: campoAgri ? campoAgri.superficieHa : lg.superficieHa,
+        };
+      }
+      const matched = agriLotes.find((al) => {
+        if (al.campo.toLowerCase() !== lg.campoNombre.toLowerCase()) return false;
+        const alClean = al.nombre.toLowerCase().replace(/lote\s*/g, "").trim();
+        const lgClean = lg.nombre.toLowerCase().replace(/lote\s*/g, "").trim();
+        return alClean === lgClean;
+      });
+      if (matched) {
+        return {
+          ...lg,
+          superficieHa: matched.superficieHa ?? lg.superficieHa,
+          cultivo: matched.cultivoActual || lg.cultivo,
+        };
+      }
+      return lg;
+    });
+
     setCampos(c);
-    setLotes(l);
-    setActivities(agricultureData.listActivities());
+    setLotes(syncedLotes);
+    setActivities(acts);
 
     const envKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || DEFAULT_MAPS_KEY;
     const storedKey = typeof window !== "undefined" ? localStorage.getItem("hjb_gmaps_api_key") || "" : "";
@@ -129,6 +157,13 @@ export default function GoogleMapView() {
       delete window.hjbOpenLabores;
     };
   }, []);
+
+  // Actualizar labores en vivo al abrir el modal de un lote
+  useEffect(() => {
+    if (laboresModalLote) {
+      setActivities(agricultureData.listActivities());
+    }
+  }, [laboresModalLote]);
 
   // Inicializar Google Maps
   useEffect(() => {
@@ -415,20 +450,22 @@ export default function GoogleMapView() {
     });
   }
 
-  // Filtrar labores asociadas a un lote
+  // Filtrar labores asociadas a un lote o perímetro de campo
   function getLaboresForLote(lote: LoteGeo): Activity[] {
     const cNom = lote.campoNombre.toLowerCase();
-    const lNom = lote.nombre.toLowerCase();
+    const lNomClean = lote.nombre.toLowerCase().replace(/lote\s*/g, "").trim();
 
     return activities.filter((act) => {
       if (act.campo.toLowerCase() !== cNom) return false;
-      if (!act.lote) return true; // labores generales del campo
-      const actLote = act.lote.toLowerCase();
+      if (lote.tipo === "perimetro_campo") return true; // Perímetro abarca todas las labores del campo
+      if (!act.lote || act.lote.toLowerCase() === "lote único") return true;
+      if (act.esGrupal) return true;
+
+      const actLoteClean = act.lote.toLowerCase().replace(/lote\s*/g, "").trim();
       return (
-        actLote === lNom ||
-        actLote === `lote ${lNom}` ||
-        actLote.includes(lNom) ||
-        act.esGrupal
+        actLoteClean === lNomClean ||
+        act.lote.toLowerCase().includes(lote.nombre.toLowerCase()) ||
+        lote.nombre.toLowerCase().includes(act.lote.toLowerCase())
       );
     });
   }
@@ -602,6 +639,40 @@ export default function GoogleMapView() {
     setShowNewLoteModal(false);
     setSelectedLote(newLote);
 
+    // Sincronización bidireccional con el módulo de Agricultura
+    try {
+      const existingAgriLotes = agricultureData.listLotes(campoFound.nombre);
+      const cleanNewNom = finalNombre.toLowerCase().replace(/lote\s*/g, "").trim();
+      const matched = existingAgriLotes.find((al) => {
+        const cleanAlNom = al.nombre.toLowerCase().replace(/lote\s*/g, "").trim();
+        return cleanAlNom === cleanNewNom;
+      });
+
+      if (matched) {
+        agricultureData.saveLote({
+          ...matched,
+          superficieHa: newLote.superficieHa,
+          cultivoActual: newLote.cultivo || matched.cultivoActual,
+          updatedAt: new Date().toISOString(),
+        });
+      } else if (formTipo === "lote_interno") {
+        agricultureData.saveLote({
+          id: `lote-${formCampoId}-${Date.now()}`,
+          campo: campoFound.nombre,
+          nombre: finalNombre.startsWith("Lote ") ? finalNombre : `Lote ${finalNombre}`,
+          superficieHa: newLote.superficieHa,
+          cultivoActual: newLote.cultivo || "",
+          estado: "En producción",
+          aptitudSuelo: "Agrícola",
+          observaciones: formObservaciones.trim() || "Delimitado desde Mapa Satelital",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.warn("Error sincronizando con agriculturaData:", err);
+    }
+
     const relatedCampo = campos.find((c) => c.id === formCampoId);
     if (relatedCampo) setSelectedCampo(relatedCampo);
 
@@ -666,7 +737,7 @@ export default function GoogleMapView() {
             onclick="window.hjbOpenLabores('${lote.id}')"
             style="display: block; width: 100%; text-align: center; background: #166534; color: #ffffff; border: none; padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;"
           >
-            📋 Ver Labores del Lote (${labores.length}) →
+            📋 Ver Labores del Lote →
           </button>
 
           <a href="/agricultura/${lote.campoId}" style="display: block; text-align: center; background: #f1f5f9; color: #334155; text-decoration: none; padding: 5px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600;">
@@ -1625,6 +1696,44 @@ export default function GoogleMapView() {
                   ))}
                 </select>
               </div>
+
+              {formTipo === "lote_interno" && (
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)" }}>
+                    Vincular con Lote de Agricultura (Opcional)
+                  </label>
+                  <select
+                    className="select"
+                    style={{ marginTop: "4px" }}
+                    onChange={(e) => {
+                      const selectedLoteId = e.target.value;
+                      if (!selectedLoteId) return;
+                      const campoObj = campos.find((c) => c.id === formCampoId);
+                      const lotesList = agricultureData.listLotes(campoObj?.nombre);
+                      const foundLote = lotesList.find((l) => l.id === selectedLoteId);
+                      if (foundLote) {
+                        setFormNombre(foundLote.nombre.replace(/^Lote\s+/i, ""));
+                        if (foundLote.superficieHa) setFormSuperficieHa(String(foundLote.superficieHa));
+                        if (foundLote.cultivoActual) setFormCultivo(foundLote.cultivoActual);
+                      }
+                    }}
+                  >
+                    <option value="">-- Elegir lote oficial o ingresar uno nuevo abajo --</option>
+                    {(() => {
+                      const campoObj = campos.find((c) => c.id === formCampoId);
+                      const lotesList = agricultureData.listLotes(campoObj?.nombre);
+                      return lotesList.map((al) => (
+                        <option key={al.id} value={al.id}>
+                          {al.nombre} ({al.superficieHa ?? "?"} ha{al.cultivoActual ? ` · ${al.cultivoActual}` : ""})
+                        </option>
+                      ));
+                    })()}
+                  </select>
+                  <small style={{ color: "var(--brand-700)", fontSize: "11px", marginTop: "3px", display: "block" }}>
+                    💡 Al seleccionar un lote oficial, se autocompletan automáticamente las hectáreas y el cultivo de Agricultura.
+                  </small>
+                </div>
+              )}
 
               <div>
                 <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)" }}>
