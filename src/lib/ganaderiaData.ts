@@ -78,9 +78,9 @@ export interface FichaVentaFrigorifico {
 }
 
 // =========================================================================
-// 1. DEFINICIÓN DE LAS 5 ETAPAS EXACTAS DEL EXCEL HJB
+// 1. DEFINICIÓN DEFAULT DE LAS 5 ETAPAS EXACTAS DEL EXCEL HJB
 // =========================================================================
-export const CORRALES_DEFINICION: DefinicionCorral[] = [
+export const CORRALES_DEFINICION_DEFAULT: DefinicionCorral[] = [
   {
     id: "guachera",
     numero: 1,
@@ -175,6 +175,8 @@ export const CORRALES_DEFINICION: DefinicionCorral[] = [
     ],
   },
 ];
+
+export const CORRALES_DEFINICION = CORRALES_DEFINICION_DEFAULT;
 
 // =========================================================================
 // 2. DATOS INICIALES REALISTAS DE HJB (EN PRODUCCIÓN)
@@ -325,9 +327,9 @@ export const FICHAS_VENTAS_DEFAULT: FichaVentaFrigorifico[] = [
     pesoNetoTotalKg: 9532.5,
     pesoNetoPromedioKg: 381.3,
     precioKgVivoArs: 4200,
-    facturacionTotalArs: 40036500, // 9532.5 * 4200
-    costoAlimentacionTotalArs: 18026450, // ~721.058 x 25
-    otrosGastosArs: 950000, // flete jaula + DTe
+    facturacionTotalArs: 40036500,
+    costoAlimentacionTotalArs: 18026450,
+    otrosGastosArs: 950000,
     costoTotalArs: 18976450,
     gananciaNetaTotalArs: 21060050,
     gananciaNetaPorCabezaArs: 842402,
@@ -362,9 +364,27 @@ export const FICHAS_VENTAS_DEFAULT: FichaVentaFrigorifico[] = [
 // =========================================================================
 // 3. PERSISTENCIA EN LOCAL STORAGE
 // =========================================================================
-const STORAGE_TROPAS = "hjb_ganaderia_tropas_v01";
-const STORAGE_PESAJES = "hjb_ganaderia_pesajes_v01";
-const STORAGE_VENTAS = "hjb_ganaderia_ventas_v01";
+const STORAGE_CORRALES = "hjb_ganaderia_corrales_v02";
+const STORAGE_TROPAS = "hjb_ganaderia_tropas_v02";
+const STORAGE_PESAJES = "hjb_ganaderia_pesajes_v02";
+const STORAGE_VENTAS = "hjb_ganaderia_ventas_v02";
+
+export function getCorrales(): DefinicionCorral[] {
+  if (typeof window === "undefined") return CORRALES_DEFINICION_DEFAULT;
+  try {
+    const raw = localStorage.getItem(STORAGE_CORRALES);
+    if (!raw) return CORRALES_DEFINICION_DEFAULT;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : CORRALES_DEFINICION_DEFAULT;
+  } catch {
+    return CORRALES_DEFINICION_DEFAULT;
+  }
+}
+
+export function saveCorrales(corrales: DefinicionCorral[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_CORRALES, JSON.stringify(corrales));
+}
 
 export function getTropas(): TropaGanadera[] {
   if (typeof window === "undefined") return TROPAS_DEFAULT;
@@ -415,9 +435,8 @@ export function saveVentas(ventas: FichaVentaFrigorifico[]) {
 // 4. CÁLCULO DINÁMICO DE COSTOS DE ALIMENTACIÓN CRUZADOS CON VALORES MÓVILES
 // =========================================================================
 export function getCostoInsumoDieta(insumoId: string): number {
-  // Conexión directa a Valores Móviles
   if (insumoId === "maiz") {
-    const p = getPrecioReferencia("maiz"); // $/Tn
+    const p = getPrecioReferencia("maiz");
     return p > 0 ? p / 1000 : 295.2; // $/kg
   }
   if (insumoId === "silo-maiz-kg") {
@@ -425,15 +444,15 @@ export function getCostoInsumoDieta(insumoId: string): number {
     return p > 0 ? p : 39.1; // $/kg
   }
   if (insumoId === "pellet-soja") {
-    const p = getPrecioReferencia("pellet-soja"); // $/Tn
+    const p = getPrecioReferencia("pellet-soja");
     return p > 0 ? p / 1000 : 489.7; // $/kg
   }
   if (insumoId === "rollo-alfalfa") {
-    const p = getPrecioReferencia("rollo-alfalfa"); // $/Rollo ~500kg
+    const p = getPrecioReferencia("rollo-alfalfa");
     return p > 0 ? p / 500 : 69.0; // $/kg
   }
   if (insumoId === "leche") {
-    return 548.0; // $/litro referencia pago leche tambo
+    return 548.0; // $/lt
   }
   if (insumoId === "balanceado-iniciador") {
     return 340.0; // $/kg
@@ -447,8 +466,9 @@ export function getCostoInsumoDieta(insumoId: string): number {
   return 100.0;
 }
 
-export function getCostoDiarioPorAnimal(corralId: EtapaCorralId): number {
-  const def = CORRALES_DEFINICION.find((c) => c.id === corralId);
+export function getCostoDiarioPorAnimal(corralId: EtapaCorralId, corralesList?: DefinicionCorral[]): number {
+  const list = corralesList || getCorrales();
+  const def = list.find((c) => c.id === corralId);
   if (!def) return 0;
   let total = 0;
   for (const c of def.dietaBase) {
@@ -458,8 +478,9 @@ export function getCostoDiarioPorAnimal(corralId: EtapaCorralId): number {
   return Math.round(total);
 }
 
-export function getResumenGanaderia() {
-  const tropas = getTropas();
+export function getResumenGanaderia(corralesList?: DefinicionCorral[], tropasCustom?: TropaGanadera[]) {
+  const tropas = tropasCustom || getTropas();
+  const corrales = corralesList || getCorrales();
   let totalCabezas = 0;
   let totalKilos = 0;
   let listosFrigorifico = 0;
@@ -471,7 +492,7 @@ export function getResumenGanaderia() {
     if (t.corralId === "terminacion" && t.pesoActualKg >= 370) {
       listosFrigorifico += t.cabezas;
     }
-    const costoAnimal = getCostoDiarioPorAnimal(t.corralId);
+    const costoAnimal = getCostoDiarioPorAnimal(t.corralId, corrales);
     costoDiarioTotal += t.cabezas * costoAnimal;
   }
 
