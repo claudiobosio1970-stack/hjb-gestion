@@ -11,10 +11,10 @@ export type CategoriaValor =
 export type FuenteValor =
   | "API DolarApi"
   | "API ArgentinaDatos"
-  | "API Secretaría de Energía"
+  | "API YPF / Surtidor Oficial"
   | "API Granos.ar (Pizarra BCR)"
-  | "Manual HJB"
-  | "Derivado / Fórmula";
+  | "Automático (Dólar BNA)"
+  | "Manual HJB";
 
 export interface ValorMovil {
   id: string;
@@ -32,7 +32,7 @@ export interface ValorMovil {
   fechaActualizacion: string;
 }
 
-const BASE_TC = 1495;
+const BASE_TC = 1530;
 
 function toUsd(ars: number | null, tc: number, decimals: number = 3): number | null {
   if (ars === null || tc <= 0) return null;
@@ -52,44 +52,44 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     id: "dolar-bna",
     nombre: "Dólar BNA (Divisas venta)",
     categoria: "Macro & Combustibles",
-    valorArs: 1495,
+    valorArs: 1530,
     valorUsd: 1.0,
     unidadArs: "$",
     unidadUsd: "USD",
     fuente: "API DolarApi",
     esEditableManual: true,
     nota: "Tipo de cambio oficial BNA para liquidaciones y paridad",
-    fechaActualizacion: "18/8/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "inflacion",
     nombre: "Inflación",
     categoria: "Macro & Combustibles",
-    valorArs: 2.1,
-    valorUsd: 2.1,
+    valorArs: 1.7,
+    valorUsd: 1.7,
     unidadArs: "%",
     unidadUsd: "%",
     fuente: "API ArgentinaDatos",
     esEditableManual: true,
-    nota: "Índice de Precios al Consumidor (IPC)",
-    fechaActualizacion: "18/8/26",
+    nota: "Índice de Precios al Consumidor (IPC INDEC)",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "gasoil",
     nombre: "Gas oil",
     categoria: "Macro & Combustibles",
-    valorArs: 2200,
-    valorUsd: toUsd(2200, BASE_TC, 2),
+    valorArs: 2289,
+    valorUsd: toUsd(2289, BASE_TC, 2),
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
-    fuente: "API Secretaría de Energía",
+    fuente: "API YPF / Surtidor Oficial",
     esEditableManual: true,
-    nota: "Gas Oil Grado 2 para maquinaria y laboreos",
-    fechaActualizacion: "18/8/26",
+    nota: "YPF DIESEL 500 (Grado 2) surtidor oficial Res. 314/16",
+    fechaActualizacion: "15/9/26",
   },
 
   // ==========================================
-  // 2. GRANOS
+  // 2. GRANOS (API Granos.ar / Pizarra Rosario BCR)
   // ==========================================
   {
     id: "maiz",
@@ -102,7 +102,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "API Granos.ar (Pizarra BCR)",
     esEditableManual: true,
     nota: "Equiv: $295,20 / kg para mixer",
-    fechaActualizacion: "14/9/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "soja",
@@ -115,7 +115,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "API Granos.ar (Pizarra BCR)",
     esEditableManual: true,
     nota: "Equiv: $555 / kg",
-    fechaActualizacion: "14/9/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "trigo",
@@ -128,7 +128,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "API Granos.ar (Pizarra BCR)",
     esEditableManual: true,
     nota: "Equiv: $344,65 / kg",
-    fechaActualizacion: "14/9/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "sorgo",
@@ -141,7 +141,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "API Granos.ar (Pizarra BCR)",
     esEditableManual: true,
     nota: "Equiv: $275,70 / kg",
-    fechaActualizacion: "14/9/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "girasol",
@@ -154,11 +154,11 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "API Granos.ar (Pizarra BCR)",
     esEditableManual: true,
     nota: "Equiv: $756,74 / kg",
-    fechaActualizacion: "14/9/26",
+    fechaActualizacion: "15/9/26",
   },
 
   // ==========================================
-  // 3. ENSILAJES Y PASTURAS
+  // 3. ENSILAJES Y PASTURAS (Manual HJB)
   // ==========================================
   {
     id: "silo-maiz-kg",
@@ -171,7 +171,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "Manual HJB",
     esEditableManual: true,
     nota: "Silaje de planta entera picado para mixer",
-    fechaActualizacion: "18/8/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "silo-avena-kg",
@@ -184,7 +184,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "Manual HJB",
     esEditableManual: true,
     nota: "Silaje de avena forrajera tambo",
-    fechaActualizacion: "18/8/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "pastura-alfalfa-kg",
@@ -197,7 +197,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "Manual HJB",
     esEditableManual: true,
     nota: "Alfalfa consumo directo en pastoreo rotativo",
-    fechaActualizacion: "18/8/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "pastura-avena-kg",
@@ -210,11 +210,11 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "Manual HJB",
     esEditableManual: true,
     nota: "Verdeo de invierno en pastoreo",
-    fechaActualizacion: "18/8/26",
+    fechaActualizacion: "15/9/26",
   },
 
   // ==========================================
-  // 4. ROLLOS FORRAJEROS
+  // 4. ROLLOS FORRAJEROS (Manual HJB)
   // ==========================================
   {
     id: "rollo-alfalfa",
@@ -227,7 +227,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "Manual HJB",
     esEditableManual: true,
     nota: "Rollo henificado de alfalfa de primera (Equiv. $69 / kg en ~500 kg)",
-    fechaActualizacion: "18/8/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "rollo-avena",
@@ -240,7 +240,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "Manual HJB",
     esEditableManual: true,
     nota: "Rollo de avena entera henificada (Equiv. $55,20 / kg en ~500 kg)",
-    fechaActualizacion: "18/8/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "rollo-chala-maiz",
@@ -253,7 +253,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "Manual HJB",
     esEditableManual: true,
     nota: "Rastrojo de maíz para volumen / mantenimiento (Equiv. $55 / kg en ~400 kg)",
-    fechaActualizacion: "18/8/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "rollo-gramineas",
@@ -266,152 +266,152 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fuente: "Manual HJB",
     esEditableManual: true,
     nota: "Rollo de pasto consociado / gramíneas (Equiv. $40 / kg en ~500 kg)",
-    fechaActualizacion: "18/8/26",
+    fechaActualizacion: "15/9/26",
   },
 
   // ==========================================
-  // 5. PELLETS & CONCENTRADOS
+  // 5. PELLETS & CONCENTRADOS (Manual HJB)
   // ==========================================
   {
     id: "pellet-soja",
     nombre: "Pellet de soja",
     categoria: "Pellets & Concentrados",
     valorArs: 489700,
-    valorUsd: 327.56,
+    valorUsd: 320.07,
     unidadArs: "$/Tn",
     unidadUsd: "USD/Tn",
     fuente: "Manual HJB",
     esEditableManual: true,
     fletePct: 7,
     nota: "Concentrado proteico con 7% flete incluido (Equiv. $489,70 / kg)",
-    fechaActualizacion: "14/9/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "pellet-trigo",
     nombre: "Pellet de trigo",
     categoria: "Pellets & Concentrados",
     valorArs: 235400,
-    valorUsd: 157.46,
+    valorUsd: 153.86,
     unidadArs: "$/Tn",
     unidadUsd: "USD/Tn",
     fuente: "Manual HJB",
     esEditableManual: true,
     fletePct: 7,
     nota: "Afrechillo / subproducto de molienda con flete (Equiv. $235,40 / kg)",
-    fechaActualizacion: "14/9/26",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "semilla-algodon",
     nombre: "Semilla de algodón",
     categoria: "Pellets & Concentrados",
     valorArs: 345000,
-    valorUsd: 230.77,
+    valorUsd: 225.49,
     unidadArs: "$/Tn",
     unidadUsd: "USD/Tn",
     fuente: "Manual HJB",
     esEditableManual: true,
     fletePct: 8,
     nota: "Suplemento graso y proteico tambo con flete (Equiv. $345,00 / kg)",
-    fechaActualizacion: "14/9/26",
+    fechaActualizacion: "15/9/26",
   },
 
   // ==========================================
-  // 6. LÍQUIDOS DE FUMIGACIÓN
+  // 6. LÍQUIDOS DE FUMIGACIÓN (Automático Dólar BNA)
   // ==========================================
   {
     id: "glifosato",
     nombre: "Glifosato",
     categoria: "Líquidos de Fumigación",
-    valorArs: 7475,
+    valorArs: 7650,
     valorUsd: 5.0,
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
+    fuente: "Automático (Dólar BNA)",
     esEditableManual: true,
-    nota: "Herbicida sistémico no selectivo (control malezas)",
-    fechaActualizacion: "18/8/26",
+    nota: "USD 5.00 × Dólar BNA venta",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "atrazina",
     nombre: "Atrazina",
     categoria: "Líquidos de Fumigación",
-    valorArs: 8225,
+    valorArs: 8415,
     valorUsd: 5.5,
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
+    fuente: "Automático (Dólar BNA)",
     esEditableManual: true,
-    nota: "Herbicida pre-emergente maíz y sorgo",
-    fechaActualizacion: "18/8/26",
+    nota: "USD 5.50 × Dólar BNA venta",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "dos-cuatro-d",
     nombre: "2,4-D",
     categoria: "Líquidos de Fumigación",
-    valorArs: 8970,
+    valorArs: 9180,
     valorUsd: 6.0,
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
+    fuente: "Automático (Dólar BNA)",
     esEditableManual: true,
-    nota: "Herbicida hormonal para malezas de hoja ancha",
-    fechaActualizacion: "18/8/26",
+    nota: "USD 6.00 × Dólar BNA venta",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "coadyuvante",
     nombre: "Coadyuvante",
     categoria: "Líquidos de Fumigación",
-    valorArs: 5230,
+    valorArs: 5355,
     valorUsd: 3.5,
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
+    fuente: "Automático (Dólar BNA)",
     esEditableManual: true,
-    nota: "Tensioactivo / antievaporante para caldo de pulverización",
-    fechaActualizacion: "18/8/26",
+    nota: "USD 3.50 × Dólar BNA venta",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "cletodim",
     nombre: "Cletodim",
     categoria: "Líquidos de Fumigación",
-    valorArs: 14950,
+    valorArs: 15300,
     valorUsd: 10.0,
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
+    fuente: "Automático (Dólar BNA)",
     esEditableManual: true,
-    nota: "Graminicida selectivo post-emergente",
-    fechaActualizacion: "18/8/26",
+    nota: "USD 10.00 × Dólar BNA venta",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "insecticida",
     nombre: "Insecticida",
     categoria: "Líquidos de Fumigación",
-    valorArs: 17940,
+    valorArs: 18360,
     valorUsd: 12.0,
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
+    fuente: "Automático (Dólar BNA)",
     esEditableManual: true,
-    nota: "Control de orugas y chinches en soja y maíz",
-    fechaActualizacion: "18/8/26",
+    nota: "USD 12.00 × Dólar BNA venta",
+    fechaActualizacion: "15/9/26",
   },
   {
     id: "fungicida",
     nombre: "Fungicida",
     categoria: "Líquidos de Fumigación",
-    valorArs: 22425,
+    valorArs: 22950,
     valorUsd: 15.0,
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
+    fuente: "Automático (Dólar BNA)",
     esEditableManual: true,
-    nota: "Control de royas y tizón foliar",
-    fechaActualizacion: "18/8/26",
+    nota: "USD 15.00 × Dólar BNA venta",
+    fechaActualizacion: "15/9/26",
   },
 ];
 
-const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v07";
+const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v08";
 const LAST_SYNC_KEY = "hjb_valores_moviles_last_sync";
 
 export function getValoresMoviles(): ValorMovil[] {
@@ -536,9 +536,9 @@ export async function syncApisLive(): Promise<{ success: boolean; details: strin
     console.warn("No se pudo obtener Dólar Oficial BNA:", err);
   }
 
-  // 2. Inflación mensual IPC
+  // 2. Inflación mensual IPC (API oficial argentina datos)
   try {
-    const res = await fetch("https://argentinadatos-proxy.vercel.app/api/finanzas/indices/inflacion", { cache: "no-store" });
+    const res = await fetch("https://api.argentinadatos.com/v1/finanzas/indices/inflacion", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
@@ -546,10 +546,10 @@ export async function syncApisLive(): Promise<{ success: boolean; details: strin
         if (typeof last.valor === "number") {
           updated = updated.map((it) =>
             it.id === "inflacion"
-              ? { ...it, valorArs: last.valor, valorUsd: last.valor, nota: `IPC mensual (${last.fecha || "último dato"})`, fechaActualizacion: today }
+              ? { ...it, valorArs: last.valor, valorUsd: last.valor, nota: `IPC mensual INDEC (${last.fecha || "último dato"})`, fechaActualizacion: today }
               : it
           );
-          details.push(`Inflación IPC: ${last.valor}%`);
+          details.push(`Inflación IPC: ${last.valor}% (${last.fecha})`);
         }
       }
     }
@@ -557,67 +557,87 @@ export async function syncApisLive(): Promise<{ success: boolean; details: strin
     console.warn("No se pudo obtener Inflación:", err);
   }
 
-  // 3. Granos Pizarra Rosario BCR vía granos.ar
+  // 3. Gas Oil YPF DIESEL 500 (API oficial de surtidores / Sec. Energía)
   try {
-    const res = await fetch("https://api.granos.ar/pizarra/rosario/latest", { cache: "no-store" });
+    const res = await fetch("https://naftas.com.ar/api/fuel?city=SANTA%20FE", { cache: "no-store" });
     if (res.ok) {
-      const data = await res.json();
-      const mapPizarra: Record<string, { ars: number; usd?: number }> = {};
-      if (Array.isArray(data)) {
-        for (const g of data) {
-          const name = String(g.grano || g.nombre || "").toLowerCase();
-          const precioArs = Number(g.precio || g.valor || g.precioArs);
-          if (name && !isNaN(precioArs) && precioArs > 0) {
-            mapPizarra[name] = { ars: precioArs, usd: Number(g.precioUsd) || undefined };
-          }
-        }
-      } else if (data && typeof data === "object") {
-        for (const [k, v] of Object.entries(data)) {
-          const val = v as any;
-          const precioArs = Number(val.precio || val.valor || val.precioArs || val);
-          if (!isNaN(precioArs) && precioArs > 0) {
-            mapPizarra[k.toLowerCase()] = { ars: precioArs, usd: Number(val.precioUsd) || undefined };
-          }
-        }
+      const fuelData = await res.json();
+      const cityKey = Object.keys(fuelData)[0];
+      const ypf = fuelData[cityKey]?.empresas?.YPF;
+      const dieselPrice = ypf?.DIESEL500?.precio || ypf?.["DIESEL 500"]?.precio;
+      if (typeof dieselPrice === "number" && dieselPrice > 0) {
+        updated = updated.map((it) =>
+          it.id === "gasoil"
+            ? {
+                ...it,
+                valorArs: dieselPrice,
+                valorUsd: toUsd(dieselPrice, tc, 2),
+                fuente: "API YPF / Surtidor Oficial",
+                nota: "YPF DIESEL 500 surtidor oficial Res. 314/16",
+                fechaActualizacion: today,
+              }
+            : it
+        );
+        details.push(`Gas Oil (YPF Diesel 500): $${dieselPrice.toLocaleString("es-AR")} / lt`);
       }
+    }
+  } catch (err) {
+    console.warn("No se pudo obtener Gas Oil YPF:", err);
+  }
 
-      const matchGrano = (id: string, keys: string[]) => {
-        for (const k of keys) {
-          if (mapPizarra[k]) return mapPizarra[k];
+  // 4. Granos Pizarra Rosario BCR vía granos.ar (Cloudflare worker oficial)
+  try {
+    const res = await fetch("https://granosar.lfcaucino.workers.dev/api/v1/pizarra", { cache: "no-store" });
+    if (res.ok) {
+      const json = await res.json();
+      const granos = json?.data?.granos;
+      if (granos && typeof granos === "object") {
+        const mapping: Record<string, { ars_tn: number; usd_tn: number }> = granos;
+        const grainIds = ["maiz", "soja", "trigo", "sorgo", "girasol"];
+
+        for (const gId of grainIds) {
+          const itemData = mapping[gId];
+          if (itemData && typeof itemData.ars_tn === "number" && itemData.ars_tn > 0) {
+            const arsVal = itemData.ars_tn;
+            const usdVal = itemData.usd_tn || toUsd(arsVal, tc, 2);
+            updated = updated.map((it) =>
+              it.id === gId
+                ? {
+                    ...it,
+                    valorArs: arsVal,
+                    valorUsd: usdVal,
+                    fuente: "API Granos.ar (Pizarra BCR)",
+                    fechaActualizacion: today,
+                  }
+                : it
+            );
+          }
         }
-        return null;
-      };
-
-      const granosKeys: Record<string, string[]> = {
-        maiz: ["maiz", "maíz", "corn"],
-        soja: ["soja", "soybean", "soy"],
-        trigo: ["trigo", "wheat"],
-        sorgo: ["sorgo", "sorghum"],
-        girasol: ["girasol", "sunflower"],
-      };
-
-      for (const [gId, keys] of Object.entries(granosKeys)) {
-        const found = matchGrano(gId, keys);
-        if (found) {
-          const arsVal = found.ars;
-          const usdVal = found.usd && found.usd > 0 ? found.usd : toUsd(arsVal, tc, 2);
-          updated = updated.map((it) =>
-            it.id === gId
-              ? {
-                  ...it,
-                  valorArs: arsVal,
-                  valorUsd: usdVal,
-                  fuente: "API Granos.ar (Pizarra BCR)",
-                  fechaActualizacion: today,
-                }
-              : it
-          );
-          details.push(`${gId.toUpperCase()}: $${arsVal.toLocaleString("es-AR")} / Tn`);
-        }
+        details.push("Granos Pizarra BCR Rosario actualizados en vivo");
       }
     }
   } catch (err) {
     console.warn("No se pudo sincronizar cotizaciones de granos.ar:", err);
+  }
+
+  // 5. Líquidos de Fumigación (Actualización automática en Pesos según Dólar BNA del día)
+  let countFito = 0;
+  updated = updated.map((it) => {
+    if (it.categoria === "Líquidos de Fumigación" && it.valorUsd !== null && it.valorUsd > 0) {
+      const arsCalculado = Math.round(it.valorUsd * tc);
+      countFito++;
+      return {
+        ...it,
+        valorArs: arsCalculado,
+        fuente: "Automático (Dólar BNA)",
+        nota: `USD ${it.valorUsd.toFixed(2)} × TC $${tc.toLocaleString("es-AR")}`,
+        fechaActualizacion: today,
+      };
+    }
+    return it;
+  });
+  if (countFito > 0) {
+    details.push(`${countFito} Líquidos de fumigación actualizados al Dólar BNA`);
   }
 
   saveValoresMoviles(updated);

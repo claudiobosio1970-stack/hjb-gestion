@@ -21,13 +21,13 @@ const CATEGORIAS: { id: CategoriaValor; label: string; icon: string; desc: strin
     id: "Macro & Combustibles",
     label: "Macroeconomía & Combustible",
     icon: "💵",
-    desc: "Tipo de cambio oficial BNA Divisas, inflación IPC y gas oil agropecuario.",
+    desc: "Tipo de cambio oficial BNA Divisas, inflación IPC y gas oil agropecuario en surtidor.",
   },
   {
     id: "Granos",
     label: "Granos",
     icon: "🌾",
-    desc: "Cotizaciones de cereales y oleaginosas (granos.ar / Pizarra Rosario BCR).",
+    desc: "Cotizaciones de cereales y oleaginosas (granos.ar / Pizarra Rosario BCR en vivo).",
   },
   {
     id: "Ensilajes & Pasturas",
@@ -51,7 +51,7 @@ const CATEGORIAS: { id: CategoriaValor; label: string; icon: string; desc: strin
     id: "Líquidos de Fumigación",
     label: "Líquidos de Fumigación",
     icon: "🧪",
-    desc: "Herbicidas, coadyuvantes, insecticidas y fungicidas para pulverización y barbecho.",
+    desc: "Herbicidas, coadyuvantes, insecticidas y fungicidas con conversión automática al Dólar BNA.",
   },
 ];
 
@@ -102,7 +102,7 @@ export default function MercadosPage() {
       setFeedback({ msg: "Hubo una demora al conectar con las APIs externas. Se preservan los valores locales.", type: "info" });
     } finally {
       setSyncing(false);
-      setTimeout(() => setFeedback(null), 6000);
+      setTimeout(() => setFeedback(null), 7000);
     }
   }
 
@@ -158,7 +158,7 @@ export default function MercadosPage() {
           </div>
           <h1>Valores Móviles & Precios de Referencia</h1>
           <p className="muted">
-            Tabla central de insumos y cotizaciones organizada por categorías limpias e independientes.
+            Tabla central bimonetaria conectada a APIs oficiales (Dólar BNA, Inflación, Gas oil YPF y Pizarra Granos Rosario BCR).
           </p>
         </div>
 
@@ -169,7 +169,7 @@ export default function MercadosPage() {
             style={{ display: "flex", alignItems: "center", gap: "6px" }}
             onClick={handleSyncApis}
             disabled={syncing}
-            title="Sincroniza en vivo granos (granos.ar), Dólar BNA, Inflación y Gasoil"
+            title="Sincroniza en vivo Dólar BNA, Inflación, Gas oil YPF, Granos BCR Rosario y Líquidos"
           >
             {syncing ? "⏳ Sincronizando..." : "🔄 Sincronizar APIs ahora"}
           </button>
@@ -283,29 +283,29 @@ export default function MercadosPage() {
           note="Oficial Divisas Venta"
         />
         <MetricCard
-          label="Gas Oil Grado 2"
+          label="Gas Oil YPF"
           value={gasoilItem?.valorArs ? `$${gasoilItem.valorArs.toLocaleString("es-AR")}` : "—"}
-          note={gasoilItem?.valorUsd ? `USD ${gasoilItem.valorUsd} / lt` : "Por litro"}
+          note="Diesel 500 surtidor oficial"
         />
         <MetricCard
           label="Maíz"
           value={maizItem?.valorArs ? `$${maizItem.valorArs.toLocaleString("es-AR")}` : "—"}
-          note={maizItem?.valorUsd ? `USD ${maizItem.valorUsd} / Tn` : "granos.ar"}
+          note={maizItem?.valorUsd ? `USD ${maizItem.valorUsd} / Tn` : "Pizarra BCR Rosario"}
         />
         <MetricCard
           label="Soja"
           value={sojaItem?.valorArs ? `$${sojaItem.valorArs.toLocaleString("es-AR")}` : "—"}
-          note={sojaItem?.valorUsd ? `USD ${sojaItem.valorUsd} / Tn` : "granos.ar"}
+          note={sojaItem?.valorUsd ? `USD ${sojaItem.valorUsd} / Tn` : "Pizarra BCR Rosario"}
         />
         <MetricCard
           label="Pellet Soja"
           value={pelletItem?.valorArs ? `$${pelletItem.valorArs.toLocaleString("es-AR")}` : "—"}
-          note={pelletItem?.valorUsd ? `USD ${pelletItem.valorUsd} / Tn` : "Concentrado"}
+          note={pelletItem?.valorUsd ? `USD ${pelletItem.valorUsd} / Tn` : "Manual HJB"}
         />
         <MetricCard
           label="Glifosato"
           value={glifoItem?.valorArs ? `$${glifoItem.valorArs.toLocaleString("es-AR")}` : "—"}
-          note={glifoItem?.valorUsd ? `USD ${glifoItem.valorUsd} / lt` : "Fitosanitario"}
+          note={glifoItem?.valorUsd ? `USD ${glifoItem.valorUsd} / lt` : "Auto Dólar BNA"}
         />
       </div>
 
@@ -348,8 +348,8 @@ export default function MercadosPage() {
                       <th style={{ width: "190px", textAlign: "right" }}>Precio en Pesos ($ ARS)</th>
                       <th style={{ width: "190px", textAlign: "right" }}>Precio en Dólares (USD)</th>
                       <th style={{ width: "100px" }}>Unidad</th>
-                      <th style={{ width: "150px" }}>Detalle / Nota</th>
-                      <th style={{ width: "170px" }}>Origen</th>
+                      <th style={{ width: "170px" }}>Detalle / Nota</th>
+                      <th style={{ width: "180px" }}>Origen</th>
                       <th style={{ width: "100px" }}>Fecha</th>
                     </tr>
                   </thead>
@@ -466,15 +466,17 @@ export default function MercadosPage() {
                           <td>
                             <span
                               className={
-                                item.fuente.startsWith("API Granos")
-                                ? "pill badgeGreen"
-                                : item.fuente.startsWith("API")
-                                ? "pill badgeBlue"
-                                : item.fuente.startsWith("Derivado")
+                                item.fuente === "Manual HJB"
                                 ? "pill badgeSlate"
-                                : "pill badgeAmber"
+                                : item.fuente.startsWith("API Granos") || item.fuente.startsWith("Automático")
+                                ? "pill badgeGreen"
+                                : "pill badgeBlue"
                               }
-                              style={{ fontSize: "11px", fontWeight: 600 }}
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                border: item.fuente === "Manual HJB" ? "1px solid #cbd5e1" : undefined,
+                              }}
                             >
                               {item.fuente}
                             </span>
@@ -501,10 +503,10 @@ export default function MercadosPage() {
       <section className="panel" style={{ marginTop: "24px", background: "#f8fafc", border: "1px dashed var(--line)" }}>
         <h3 style={{ fontSize: "15px", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
           <span>🏛️</span>
-          <span>Referencia Central de Costos HJB</span>
+          <span>Transparencia de Datos HJB</span>
         </h3>
         <p style={{ fontSize: "13px", color: "var(--slate-700)", lineHeight: 1.5, margin: 0 }}>
-          Esta tabla es la fuente única de verdad de precios e insumos para la empresa. Tanto la actualización automática de las cotizaciones (APIs en vivo) como las ediciones manuales en pesos o dólares impactan de forma unificada en todo el sistema para las dietas de hacienda y costos agrícolas.
+          Todos los insumos con cotización pública se actualizan automáticamente mediante sus APIs oficiales en vivo (Dólar BNA Oficial, Inflación IPC, Gas oil YPF surtidor, Pizarra Rosario BCR y Líquidos fitosanitarios al tipo de cambio del día). Los insumos de producción propia o contratos directos (ensilajes, pasturas, rollos y pellets) se gestionan de manera exclusiva con <strong>Manual HJB</strong>.
         </p>
       </section>
     </AppShell>
