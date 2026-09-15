@@ -20,6 +20,7 @@ import {
   savePesajes,
   saveTropas,
   saveVentas,
+  resetCorralesToDefault,
 } from "@/lib/ganaderiaData";
 
 export default function GanaderiaPage() {
@@ -30,8 +31,9 @@ export default function GanaderiaPage() {
   const [ventas, setVentas] = useState<FichaVentaFrigorifico[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // Vista Específica de un Corral ("Entrar a cada corral")
-  const [selectedCorralId, setSelectedCorralId] = useState<EtapaCorralId | null>(null);
+  // Ficha Técnica Dedicada del Corral (Modal Enfocado)
+  const [modalFichaCorralId, setModalFichaCorralId] = useState<EtapaCorralId | null>(null);
+  const [modoEdicionDietaModal, setModoEdicionDietaModal] = useState(false);
 
   // Filtros de Búsqueda para la Tabla de Tropas
   const [filtroTexto, setFiltroTexto] = useState("");
@@ -103,6 +105,14 @@ export default function GanaderiaPage() {
     setHasDietChanges(false);
     triggerFeedback("¡Dietas y raciones actualizadas y guardadas con éxito!");
   }
+
+  function handleRestaurarDietas() {
+    const defaults = resetCorralesToDefault();
+    setCorrales(defaults);
+    setHasDietChanges(false);
+    triggerFeedback("Se restauraron las raciones de referencia originales de HJB.");
+  }
+
 
   // Modificar cantidad de insumo en una dieta
   function handleEditCantidadDieta(corralId: EtapaCorralId, insumoIdx: number, newCant: number) {
@@ -303,12 +313,34 @@ export default function GanaderiaPage() {
     return true;
   });
 
-  // Corral seleccionado para ver detalle
-  const corralSeleccionado = corrales.find((c) => c.id === selectedCorralId);
-  const tropasCorralSeleccionado = tropas.filter((t) => t.corralId === selectedCorralId);
-  const cabezasCorralSeleccionado = tropasCorralSeleccionado.reduce((acc, t) => acc + t.cabezas, 0);
-  const costoDiaAnimalSeleccionado = corralSeleccionado ? getCostoDiarioPorAnimal(corralSeleccionado.id, corrales) : 0;
-  const costoTotalCorralDiaSeleccionado = costoDiaAnimalSeleccionado * cabezasCorralSeleccionado;
+  // Cálculos para la Ficha Técnica de Corral (Modal)
+  const corralModalSeleccionado = corrales.find((c) => c.id === modalFichaCorralId);
+  const tropasModal = tropas.filter((t) => t.corralId === modalFichaCorralId);
+  const cabezasModal = tropasModal.reduce((acc, t) => acc + t.cabezas, 0);
+  const pesoPromModal =
+    cabezasModal > 0
+      ? Math.round(tropasModal.reduce((acc, t) => acc + t.cabezas * t.pesoActualKg, 0) / cabezasModal)
+      : (corralModalSeleccionado?.pesoEntradaKg || 0);
+  const gdpvPromModal =
+    cabezasModal > 0
+      ? Number((tropasModal.reduce((acc, t) => acc + t.cabezas * t.gdpvKgDia, 0) / cabezasModal).toFixed(2))
+      : 0;
+  const diasPromModal =
+    cabezasModal > 0
+      ? Math.round(tropasModal.reduce((acc, t) => acc + t.cabezas * t.diasEnCorral, 0) / cabezasModal)
+      : 0;
+  const costoDiaAnimalModal = corralModalSeleccionado ? getCostoDiarioPorAnimal(corralModalSeleccionado.id, corrales) : 0;
+  const costoTotalCorralDiaModal = costoDiaAnimalModal * cabezasModal;
+  const progresoModalPct = corralModalSeleccionado
+    ? Math.min(
+        100,
+        Math.round(
+          ((pesoPromModal - corralModalSeleccionado.pesoEntradaKg) /
+            (corralModalSeleccionado.pesoObjetivoKg - corralModalSeleccionado.pesoEntradaKg)) *
+            100
+        )
+      )
+    : 0;
 
   return (
     <AppShell active="Ganadería">
@@ -458,239 +490,12 @@ export default function GanaderiaPage() {
         />
       </div>
 
-      {/* ========================================================================= */}
-      {/* VISTA ESPECÍFICA DE UN CORRAL SELECCIONADO (DRILL-DOWN)                  */}
-      {/* ========================================================================= */}
-      {selectedCorralId && corralSeleccionado ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginBottom: "30px" }}>
-          {/* Barra de Retorno y Navegación entre Corrales */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "12px",
-              background: "#f8fafc",
-              padding: "12px 18px",
-              borderRadius: "10px",
-              border: "1px solid var(--line)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <button
-                type="button"
-                className="ghostButton"
-                onClick={() => setSelectedCorralId(null)}
-                style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}
-              >
-                ← Volver a Todos los Corrales
-              </button>
-              <span style={{ color: "var(--slate-400)" }}>|</span>
-              <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--slate-900)" }}>
-                {corralSeleccionado.icono} {corralSeleccionado.nombreCompleto}
-              </span>
-            </div>
-
-            {/* Selector rápido para saltar de corral */}
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              {corrales.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setSelectedCorralId(c.id)}
-                  className={selectedCorralId === c.id ? "pill badgeGreen" : "pill badgeSlate"}
-                  style={{ cursor: "pointer", fontSize: "11px", fontWeight: 700 }}
-                >
-                  {c.icono} {c.nombreCorto}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tarjetas de Métricas Específicas de Este Corral */}
-          <div className="metricsGrid four">
-            <MetricCard
-              label={`Cabezas en ${corralSeleccionado.nombreCorto}`}
-              value={`${cabezasCorralSeleccionado} cab.`}
-              note={`Objetivo: ${corralSeleccionado.pesoObjetivoKg} kg`}
-            />
-            <MetricCard
-              label="Costo Alimentación / Día"
-              value={`$${costoTotalCorralDiaSeleccionado.toLocaleString("es-AR")}`}
-              note="Total consumido hoy en el corral"
-            />
-            <MetricCard
-              label="Costo Animal / Día"
-              value={`$${costoDiaAnimalSeleccionado.toLocaleString("es-AR")}`}
-              note="Ración individual por cabeza"
-            />
-            <MetricCard
-              label="Costo Total Etapa / Cab."
-              value={`$${(costoDiaAnimalSeleccionado * corralSeleccionado.diasEstimados).toLocaleString("es-AR")}`}
-              note={`${corralSeleccionado.diasEstimados} días estimados`}
-            />
-          </div>
-
-          {/* Ración Específica y Editable de Este Corral */}
-          <section className="panel" style={{ padding: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
-              <div>
-                <h3 style={{ fontSize: "16px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>🥣</span>
-                  <span>Dieta y Consumo Específico de este Corral</span>
-                </h3>
-                <p className="muted" style={{ fontSize: "12.5px", margin: "2px 0 0 0" }}>
-                  Podés editar las cantidades de la ración; los costos por animal y de todo el corral se actualizan al instante.
-                </p>
-              </div>
-
-              {hasDietChanges && (
-                <button
-                  type="button"
-                  className="primaryButton"
-                  onClick={handleGuardarDietas}
-                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
-                >
-                  💾 Guardar Ración de este Corral
-                </button>
-              )}
-            </div>
-
-            <div className="tableWrap">
-              <table className="dataTable">
-                <thead>
-                  <tr>
-                    <th>Ingrediente de la Ración</th>
-                    <th style={{ width: "160px", textAlign: "right" }}>Cantidad por Animal / Día</th>
-                    <th style={{ width: "180px", textAlign: "right" }}>Consumo Total Corral / Día</th>
-                    <th style={{ width: "150px", textAlign: "right" }}>Precio Insumo (Móvil)</th>
-                    <th style={{ width: "160px", textAlign: "right" }}>Costo Total Diario</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {corralSeleccionado.dietaBase.map((d, idx) => {
-                    const precioUnit = getCostoInsumoDieta(d.insumoId);
-                    const totalKgCorral = Number((d.cantidadKgDia * cabezasCorralSeleccionado).toFixed(1));
-                    const costoTotalInsumo = Math.round(totalKgCorral * precioUnit);
-
-                    return (
-                      <tr key={idx}>
-                        <td>
-                          <strong>{d.nombre}</strong>
-                        </td>
-                        <td style={{ textAlign: "right" }}>
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                            <input
-                              type="number"
-                              step="0.05"
-                              value={d.cantidadKgDia}
-                              onChange={(e) =>
-                                handleEditCantidadDieta(
-                                  corralSeleccionado.id,
-                                  idx,
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              style={{
-                                width: "80px",
-                                padding: "4px 6px",
-                                borderRadius: "4px",
-                                border: "1px solid #cbd5e1",
-                                textAlign: "right",
-                                fontWeight: 700,
-                                fontSize: "13px",
-                              }}
-                            />
-                            <span style={{ fontSize: "12px", color: "var(--slate-500)", fontWeight: 600 }}>
-                              {d.unidad}/día
-                            </span>
-                          </div>
-                        </td>
-                        <td style={{ textAlign: "right" }}>
-                          <strong>{totalKgCorral.toLocaleString("es-AR")} {d.unidad}</strong>
-                          <div style={{ fontSize: "11px", color: "var(--slate-400)" }}>para mixer</div>
-                        </td>
-                        <td style={{ textAlign: "right" }}>
-                          ${precioUnit.toLocaleString("es-AR")} / {d.unidad}
-                        </td>
-                        <td style={{ textAlign: "right" }}>
-                          <strong style={{ color: "#166534" }}>${costoTotalInsumo.toLocaleString("es-AR")}</strong>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* Tropas presentes en este corral */}
-          <section className="panel" style={{ padding: "20px" }}>
-            <h3 style={{ fontSize: "16px", margin: "0 0 12px 0" }}>
-              Tropas Activas en {corralSeleccionado.nombreCorto} ({tropasCorralSeleccionado.length})
-            </h3>
-            <div className="tableWrap">
-              <table className="dataTable">
-                <thead>
-                  <tr>
-                    <th>Código / Nombre</th>
-                    <th style={{ textAlign: "right" }}>Cabezas</th>
-                    <th style={{ textAlign: "right" }}>Peso Inicial</th>
-                    <th style={{ textAlign: "right" }}>Peso Actual</th>
-                    <th style={{ textAlign: "right" }}>Ganancia (GDPV)</th>
-                    <th style={{ textAlign: "right" }}>Días en Corral</th>
-                    <th>Ingreso</th>
-                    <th style={{ textAlign: "center" }}>Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tropasCorralSeleccionado.map((t) => (
-                    <tr key={t.id}>
-                      <td>
-                        <strong>{t.codigo}</strong>
-                        <div style={{ fontSize: "12px", color: "var(--slate-500)" }}>{t.nombre}</div>
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <strong>{t.cabezas}</strong>
-                      </td>
-                      <td style={{ textAlign: "right" }}>{t.pesoInicialKg} kg</td>
-                      <td style={{ textAlign: "right" }}>
-                        <strong>{t.pesoActualKg} kg</strong>
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <span className="pill badgeGreen">+{t.gdpvKgDia} kg/d</span>
-                      </td>
-                      <td style={{ textAlign: "right" }}>{t.diasEnCorral} d</td>
-                      <td>{t.fechaIngreso}</td>
-                      <td style={{ textAlign: "center" }}>
-                        <button
-                          type="button"
-                          className="ghostButton"
-                          onClick={() => handleAbrirMover(t)}
-                          style={{ padding: "4px 8px", fontSize: "12px" }}
-                        >
-                          🔄 Mover corral
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      {/* Navegación por Pestañas */}
+      {/* Navegación por Pestañas */}      {/* Navegación por Pestañas */}
       <div className="tabs" style={{ marginBottom: "20px" }}>
         <button
           type="button"
           className={activeTab === "corrales" ? "tab active" : "tab"}
-          onClick={() => {
-            setActiveTab("corrales");
-            setSelectedCorralId(null);
-          }}
+          onClick={() => setActiveTab("corrales")}
         >
           📋 Corrales & Stock ({resumen.totalCabezas} cab)
         </button>
@@ -720,7 +525,7 @@ export default function GanaderiaPage() {
       {/* ========================================================================= */}
       {/* TAB 1: CORRALES Y STOCK                                                  */}
       {/* ========================================================================= */}
-      {activeTab === "corrales" && !selectedCorralId && (
+      {activeTab === "corrales" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           {/* Banner de Ayuda: Clic para entrar a cada corral */}
           <div
@@ -737,7 +542,7 @@ export default function GanaderiaPage() {
             }}
           >
             <span>
-              💡 <strong>Hacé clic en cualquier corral</strong> para entrar y ver su costo de alimentación específico, ración para mixer y tropas activas.
+              💡 <strong>Hacé clic en cualquier corral</strong> para abrir su Ficha Técnica Completa con costos de alimentación desglosados, ración para mixer y tropas.
             </span>
           </div>
 
@@ -759,7 +564,7 @@ export default function GanaderiaPage() {
               return (
                 <div
                   key={c.id}
-                  onClick={() => setSelectedCorralId(c.id)}
+                  onClick={() => setModalFichaCorralId(c.id)}
                   style={{
                     background: "#ffffff",
                     border: "1px solid var(--line)",
@@ -837,7 +642,7 @@ export default function GanaderiaPage() {
                         Total: ${(costoDiaAnimal * cabezasCorral).toLocaleString("es-AR")}/d
                       </span>
                       <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#2563eb" }}>
-                        Ver corral ➔
+                        🔍 Ver Ficha Técnica ➔
                       </span>
                     </div>
                   </div>
@@ -999,7 +804,7 @@ export default function GanaderiaPage() {
                           <td>
                             <button
                               type="button"
-                              onClick={() => setSelectedCorralId(t.corralId)}
+                              onClick={() => setModalFichaCorralId(t.corralId)}
                               style={{
                                 background: "none",
                                 border: "none",
@@ -1174,6 +979,16 @@ export default function GanaderiaPage() {
 
                         <td style={{ textAlign: "right" }}>
                           <span className="pill badgeSlate">{c.diasEstimados} días</span>
+                          <div style={{ marginTop: "6px" }}>
+                            <button
+                              type="button"
+                              className="ghostButton"
+                              onClick={() => setModalFichaCorralId(c.id)}
+                              style={{ padding: "3px 8px", fontSize: "11px", fontWeight: 700 }}
+                            >
+                              🔍 Ver Ficha
+                            </button>
+                          </div>
                         </td>
 
                         <td style={{ textAlign: "right" }}>
@@ -1390,6 +1205,463 @@ export default function GanaderiaPage() {
             </table>
           </div>
         </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: FICHA TÉCNICA Y COSTO ESPECÍFICO DEL CORRAL                       */}
+      {/* ========================================================================= */}
+      {modalFichaCorralId && corralModalSeleccionado && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.7)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => {
+            setModalFichaCorralId(null);
+            setModoEdicionDietaModal(false);
+          }}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "14px",
+              maxWidth: "940px",
+              width: "100%",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              border: "1px solid var(--line)",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del Modal */}
+            <div
+              style={{
+                padding: "18px 24px",
+                borderBottom: "1px solid var(--line)",
+                background: "#f8fafc",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                gap: "12px",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "26px" }}>{corralModalSeleccionado.icono}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <h2 style={{ fontSize: "19px", margin: 0, color: "var(--slate-950)", fontWeight: 800 }}>
+                      {corralModalSeleccionado.nombreCompleto}
+                    </h2>
+                    <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+                      Etapa #{corralModalSeleccionado.numero} de 5
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "12px", fontSize: "12.5px", color: "var(--slate-600)", flexWrap: "wrap" }}>
+                  <span>🎯 <strong>Rango de Peso:</strong> {corralModalSeleccionado.pesoEntradaKg} ➔ {corralModalSeleccionado.pesoObjetivoKg} kg</span>
+                  <span>⏱️ <strong>Estadía Estimada:</strong> {corralModalSeleccionado.diasEstimados} días</span>
+                  <span>🏠 <strong>Capacidad:</strong> 30 cab.</span>
+                </div>
+              </div>
+
+              {/* Selector Rápido de Corral y Botón Cerrar */}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ display: "flex", gap: "3px", background: "#e2e8f0", padding: "3px", borderRadius: "8px" }}>
+                  {corrales.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setModalFichaCorralId(c.id)}
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        borderRadius: "6px",
+                        border: "none",
+                        cursor: "pointer",
+                        background: modalFichaCorralId === c.id ? "#0f172a" : "transparent",
+                        color: modalFichaCorralId === c.id ? "#ffffff" : "#475569",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {c.icono} {c.nombreCorto}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalFichaCorralId(null);
+                    setModoEdicionDietaModal(false);
+                  }}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    fontSize: "20px",
+                    cursor: "pointer",
+                    color: "var(--slate-400)",
+                    padding: "4px 6px",
+                    borderRadius: "6px",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido Scrolleable */}
+            <div style={{ padding: "22px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "20px" }}>
+              
+              {/* 1. ESTADO OPERATIVO DEL CORRAL */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--slate-500)" }}>
+                    📊 1. Estado Operativo del Corral
+                  </span>
+                </div>
+                <div className="metricsGrid four">
+                  <MetricCard
+                    label="Cabezas Actuales"
+                    value={`${cabezasModal} cab.`}
+                    note={`Ocupación: ${Math.round((cabezasModal / 30) * 100)}% de 30 plazas`}
+                  />
+                  <MetricCard
+                    label="Peso Promedio Actual"
+                    value={`${pesoPromModal} kg`}
+                    note={`Meta: ${corralModalSeleccionado.pesoObjetivoKg} kg (${progresoModalPct}% avance)`}
+                  />
+                  <MetricCard
+                    label="Ganancia Diaria (GDPV)"
+                    value={`+${gdpvPromModal} kg/d`}
+                    note="Ritmo de ganancia de peso"
+                  />
+                  <MetricCard
+                    label="Días Promedio en Corral"
+                    value={`${diasPromModal} días`}
+                    note={`Estadía prevista: ${corralModalSeleccionado.diasEstimados} días`}
+                  />
+                </div>
+              </div>
+
+              {/* 2. COSTOS DE ALIMENTACIÓN DESGLOSADOS */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--slate-500)" }}>
+                    💰 2. Costos de Alimentación Desglosados
+                  </span>
+                </div>
+                <div className="metricsGrid four">
+                  <div
+                    style={{
+                      background: "#f0fdf4",
+                      border: "1px solid #bbf7d0",
+                      borderRadius: "10px",
+                      padding: "14px",
+                    }}
+                  >
+                    <div style={{ fontSize: "11.5px", color: "#166534", fontWeight: 700 }}>Costo Animal / Día</div>
+                    <div style={{ fontSize: "22px", fontWeight: 800, color: "#14532d", margin: "4px 0" }}>
+                      ${costoDiaAnimalModal.toLocaleString("es-AR")}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#15803d" }}>Ración individual por cabeza</div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "#eff6ff",
+                      border: "1px solid #bfdbfe",
+                      borderRadius: "10px",
+                      padding: "14px",
+                    }}
+                  >
+                    <div style={{ fontSize: "11.5px", color: "#1e40af", fontWeight: 700 }}>Costo Total Corral / Día</div>
+                    <div style={{ fontSize: "22px", fontWeight: 800, color: "#1e3a8a", margin: "4px 0" }}>
+                      ${costoTotalCorralDiaModal.toLocaleString("es-AR")}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#2563eb" }}>Gasto diario para ${cabezasModal} cabezas</div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "10px",
+                      padding: "14px",
+                    }}
+                  >
+                    <div style={{ fontSize: "11.5px", color: "#475569", fontWeight: 700 }}>Costo Total Etapa / Cab.</div>
+                    <div style={{ fontSize: "22px", fontWeight: 800, color: "#0f172a", margin: "4px 0" }}>
+                      ${(costoDiaAnimalModal * corralModalSeleccionado.diasEstimados).toLocaleString("es-AR")}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#64748b" }}>Acumulado en los ${corralModalSeleccionado.diasEstimados} días</div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "#fdf4ff",
+                      border: "1px solid #f0abfc",
+                      borderRadius: "10px",
+                      padding: "14px",
+                    }}
+                  >
+                    <div style={{ fontSize: "11.5px", color: "#86198f", fontWeight: 700 }}>Proyección Mensual (30d)</div>
+                    <div style={{ fontSize: "22px", fontWeight: 800, color: "#701a75", margin: "4px 0" }}>
+                      ${(costoTotalCorralDiaModal * 30).toLocaleString("es-AR")}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#a21caf" }}>Presupuesto mensual del corral</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. RACIÓN DIARIA Y ORDEN PARA MIXER */}
+              <div style={{ background: "#ffffff", border: "1px solid var(--line)", borderRadius: "10px", padding: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+                  <div>
+                    <h3 style={{ fontSize: "14.5px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🥣</span>
+                      <span>Ración Diaria y Orden de Carga para Mixer</span>
+                    </h3>
+                    <p className="muted" style={{ fontSize: "12px", margin: "2px 0 0 0" }}>
+                      Cantidades individuales y carga total a preparar en comedero para <strong>${cabezasModal} cabezas</strong>.
+                    </p>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      className={modoEdicionDietaModal ? "primaryButton" : "ghostButton"}
+                      onClick={() => setModoEdicionDietaModal(!modoEdicionDietaModal)}
+                      style={{ fontSize: "11.5px", padding: "4px 8px" }}
+                    >
+                      {modoEdicionDietaModal ? "👀 Ver Modo Lectura" : "✏️ Modificar Ración"}
+                    </button>
+
+                    {hasDietChanges && (
+                      <>
+                        <button
+                          type="button"
+                          className="primaryButton"
+                          onClick={() => {
+                            handleGuardarDietas();
+                            setModoEdicionDietaModal(false);
+                          }}
+                          style={{ fontSize: "11.5px", padding: "4px 10px", background: "#166534" }}
+                        >
+                          💾 Guardar Ración
+                        </button>
+                        <button
+                          type="button"
+                          className="ghostButton"
+                          onClick={handleRestaurarDietas}
+                          style={{ fontSize: "11.5px", padding: "4px 8px", color: "#dc2626" }}
+                        >
+                          ↺ Restaurar HJB
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="tableWrap">
+                  <table className="dataTable">
+                    <thead>
+                      <tr>
+                        <th>Ingrediente</th>
+                        <th style={{ textAlign: "right" }}>Ración / Cabeza</th>
+                        <th style={{ textAlign: "right" }}>Carga Total Mixer (${cabezasModal} cab.)</th>
+                        <th style={{ textAlign: "right" }}>Precio Insumo (Móvil)</th>
+                        <th style={{ textAlign: "right" }}>Costo Total Día</th>
+                        <th style={{ textAlign: "right" }}>% Ración</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {corralModalSeleccionado.dietaBase.map((d, idx) => {
+                        const precioUnit = getCostoInsumoDieta(d.insumoId);
+                        const totalKgCorral = Number((d.cantidadKgDia * cabezasModal).toFixed(1));
+                        const costoInsumoDia = Math.round(totalKgCorral * precioUnit);
+                        const incidenciaPct = costoTotalCorralDiaModal > 0 ? Math.round((costoInsumoDia / costoTotalCorralDiaModal) * 100) : 0;
+
+                        return (
+                          <tr key={idx}>
+                            <td>
+                              <strong>{d.nombre}</strong>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              {modoEdicionDietaModal ? (
+                                <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                  <input
+                                    type="number"
+                                    step="0.05"
+                                    value={d.cantidadKgDia}
+                                    onChange={(e) =>
+                                      handleEditCantidadDieta(
+                                        corralModalSeleccionado.id,
+                                        idx,
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                    style={{
+                                      width: "70px",
+                                      padding: "3px 6px",
+                                      borderRadius: "4px",
+                                      border: "1px solid #3b82f6",
+                                      textAlign: "right",
+                                      fontWeight: 700,
+                                      fontSize: "12.5px",
+                                    }}
+                                  />
+                                  <span style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 600 }}>{d.unidad}</span>
+                                </div>
+                              ) : (
+                                <strong style={{ fontSize: "13px" }}>{d.cantidadKgDia} {d.unidad}</strong>
+                              )}
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <strong style={{ color: "#0f172a" }}>{totalKgCorral.toLocaleString("es-AR")} {d.unidad}</strong>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              ${precioUnit.toLocaleString("es-AR")} / {d.unidad}
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <strong style={{ color: "#166534" }}>${costoInsumoDia.toLocaleString("es-AR")}</strong>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <span className="pill badgeSlate" style={{ fontSize: "11px" }}>{incidenciaPct}%</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: "#f8fafc", fontWeight: 700 }}>
+                        <td>TOTALES RACIÓN</td>
+                        <td style={{ textAlign: "right" }}>
+                          {corralModalSeleccionado.dietaBase.reduce((acc, d) => acc + d.cantidadKgDia, 0).toFixed(2)} kg/Lts
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          {(corralModalSeleccionado.dietaBase.reduce((acc, d) => acc + d.cantidadKgDia, 0) * cabezasModal).toFixed(1)} kg/Lts
+                        </td>
+                        <td style={{ textAlign: "right" }}>—</td>
+                        <td style={{ textAlign: "right", color: "#166534", fontSize: "13.5px" }}>
+                          ${costoTotalCorralDiaModal.toLocaleString("es-AR")}
+                        </td>
+                        <td style={{ textAlign: "right" }}>100%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* 4. TROPAS EN ESTE CORRAL */}
+              <div style={{ background: "#ffffff", border: "1px solid var(--line)", borderRadius: "10px", padding: "16px" }}>
+                <h3 style={{ fontSize: "14.5px", margin: "0 0 10px 0", fontWeight: 800, display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>🐂</span>
+                  <span>Tropas Alojadas en {corralModalSeleccionado.nombreCorto} ({tropasModal.length})</span>
+                </h3>
+
+                {tropasModal.length === 0 ? (
+                  <div style={{ padding: "18px", textAlign: "center", color: "var(--slate-500)", background: "#f8fafc", borderRadius: "8px", fontSize: "13px" }}>
+                    No hay tropas encerradas en este corral actualmente.
+                  </div>
+                ) : (
+                  <div className="tableWrap">
+                    <table className="dataTable">
+                      <thead>
+                        <tr>
+                          <th>Código / Nombre</th>
+                          <th style={{ textAlign: "right" }}>Cabezas</th>
+                          <th style={{ textAlign: "right" }}>Peso Ingreso</th>
+                          <th style={{ textAlign: "right" }}>Peso Actual</th>
+                          <th style={{ textAlign: "right" }}>Ganancia (GDPV)</th>
+                          <th style={{ textAlign: "right" }}>Días en Corral</th>
+                          <th>Fecha Ingreso</th>
+                          <th style={{ textAlign: "center" }}>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tropasModal.map((t) => (
+                          <tr key={t.id}>
+                            <td>
+                              <strong>{t.codigo}</strong>
+                              <div style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>{t.nombre}</div>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <strong>{t.cabezas}</strong>
+                            </td>
+                            <td style={{ textAlign: "right" }}>{t.pesoInicialKg} kg</td>
+                            <td style={{ textAlign: "right" }}>
+                              <strong>{t.pesoActualKg} kg</strong>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <span className="pill badgeGreen">+{t.gdpvKgDia} kg/d</span>
+                            </td>
+                            <td style={{ textAlign: "right" }}>{t.diasEnCorral} d</td>
+                            <td>{t.fechaIngreso}</td>
+                            <td style={{ textAlign: "center" }}>
+                              <button
+                                type="button"
+                                className="ghostButton"
+                                onClick={() => {
+                                  setModalFichaCorralId(null);
+                                  handleAbrirMover(t);
+                                }}
+                                style={{ padding: "4px 8px", fontSize: "11.5px" }}
+                              >
+                                🔄 Mover corral
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer del Modal */}
+            <div
+              style={{
+                padding: "12px 24px",
+                background: "#f8fafc",
+                borderTop: "1px solid var(--line)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ fontSize: "12px", color: "var(--slate-500)" }}>
+                💡 Ración sincronizada en tiempo real con <strong>Valores Móviles</strong>.
+              </div>
+              <button
+                type="button"
+                className="ghostButton"
+                onClick={() => {
+                  setModalFichaCorralId(null);
+                  setModoEdicionDietaModal(false);
+                }}
+                style={{ fontWeight: 700, padding: "6px 14px" }}
+              >
+                ✕ Cerrar Ficha
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ========================================================================= */}

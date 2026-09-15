@@ -386,6 +386,14 @@ export function saveCorrales(corrales: DefinicionCorral[]) {
   localStorage.setItem(STORAGE_CORRALES, JSON.stringify(corrales));
 }
 
+export function resetCorralesToDefault(): DefinicionCorral[] {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_CORRALES);
+  }
+  return JSON.parse(JSON.stringify(CORRALES_DEFINICION_DEFAULT));
+}
+
+
 export function getTropas(): TropaGanadera[] {
   if (typeof window === "undefined") return TROPAS_DEFAULT;
   try {
