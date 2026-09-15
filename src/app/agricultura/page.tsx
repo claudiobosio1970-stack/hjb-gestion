@@ -38,11 +38,11 @@ export default function AgriculturaPage() {
         <div>
           <div className="badgeRow" style={{ marginBottom: "6px" }}>
             <span className="pill badgeGreen">Producción Vegetal</span>
-            <span className="pill badgeSlate">Historial 2024/25 - 2026/27</span>
+            <span className="pill badgeSlate">Campaña 2026/27</span>
           </div>
           <h1>Agricultura</h1>
           <p className="muted">
-            Todos los campos y lotes de HJB, rotaciones, labores, insumos y rendimientos históricos.
+            Todos los campos y lotes de HJB, rotaciones, labores, insumos y rendimientos.
           </p>
         </div>
         <button className="primaryButton" onClick={startNew}>+ Nueva labor</button>
@@ -50,8 +50,8 @@ export default function AgriculturaPage() {
 
       <div className="metricsGrid four">
         <MetricCard label="Campos Totales" value="5" note="Aguilera, Tambo, Racca, Kitty, Keuneke" />
-        <MetricCard label="Historial Completo" value={String(activities.length)} note="Labores registradas" />
-        <MetricCard label="Campañas Activas" value="3" note="2024/25 · 2025/26 · 2026/27" />
+        <MetricCard label="Labores Registradas" value={String(activities.length)} note={activities.length === 0 ? "Historial limpio para 2026/27" : "Labores cargadas"} />
+        <MetricCard label="Campaña Actual" value="2026/27" note="En curso" />
         <MetricCard label="Destinos de Producción" value="Grano · Silo · Forraje" note="Seguimiento integral" />
       </div>
 

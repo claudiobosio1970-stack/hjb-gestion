@@ -347,18 +347,32 @@ export default function ActivityTable({
           </thead>
           <tbody>
             {!filteredActivities.length ? (
-              <tr>
-                <td colSpan={onEdit ? 9 : 8} style={{ textAlign: "center", padding: "36px", color: "var(--muted)" }}>
-                  No se encontraron labores que coincidan con los filtros aplicados.
-                  {hasActiveFilters && (
-                    <div style={{ marginTop: "8px" }}>
-                      <button className="thResetBtn" onClick={reset}>
-                        Restablecer filtros
-                      </button>
+              activities.length === 0 ? (
+                <tr>
+                  <td colSpan={onEdit ? 9 : 8} style={{ textAlign: "center", padding: "48px 24px", color: "var(--muted)" }}>
+                    <div style={{ fontSize: "28px", marginBottom: "8px" }}>🌱</div>
+                    <div style={{ fontWeight: 600, fontSize: "15px", color: "var(--slate-800)", marginBottom: "4px" }}>
+                      No hay labores registradas para la campaña 2026/27
                     </div>
-                  )}
-                </td>
-              </tr>
+                    <div style={{ fontSize: "13px" }}>
+                      El historial está limpio. Hacé clic en <strong>+ Nueva labor</strong> o <strong>+ Registrar labor</strong> para cargar el primer trabajo.
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <tr>
+                  <td colSpan={onEdit ? 9 : 8} style={{ textAlign: "center", padding: "36px", color: "var(--muted)" }}>
+                    No se encontraron labores que coincidan con los filtros aplicados.
+                    {hasActiveFilters && (
+                      <div style={{ marginTop: "8px" }}>
+                        <button className="thResetBtn" onClick={reset}>
+                          Restablecer filtros
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )
             ) : (
               filteredActivities.map((activity) => {
                 const fechaStr = activity.fechaReal || activity.fechaPlanificada;

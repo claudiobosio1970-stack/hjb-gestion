@@ -108,14 +108,12 @@ export interface AgricultureRepository {
 }
 
 const KEYS = {
-  activities: "hjb_agriculture_activities_v06",
+  activities: "hjb_agriculture_activities_v07",
   lotes: "hjb_agriculture_lotes_v01",
   soils: "hjb_agriculture_soils_v04",
   documents: "hjb_agriculture_documents_v04",
-  migrated: "hjb_agriculture_migrated_v06",
+  migrated: "hjb_agriculture_migrated_v07",
 };
-
-const LEGACY_V04_KEY = "hjb_agriculture_activities_v04";
 
 export const INITIAL_LOTES: Lote[] = [
   // Aguilera
@@ -361,14 +359,8 @@ function initializeActivities() {
   if (typeof window === "undefined") return;
   if (window.localStorage.getItem(KEYS.migrated)) return;
 
-  const baseHistorical: Activity[] = HISTORIAL_AGRICOLA_HJB.map(historicalToActivity);
-  const existingV04 = readArray<Activity>(LEGACY_V04_KEY);
-
-  const historyIds = new Set(baseHistorical.map((x) => x.id));
-  const userAdded = existingV04.filter((x) => !historyIds.has(x.id));
-
-  const consolidated = [...userAdded, ...baseHistorical];
-  writeArray(KEYS.activities, consolidated);
+  // Inicialización limpia para inicio de campaña 2026/27 (sin datos de prueba)
+  writeArray(KEYS.activities, []);
   window.localStorage.setItem(KEYS.migrated, "1");
 }
 
@@ -376,8 +368,7 @@ const localRepository: AgricultureRepository = {
   listActivities() {
     initializeActivities();
     const stored = readArray<Activity>(KEYS.activities);
-    const list = stored.length > 0 ? stored : HISTORIAL_AGRICOLA_HJB.map(historicalToActivity);
-    return sortActivitiesRecentFirst(list);
+    return sortActivitiesRecentFirst(stored);
   },
 
   saveActivity(activity) {
