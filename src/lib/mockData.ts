@@ -1,9 +1,9 @@
 export const campos = [
-  { nombre: "Aguilera", slug: "aguilera", superficie: "120 ha", detalle: "Maíz 2026/27", estado: "Activo" },
-  { nombre: "Tambo", slug: "tambo", superficie: "185 ha", detalle: "9 lotes (Pasturas y Maíz Forrajero)", estado: "Activo" },
-  { nombre: "Racca", slug: "racca", superficie: "95 ha", detalle: "Racca 2 → Maíz 2026/27", estado: "Planificado" },
-  { nombre: "Kitty", slug: "kitty", superficie: "80 ha", detalle: "Maíz 2026/27", estado: "Planificado" },
-  { nombre: "Keuneke", slug: "keuneke", superficie: "110 ha", detalle: "Rotación 2026/27", estado: "Planificado" }
+  { nombre: "Aguilera", slug: "aguilera", superficie: "20 ha", detalle: "1 lote (Lote Único)", estado: "Activo" },
+  { nombre: "Tambo", slug: "tambo", superficie: "73 ha", detalle: "9 lotes (Producción forrajera y lechera)", estado: "Activo" },
+  { nombre: "Racca", slug: "racca", superficie: "100 ha", detalle: "2 lotes (Lote 1 y Lote 2)", estado: "Activo" },
+  { nombre: "Kitty", slug: "kitty", superficie: "29 ha", detalle: "1 lote (Lote Único)", estado: "Activo" },
+  { nombre: "Keuneke", slug: "keuneke", superficie: "57 ha", detalle: "2 lotes (Lote 1 y Lote 2)", estado: "Activo" }
 ];
 
 export const productos = [
