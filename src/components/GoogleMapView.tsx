@@ -279,18 +279,26 @@ export default function GoogleMapView() {
         path.addListener("remove_at", handlePathChange);
       }
 
-      // Etiqueta Insignia Blanca centrada en el lote
+      // Etiqueta Insignia Blanca centrada en el lote (ancho adaptable según el nombre)
       const centroid = computePolygonCentroid(lote.coordenadas);
+      const text = lote.nombre;
+      const charWidth = 8.2;
+      const padding = 20;
+      const badgeWidth = Math.max(38, Math.round(text.length * charWidth + padding));
+      const badgeHeight = 28;
+      const textX = Math.round(badgeWidth / 2);
+      const textY = 18;
+
       const badgeSvg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="42" height="28" viewBox="0 0 42 28">
+        <svg xmlns="http://www.w3.org/2000/svg" width="${badgeWidth}" height="${badgeHeight}" viewBox="0 0 ${badgeWidth} ${badgeHeight}">
           <defs>
             <filter id="badgeShadow_${lote.id}" x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-opacity="0.35"/>
             </filter>
           </defs>
-          <rect x="2" y="2" width="38" height="24" rx="4" fill="#ffffff" stroke="#15803d" stroke-width="1.8" filter="url(#badgeShadow_${lote.id})"/>
-          <text x="21" y="18" font-size="12.5" font-weight="900" font-family="system-ui, -apple-system, sans-serif" fill="#0f172a" text-anchor="middle">
-            ${lote.nombre}
+          <rect x="2" y="2" width="${badgeWidth - 4}" height="${badgeHeight - 4}" rx="4" fill="#ffffff" stroke="#15803d" stroke-width="1.8" filter="url(#badgeShadow_${lote.id})"/>
+          <text x="${textX}" y="${textY}" font-size="12" font-weight="900" font-family="system-ui, -apple-system, sans-serif" fill="#0f172a" text-anchor="middle">
+            ${text}
           </text>
         </svg>
       `;
@@ -298,11 +306,11 @@ export default function GoogleMapView() {
       const labelMarker = new window.google.maps.Marker({
         position: centroid,
         map,
-        title: `Lote ${lote.nombre} - ${lote.campoNombre}`,
+        title: `${lote.nombre} - ${lote.campoNombre}`,
         icon: {
           url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(badgeSvg),
-          scaledSize: new window.google.maps.Size(42, 28),
-          anchor: new window.google.maps.Point(21, 14),
+          scaledSize: new window.google.maps.Size(badgeWidth, badgeHeight),
+          anchor: new window.google.maps.Point(badgeWidth / 2, badgeHeight / 2),
         },
         zIndex: 10,
       });
@@ -472,21 +480,21 @@ export default function GoogleMapView() {
 
   // Guardar nuevo lote trazado
   function handleSaveNewLote() {
-    if (!formNombre.trim()) {
-      alert("Por favor ingresá la identificación o nombre del lote (ej: 3a, 1, 2)");
-      return;
-    }
-
     const campoFound = campos.find((c) => c.id === formCampoId) || {
+      id: formCampoId,
       nombre: formCampoId.charAt(0).toUpperCase() + formCampoId.slice(1),
+      superficieHa: 0,
     };
+
+    // Si el usuario no escribió nombre de lote, toma directamente el nombre del campo
+    const finalNombre = formNombre.trim() || campoFound.nombre;
 
     const newLote: LoteGeo = {
       id: `${formCampoId}-lote-${Date.now()}`,
       campoId: formCampoId,
       campoNombre: campoFound.nombre,
-      nombre: formNombre.trim(),
-      superficieHa: formSuperficieHa ? parseFloat(formSuperficieHa) : null,
+      nombre: finalNombre,
+      superficieHa: formSuperficieHa ? parseFloat(formSuperficieHa) : (campoFound.superficieHa || null),
       coordenadas: pendingCoords,
       color: "#22c55e",
       cultivo: formCultivo.trim() || undefined,
@@ -505,7 +513,7 @@ export default function GoogleMapView() {
       renderLotes(mapInstanceRef.current, updated, showLotesLayer, isEditingVertices);
     }
 
-    setStatusNotice(`✓ Lote "${newLote.nombre}" delimitado y guardado en Campo ${newLote.campoNombre}`);
+    setStatusNotice(`✓ Delimitación de "${newLote.nombre}" guardada con éxito`);
     setTimeout(() => setStatusNotice(null), 4000);
   }
 
@@ -1144,7 +1152,14 @@ export default function GoogleMapView() {
                   className="select"
                   style={{ marginTop: "4px" }}
                   value={formCampoId}
-                  onChange={(e) => setFormCampoId(e.target.value)}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setFormCampoId(newId);
+                    const found = campos.find((c) => c.id === newId);
+                    if (found && found.superficieHa) {
+                      setFormSuperficieHa(String(found.superficieHa));
+                    }
+                  }}
                 >
                   {campos.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -1156,7 +1171,7 @@ export default function GoogleMapView() {
 
               <div>
                 <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)" }}>
-                  Identificación / Nombre del Lote *
+                  Identificación / Nombre del Lote (Opcional)
                 </label>
                 <input
                   type="text"
@@ -1164,16 +1179,16 @@ export default function GoogleMapView() {
                   style={{ marginTop: "4px" }}
                   value={formNombre}
                   onChange={(e) => setFormNombre(e.target.value)}
-                  placeholder="Ej: 3a, 3b, 1, 2, Lote Norte..."
+                  placeholder={`Opcional (si se deja vacío dirá "${campos.find((c) => c.id === formCampoId)?.nombre || "Campo"}")`}
                 />
-                <small style={{ color: "var(--muted)", fontSize: "11px" }}>
-                  Este texto se mostrará en la tarjeta blanca en el centro del lote sobre el satélite.
+                <small style={{ color: "var(--muted)", fontSize: "11px", marginTop: "3px", display: "block" }}>
+                  💡 Si el campo es un lote único sin divisiones internas, dejalo vacío y la tarjeta sobre el satélite dirá directamente el <strong>nombre del campo</strong>.
                 </small>
               </div>
 
               <div>
                 <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)" }}>
-                  Superficie Real en Hectáreas (ha) — Carga Manual *
+                  Superficie Real en Hectáreas (ha) — Carga Manual
                 </label>
                 <input
                   type="number"
@@ -1182,7 +1197,7 @@ export default function GoogleMapView() {
                   style={{ marginTop: "4px" }}
                   value={formSuperficieHa}
                   onChange={(e) => setFormSuperficieHa(e.target.value)}
-                  placeholder="Ej: 25, 48, 50..."
+                  placeholder="Ej: 20, 25, 29, 48..."
                 />
                 <div style={{ marginTop: "4px", background: "#f8fafc", padding: "8px 10px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
                   <small style={{ color: "#475569", fontSize: "11px", display: "block", lineHeight: 1.35 }}>
