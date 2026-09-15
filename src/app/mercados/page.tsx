@@ -118,7 +118,7 @@ export default function MercadosPage() {
   const inflacionItem = items.find((x) => x.id === "inflacion");
   const gasoilItem = items.find((x) => x.id === "gasoil");
   const maizItem = items.find((x) => x.id === "maiz-kg");
-  const pelletItem = items.find((x) => x.id === "pellet-soja-kg");
+  const pelletItem = items.find((x) => x.id === "pellet-soja" || x.id === "pellet-soja-kg");
 
   return (
     <AppShell active="Valores Móviles">
@@ -290,7 +290,7 @@ export default function MercadosPage() {
             className={activeFilter === cat ? "tab active" : "tab"}
             onClick={() => setActiveFilter(cat)}
           >
-            {cat === "Todas" ? "📋 Todos los 24 Productos" : cat}
+            {cat === "Todas" ? `📋 Todos (${items.length} Insumos)` : cat}
           </button>
         ))}
       </div>

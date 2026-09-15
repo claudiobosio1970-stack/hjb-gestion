@@ -10,6 +10,7 @@ export type FuenteValor =
   | "API DolarApi"
   | "API ArgentinaDatos"
   | "API Secretaría de Energía"
+  | "API Granos.ar (Pizarra BCR)"
   | "Manual HJB"
   | "Derivado / Fórmula";
 
@@ -86,11 +87,12 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
 
   // ==========================================
-  // 2. GRANOS Y CONCENTRADOS (DIETAS)
+  // 2. GRANOS & CONCENTRADOS (DIETAS Y PIZARRA)
+  // Cada insumo figura UNA SOLA VEZ
   // ==========================================
   {
     id: "maiz-kg",
-    nombre: "Maíz",
+    nombre: "Maíz (Mixer)",
     categoria: "Granos & Concentrados",
     valorArs: 273,
     valorUsd: toUsd(273, BASE_TC, 3),
@@ -102,101 +104,21 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fechaActualizacion: "18/8/26",
   },
   {
-    id: "pellet-soja-tn",
-    nombre: "Pellet de soja",
-    categoria: "Granos & Concentrados",
-    valorArs: 403650,
-    valorUsd: 270.0,
-    unidadArs: "$/Tn",
-    unidadUsd: "USD/Tn",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Concentrado proteico",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "pellet-soja-kg",
+    id: "pellet-soja",
     nombre: "Pellet de soja",
     categoria: "Granos & Concentrados",
     valorArs: 404,
     valorUsd: 0.27,
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
-    fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de Pellet Tn / 1000",
-    esEditableManual: true,
-    nota: "Concentrado proteico por kilo para dietas",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "semilla-algodon-tn",
-    nombre: "Semilla de algodón",
-    categoria: "Granos & Concentrados",
-    valorArs: null,
-    valorUsd: null,
-    unidadArs: "$/Tn",
-    unidadUsd: "USD/Tn",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Sin cotización actual (S/C)",
+    nota: "Concentrado proteico puesto en tambo (Equiv. $404.000 / Tn · USD 270 / Tn)",
     fechaActualizacion: "18/8/26",
   },
   {
-    id: "semilla-algodon-kg",
-    nombre: "Semilla de algodón",
-    categoria: "Granos & Concentrados",
-    valorArs: null,
-    valorUsd: null,
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Sin cotización en origen",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "semilla-algodon-flete-kg",
-    nombre: "Semilla de algodón + flete",
-    categoria: "Granos & Concentrados",
-    valorArs: 255,
-    valorUsd: toUsd(255, BASE_TC, 3),
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Semilla de algodón puesta en tambo con flete incluido",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "pellet-trigo-tn",
+    id: "pellet-trigo",
     nombre: "Pellet de trigo",
-    categoria: "Granos & Concentrados",
-    valorArs: 209300,
-    valorUsd: 140.0,
-    unidadArs: "$/Tn",
-    unidadUsd: "USD/Tn",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Subproducto de trigo",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "pellet-trigo-kg",
-    nombre: "Pellet de trigo",
-    categoria: "Granos & Concentrados",
-    valorArs: 209,
-    valorUsd: 0.14,
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de Pellet Trigo Tn / 1000",
-    esEditableManual: true,
-    nota: "Subproducto por kilo para ración",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "pellet-trigo-flete-kg",
-    nombre: "Pellet de trigo + flete",
     categoria: "Granos & Concentrados",
     valorArs: 222,
     valorUsd: toUsd(222, BASE_TC, 3),
@@ -205,12 +127,91 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fletePct: 6,
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Pellet de trigo puesto en tambo con 6% de flete",
+    nota: "Pellet de trigo puesto en tambo con flete incluido (Equiv. $222.000 / Tn)",
     fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "semilla-algodon",
+    nombre: "Semilla de algodón",
+    categoria: "Granos & Concentrados",
+    valorArs: 255,
+    valorUsd: toUsd(255, BASE_TC, 3),
+    unidadArs: "$/kg",
+    unidadUsd: "USD/kg",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Semilla de algodón puesta en tambo con flete incluido (Equiv. $255.000 / Tn)",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "soja-pizarra",
+    nombre: "Soja Rosario (Pizarra BCR)",
+    categoria: "Granos & Concentrados",
+    valorArs: 555000,
+    valorUsd: 370.62,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
+    esEditableManual: true,
+    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
+    fechaActualizacion: "14/9/26",
+  },
+  {
+    id: "maiz-pizarra",
+    nombre: "Maíz Rosario (Pizarra BCR)",
+    categoria: "Granos & Concentrados",
+    valorArs: 295200,
+    valorUsd: 197.13,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
+    esEditableManual: true,
+    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
+    fechaActualizacion: "14/9/26",
+  },
+  {
+    id: "trigo-pizarra",
+    nombre: "Trigo Rosario (Pizarra BCR)",
+    categoria: "Granos & Concentrados",
+    valorArs: 344655,
+    valorUsd: 230.15,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
+    esEditableManual: true,
+    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
+    fechaActualizacion: "14/9/26",
+  },
+  {
+    id: "sorgo-pizarra",
+    nombre: "Sorgo Rosario (Pizarra BCR)",
+    categoria: "Granos & Concentrados",
+    valorArs: 275700,
+    valorUsd: 184.11,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
+    esEditableManual: true,
+    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
+    fechaActualizacion: "14/9/26",
+  },
+  {
+    id: "girasol-pizarra",
+    nombre: "Girasol Rosario (Pizarra BCR)",
+    categoria: "Granos & Concentrados",
+    valorArs: 756743,
+    valorUsd: 505.34,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "API Granos.ar (Pizarra BCR)",
+    esEditableManual: true,
+    nota: "Cámara Arbitral de Cereales de Rosario (BCR)",
+    fechaActualizacion: "14/9/26",
   },
 
   // ==========================================
   // 3. ENSILAJES Y PASTURAS (DIETAS)
+  // Cada insumo figura UNA SOLA VEZ
   // ==========================================
   {
     id: "silo-maiz-kg",
@@ -267,9 +268,10 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
 
   // ==========================================
   // 4. ROLLOS FORRAJEROS
+  // Cada rollo figura UNA SOLA VEZ
   // ==========================================
   {
-    id: "rollo-alfalfa-rollo",
+    id: "rollo-alfalfa",
     nombre: "Rollo de alfalfa",
     categoria: "Rollos Forrajeros",
     valorArs: 80600,
@@ -278,25 +280,11 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Rollo de primera calidad confeccionado",
+    nota: "Rollo de primera calidad confeccionado (Equiv. $161 / kg en ~500 kg)",
     fechaActualizacion: "18/8/26",
   },
   {
-    id: "rollo-alfalfa-kg",
-    nombre: "Rollo de alfalfa",
-    categoria: "Rollos Forrajeros",
-    valorArs: 161,
-    valorUsd: toUsd(161, BASE_TC, 3),
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de $80.600 / ~500 kg",
-    esEditableManual: true,
-    nota: "Costo por kg de materia henificada",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "rollo-avena-rollo",
+    id: "rollo-avena",
     nombre: "Rollo de avena",
     categoria: "Rollos Forrajeros",
     valorArs: 56420,
@@ -305,25 +293,11 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Rollo forrajero avena confeccionado",
+    nota: "Rollo forrajero avena confeccionado (Equiv. $113 / kg en ~500 kg)",
     fechaActualizacion: "18/8/26",
   },
   {
-    id: "rollo-avena-kg",
-    nombre: "Rollo de avena",
-    categoria: "Rollos Forrajeros",
-    valorArs: 113,
-    valorUsd: toUsd(113, BASE_TC, 3),
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de $56.420 / ~500 kg",
-    esEditableManual: true,
-    nota: "Fibra forrajera avena por kilo",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "rollo-chala-maiz-rollo",
+    id: "rollo-chala-maiz",
     nombre: "Rollo de chala de maíz",
     categoria: "Rollos Forrajeros",
     valorArs: 22000,
@@ -332,25 +306,11 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Rastrojo de maíz para volumen / mantenimiento",
+    nota: "Rastrojo de maíz para volumen / mantenimiento (Equiv. $55 / kg en ~400 kg)",
     fechaActualizacion: "18/8/26",
   },
   {
-    id: "rollo-chala-maiz-kg",
-    nombre: "Rollo de chala de maíz",
-    categoria: "Rollos Forrajeros",
-    valorArs: 55,
-    valorUsd: toUsd(55, BASE_TC, 3),
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de $22.000 / ~400 kg",
-    esEditableManual: true,
-    nota: "Fibra de volumen seco por kilo",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "rollo-gramineas-rollo",
+    id: "rollo-gramineas",
     nombre: "Rollo de gramíneas",
     categoria: "Rollos Forrajeros",
     valorArs: 20150,
@@ -359,26 +319,12 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Rollo de pasto consociado / gramíneas",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "rollo-gramineas-kg",
-    nombre: "Rollo de gramíneas",
-    categoria: "Rollos Forrajeros",
-    valorArs: 40,
-    valorUsd: toUsd(40, BASE_TC, 3),
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Derivado / Fórmula",
-    origenCalculo: "Derivado de $20.150 / ~500 kg",
-    esEditableManual: true,
-    nota: "Henificado de gramíneas por kilo",
+    nota: "Rollo de pasto consociado / gramíneas (Equiv. $40 / kg en ~500 kg)",
     fechaActualizacion: "18/8/26",
   },
 ];
 
-const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v03";
+const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v05";
 const LAST_SYNC_KEY = "hjb_valores_moviles_last_sync";
 
 export function getValoresMoviles(): ValorMovil[] {
@@ -418,7 +364,6 @@ export function updateFromArs(items: ValorMovil[], id: string, nuevoArs: number 
   }
 
   if (id === "dolar-bna") {
-    const tcActualizado = nuevoArs && nuevoArs > 0 ? nuevoArs : tc;
     copy[idx] = { ...copy[idx], valorArs: nuevoArs, valorUsd: 1.0, fechaActualizacion: today };
     return copy;
   }
@@ -433,7 +378,7 @@ export function updateFromArs(items: ValorMovil[], id: string, nuevoArs: number 
     fechaActualizacion: today,
   };
 
-  recalculateDerivatives(copy, id, tc);
+  updateNotesAfterEdit(copy[idx]);
   return copy;
 }
 
@@ -459,31 +404,35 @@ export function updateFromUsd(items: ValorMovil[], id: string, nuevoUsd: number 
     fechaActualizacion: today,
   };
 
-  recalculateDerivatives(copy, id, tc);
+  updateNotesAfterEdit(copy[idx]);
   return copy;
 }
 
-function recalculateDerivatives(list: ValorMovil[], changedId: string, tc: number) {
-  function updatePair(targetId: string, factor: number) {
-    const parent = list.find((x) => x.id === changedId);
-    const childIdx = list.findIndex((x) => x.id === targetId);
-    if (parent && childIdx >= 0 && typeof parent.valorArs === "number") {
-      const ars = Math.round(parent.valorArs / factor);
-      const usd = toUsd(ars, tc, 3);
-      list[childIdx] = {
-        ...list[childIdx],
-        valorArs: ars,
-        valorUsd: usd,
-      };
-    }
+function updateNotesAfterEdit(item: ValorMovil) {
+  if (typeof item.valorArs !== "number") return;
+  if (item.id === "pellet-soja") {
+    const tnArs = Math.round(item.valorArs * 1000);
+    const tnUsd = ((item.valorUsd || 0) * 1000).toFixed(1);
+    item.nota = `Concentrado proteico puesto en tambo (Equiv. $${tnArs.toLocaleString("es-AR")} / Tn · USD ${tnUsd} / Tn)`;
+  } else if (item.id === "pellet-trigo") {
+    const tnArs = Math.round(item.valorArs * 1000);
+    item.nota = `Pellet de trigo puesto en tambo con flete incluido (Equiv. $${tnArs.toLocaleString("es-AR")} / Tn)`;
+  } else if (item.id === "semilla-algodon") {
+    const tnArs = Math.round(item.valorArs * 1000);
+    item.nota = `Semilla de algodón puesta en tambo con flete incluido (Equiv. $${tnArs.toLocaleString("es-AR")} / Tn)`;
+  } else if (item.id === "rollo-alfalfa") {
+    const kgArs = (item.valorArs / 500).toFixed(1);
+    item.nota = `Rollo de primera calidad confeccionado (Equiv. $${kgArs} / kg en ~500 kg)`;
+  } else if (item.id === "rollo-avena") {
+    const kgArs = (item.valorArs / 500).toFixed(1);
+    item.nota = `Rollo forrajero avena confeccionado (Equiv. $${kgArs} / kg en ~500 kg)`;
+  } else if (item.id === "rollo-chala-maiz") {
+    const kgArs = (item.valorArs / 400).toFixed(1);
+    item.nota = `Rastrojo de maíz para volumen / mantenimiento (Equiv. $${kgArs} / kg en ~400 kg)`;
+  } else if (item.id === "rollo-gramineas") {
+    const kgArs = (item.valorArs / 500).toFixed(1);
+    item.nota = `Rollo de pasto consociado / gramíneas (Equiv. $${kgArs} / kg en ~500 kg)`;
   }
-
-  if (changedId === "pellet-soja-tn") updatePair("pellet-soja-kg", 1000);
-  if (changedId === "pellet-trigo-tn") updatePair("pellet-trigo-kg", 1000);
-  if (changedId === "rollo-alfalfa-rollo") updatePair("rollo-alfalfa-kg", 500);
-  if (changedId === "rollo-avena-rollo") updatePair("rollo-avena-kg", 500);
-  if (changedId === "rollo-chala-maiz-rollo") updatePair("rollo-chala-maiz-kg", 400);
-  if (changedId === "rollo-gramineas-rollo") updatePair("rollo-gramineas-kg", 500);
 }
 
 export async function syncApisLive(): Promise<{ success: boolean; updatedCount: number; details: string[] }> {
@@ -570,6 +519,39 @@ export async function syncApisLive(): Promise<{ success: boolean; updatedCount: 
     console.warn("Secretaría de Energía warning:", err);
   }
 
+  // 4. Granos Pizarra Rosario (BCR) vía API granos.ar
+  try {
+    const res = await fetch("https://granosar.lfcaucino.workers.dev/api/v1/pizarra", { cache: "no-store" });
+    if (res.ok) {
+      const json = await res.json();
+      const granos = json.data?.granos;
+      if (granos) {
+        const updatePizarraItem = (id: string, g: { ars_tn: number; usd_tn: number }) => {
+          const idx = current.findIndex((x) => x.id === id);
+          if (idx >= 0 && g && typeof g.ars_tn === "number") {
+            current[idx].valorArs = g.ars_tn;
+            current[idx].valorUsd = g.usd_tn;
+            current[idx].fechaActualizacion = today;
+            current[idx].fuente = "API Granos.ar (Pizarra BCR)";
+            updatedCount++;
+          }
+        };
+
+        updatePizarraItem("soja-pizarra", granos.soja);
+        updatePizarraItem("maiz-pizarra", granos.maiz);
+        updatePizarraItem("trigo-pizarra", granos.trigo);
+        updatePizarraItem("sorgo-pizarra", granos.sorgo);
+        updatePizarraItem("girasol-pizarra", granos.girasol);
+
+        details.push(
+          `Pizarra Rosario: Soja $${granos.soja.ars_tn.toLocaleString("es-AR")} · Maíz $${granos.maiz.ars_tn.toLocaleString("es-AR")} · Trigo $${granos.trigo.ars_tn.toLocaleString("es-AR")}`
+        );
+      }
+    }
+  } catch (err) {
+    console.warn("Granos.ar API warning:", err);
+  }
+
   saveValoresMoviles(current);
 
   if (typeof window !== "undefined") {
@@ -620,7 +602,29 @@ export function getLastSyncTime(): string | null {
 
 export function getPrecioReferencia(id: string, moneda: "ARS" | "USD" = "ARS"): number {
   const items = getValoresMoviles();
-  const item = items.find((x) => x.id === id);
+  let item = items.find((x) => x.id === id);
+  if (!item) {
+    // Mapeo retrocompatible
+    if (id === "pellet-soja-kg" || id === "pellet-soja-tn") item = items.find((x) => x.id === "pellet-soja");
+    else if (id === "pellet-trigo-kg" || id === "pellet-trigo-tn" || id === "pellet-trigo-flete-kg") item = items.find((x) => x.id === "pellet-trigo");
+    else if (id === "semilla-algodon-kg" || id === "semilla-algodon-tn" || id === "semilla-algodon-flete-kg") item = items.find((x) => x.id === "semilla-algodon");
+    else if (id === "rollo-alfalfa-kg") {
+      const parent = items.find((x) => x.id === "rollo-alfalfa");
+      if (parent) return moneda === "USD" ? (parent.valorUsd || 0) / 500 : (parent.valorArs || 0) / 500;
+    } else if (id === "rollo-avena-kg") {
+      const parent = items.find((x) => x.id === "rollo-avena");
+      if (parent) return moneda === "USD" ? (parent.valorUsd || 0) / 500 : (parent.valorArs || 0) / 500;
+    } else if (id === "rollo-chala-maiz-kg") {
+      const parent = items.find((x) => x.id === "rollo-chala-maiz");
+      if (parent) return moneda === "USD" ? (parent.valorUsd || 0) / 400 : (parent.valorArs || 0) / 400;
+    } else if (id === "rollo-gramineas-kg") {
+      const parent = items.find((x) => x.id === "rollo-gramineas");
+      if (parent) return moneda === "USD" ? (parent.valorUsd || 0) / 500 : (parent.valorArs || 0) / 500;
+    } else if (id === "rollo-alfalfa-rollo") item = items.find((x) => x.id === "rollo-alfalfa");
+    else if (id === "rollo-avena-rollo") item = items.find((x) => x.id === "rollo-avena");
+    else if (id === "rollo-chala-maiz-rollo") item = items.find((x) => x.id === "rollo-chala-maiz");
+    else if (id === "rollo-gramineas-rollo") item = items.find((x) => x.id === "rollo-gramineas");
+  }
   if (!item) return 0;
   if (moneda === "USD") {
     return typeof item.valorUsd === "number" ? item.valorUsd : 0;
