@@ -19,6 +19,7 @@ declare global {
   interface Window {
     google?: any;
     initHJBGoogleMap?: () => void;
+    hjbDeleteLote?: (id: string) => void;
   }
 }
 
@@ -41,7 +42,7 @@ export default function GoogleMapView() {
   const labelMarkersRef = useRef<Map<string, any>>(new Map());
   const infoWindowRef = useRef<any>(null);
 
-  // Trazador Nativo Directo (Click-to-Draw sin librerías externas)
+  // Trazador Nativo Directo (Click-to-Draw 100% nativo)
   const mapClickListenerRef = useRef<any>(null);
   const tracingPointsRef = useRef<Array<{ lat: number; lng: number }>>([]);
   const tracingPolylineRef = useRef<any>(null);
@@ -70,22 +71,22 @@ export default function GoogleMapView() {
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
-  // Modal para guardar nuevo lote trazado
+  // Modal para guardar nuevo trazo (Perímetro de Campo o Lote Interno)
   const [showNewLoteModal, setShowNewLoteModal] = useState(false);
   const [pendingCoords, setPendingCoords] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [formTipo, setFormTipo] = useState<"perimetro_campo" | "lote_interno">("lote_interno");
   const [formCampoId, setFormCampoId] = useState("racca");
   const [formNombre, setFormNombre] = useState("");
   const [formSuperficieHa, setFormSuperficieHa] = useState("");
   const [formCultivo, setFormCultivo] = useState("");
   const [formObservaciones, setFormObservaciones] = useState("");
 
-  // Cargar datos geográficos al montar
+  // Cargar datos geográficos al montar y registrar handler global de borrado para InfoWindow
   useEffect(() => {
     const c = getCamposGeo();
     const l = getLotesGeo();
     setCampos(c);
     setLotes(l);
-    // Seleccionar Racca por defecto si existe
     const racca = c.find((x) => x.id === "racca");
     if (racca) setSelectedCampo(racca);
 
@@ -95,8 +96,16 @@ export default function GoogleMapView() {
     setApiKey(activeKey);
     setInputKey(activeKey);
 
+    window.hjbDeleteLote = (id: string) => {
+      handleDeleteLote(id);
+    };
+
     (window as any).gm_authFailure = () => {
       setLoadError("Google Maps reportó que la clave requiere verificar que la 'Maps JavaScript API' esté habilitada en Google Cloud Console.");
+    };
+
+    return () => {
+      delete window.hjbDeleteLote;
     };
   }, []);
 
@@ -138,7 +147,6 @@ export default function GoogleMapView() {
     if (!mapContainerRef.current || !window.google || !window.google.maps) return;
 
     try {
-      // Centro geográfico real de los 5 campos en Santa Fe (Ruta 40S)
       const centerCoords = { lat: -32.228, lng: -61.645 };
       const map = new window.google.maps.Map(mapContainerRef.current, {
         center: centerCoords,
@@ -203,6 +211,7 @@ export default function GoogleMapView() {
           scaledSize: new window.google.maps.Size(36, 46),
           anchor: new window.google.maps.Point(18, 46),
         },
+        zIndex: 5,
       });
 
       if (calibrating) {
@@ -230,7 +239,7 @@ export default function GoogleMapView() {
     });
   }
 
-  // Renderizar Polígonos de Lotes y Etiquetas Insignias
+  // Renderizar Polígonos de Lotes y Perímetros con Etiquetas Insignias
   function renderLotes(map: any, lotesList: LoteGeo[], visible: boolean, editingVertices: boolean) {
     if (!map || !window.google || !window.google.maps) return;
 
@@ -242,19 +251,26 @@ export default function GoogleMapView() {
     if (!visible) return;
 
     lotesList.forEach((lote) => {
+      const isPerimetro = lote.tipo === "perimetro_campo";
+      const campoObj = campos.find((c) => c.id === lote.campoId);
+      const strokeColor = isPerimetro ? (campoObj?.color || "#047857") : "#16a34a";
+      const strokeWeight = isPerimetro ? 3.5 : 2.2;
+      const fillOpacity = isPerimetro ? 0.08 : (selectedLote?.id === lote.id ? 0.45 : 0.30);
+      const fillColor = isPerimetro ? (campoObj?.color || "#047857") : (lote.color || "#22c55e");
+      const zIndex = isPerimetro ? 2 : 4;
+
       const polygon = new window.google.maps.Polygon({
         paths: lote.coordenadas,
-        strokeColor: "#16a34a",
+        strokeColor,
         strokeOpacity: 0.95,
-        strokeWeight: 2.5,
-        fillColor: lote.color || "#22c55e",
-        fillOpacity: selectedLote?.id === lote.id ? 0.45 : 0.28,
+        strokeWeight,
+        fillColor,
+        fillOpacity,
         map,
         editable: editingVertices,
-        zIndex: 3,
+        zIndex,
       });
 
-      // Si está activo el modo ajuste de vértices, escuchar drag de esquinas
       if (editingVertices) {
         const path = polygon.getPath();
         const handlePathChange = () => {
@@ -270,7 +286,7 @@ export default function GoogleMapView() {
           const badge = labelMarkersRef.current.get(lote.id);
           if (badge) badge.setPosition(newCentroid);
 
-          setStatusNotice(`✓ Vértices del Lote ${lote.nombre} (${lote.campoNombre}) actualizados`);
+          setStatusNotice(`✓ Vértices de "${lote.nombre}" actualizados`);
           setTimeout(() => setStatusNotice(null), 3000);
         };
 
@@ -279,7 +295,7 @@ export default function GoogleMapView() {
         path.addListener("remove_at", handlePathChange);
       }
 
-      // Etiqueta Insignia Blanca centrada en el lote (ancho adaptable según el nombre)
+      // Etiqueta Insignia Blanca centrada en el lote / perímetro
       const centroid = computePolygonCentroid(lote.coordenadas);
       const text = lote.nombre;
       const charWidth = 8.2;
@@ -288,6 +304,7 @@ export default function GoogleMapView() {
       const badgeHeight = 28;
       const textX = Math.round(badgeWidth / 2);
       const textY = 18;
+      const badgeBorderColor = isPerimetro ? strokeColor : "#15803d";
 
       const badgeSvg = `
         <svg xmlns="http://www.w3.org/2000/svg" width="${badgeWidth}" height="${badgeHeight}" viewBox="0 0 ${badgeWidth} ${badgeHeight}">
@@ -296,7 +313,7 @@ export default function GoogleMapView() {
               <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-opacity="0.35"/>
             </filter>
           </defs>
-          <rect x="2" y="2" width="${badgeWidth - 4}" height="${badgeHeight - 4}" rx="4" fill="#ffffff" stroke="#15803d" stroke-width="1.8" filter="url(#badgeShadow_${lote.id})"/>
+          <rect x="2" y="2" width="${badgeWidth - 4}" height="${badgeHeight - 4}" rx="4" fill="#ffffff" stroke="${badgeBorderColor}" stroke-width="${isPerimetro ? '2.5' : '1.8'}" filter="url(#badgeShadow_${lote.id})"/>
           <text x="${textX}" y="${textY}" font-size="12" font-weight="900" font-family="system-ui, -apple-system, sans-serif" fill="#0f172a" text-anchor="middle">
             ${text}
           </text>
@@ -312,7 +329,7 @@ export default function GoogleMapView() {
           scaledSize: new window.google.maps.Size(badgeWidth, badgeHeight),
           anchor: new window.google.maps.Point(badgeWidth / 2, badgeHeight / 2),
         },
-        zIndex: 10,
+        zIndex: isPerimetro ? 9 : 10,
       });
 
       const onLoteClick = (e?: any) => {
@@ -332,10 +349,10 @@ export default function GoogleMapView() {
   }
 
   // =========================================================================
-  // TRAZADOR NATIVO DIRECTO (Sin dependencias de librerías externas)
+  // TRAZADOR NATIVO DIRECTO (Sin dependencias externas)
   // =========================================================================
 
-  function startNativeTracing(targetCampoId?: string) {
+  function startNativeTracing(targetCampoId?: string, tipoDeseado: "perimetro_campo" | "lote_interno" = "lote_interno") {
     if (!mapInstanceRef.current || !window.google?.maps) return;
 
     if (isTracing) {
@@ -343,39 +360,42 @@ export default function GoogleMapView() {
       return;
     }
 
-    if (targetCampoId) {
-      setFormCampoId(targetCampoId);
-    } else if (selectedCampo) {
-      setFormCampoId(selectedCampo.id);
+    const campoId = targetCampoId || (selectedCampo ? selectedCampo.id : "racca");
+    setFormCampoId(campoId);
+    setFormTipo(tipoDeseado);
+
+    const campoObj = campos.find((c) => c.id === campoId);
+    if (tipoDeseado === "perimetro_campo") {
+      setFormNombre(campoObj ? campoObj.nombre : "");
+      setFormSuperficieHa(campoObj && campoObj.superficieHa ? String(campoObj.superficieHa) : "");
+    } else {
+      setFormNombre("");
+      setFormSuperficieHa("");
     }
 
-    // Desactivar otros modos
     setIsCalibrating(false);
     setIsEditingVertices(false);
     renderLotes(mapInstanceRef.current, lotes, showLotesLayer, false);
 
-    // Limpiar puntos previos
     cleanTracingTempObjects();
     tracingPointsRef.current = [];
     setTracingCount(0);
     setIsTracing(true);
 
     const map = mapInstanceRef.current;
+    const strokeColor = tipoDeseado === "perimetro_campo" ? (campoObj?.color || "#047857") : "#15803d";
 
-    // Crear polilínea temporal para ir viendo las líneas trazadas en tiempo real
     tracingPolylineRef.current = new window.google.maps.Polyline({
       path: [],
-      strokeColor: "#15803d",
+      strokeColor,
       strokeOpacity: 1.0,
-      strokeWeight: 3,
+      strokeWeight: 3.5,
       map: map,
       zIndex: 25,
     });
 
-    // Cambiar cursor a cruz de precisión
     map.setOptions({ draggableCursor: "crosshair" });
 
-    // Escuchar cada clic sobre el satélite
     mapClickListenerRef.current = map.addListener("click", (e: any) => {
       const lat = Number(e.latLng.lat().toFixed(6));
       const lng = Number(e.latLng.lng().toFixed(6));
@@ -385,14 +405,13 @@ export default function GoogleMapView() {
       const newPath = [...tracingPointsRef.current];
       tracingPolylineRef.current.setPath(newPath);
 
-      // Colocar un marcador de punto en cada esquina
       const dotMarker = new window.google.maps.Marker({
         position: pt,
         map: map,
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 6,
-          fillColor: "#22c55e",
+          fillColor: tipoDeseado === "perimetro_campo" ? strokeColor : "#22c55e",
           fillOpacity: 1,
           strokeColor: "#ffffff",
           strokeWeight: 2,
@@ -400,11 +419,10 @@ export default function GoogleMapView() {
         zIndex: 26,
       });
       tracingMarkersRef.current.push(dotMarker);
-
       setTracingCount(newPath.length);
     });
 
-    setStatusNotice("✏️ Modo Trazo Activo: Hacé clic sobre el satélite en cada esquina del lote. Cuando termines, presioná '✓ Guardar Lote'.");
+    setStatusNotice(`✏️ Modo Trazo Activo: Hacé clic en el satélite en cada esquina del ${tipoDeseado === "perimetro_campo" ? "perímetro del campo" : "lote"}.`);
   }
 
   function undoLastTracingPoint() {
@@ -423,19 +441,14 @@ export default function GoogleMapView() {
 
   function finishNativeTracing() {
     if (tracingPointsRef.current.length < 3) {
-      alert("Por favor marcá al menos 3 puntos en el satélite para formar el polígono del lote.");
+      alert("Por favor marcá al menos 3 puntos en el satélite para formar el polígono.");
       return;
     }
 
     const coords = [...tracingPointsRef.current];
     cancelNativeTracing();
 
-    // Abrir modal de datos del lote
     setPendingCoords(coords);
-    setFormNombre("");
-    setFormSuperficieHa("");
-    setFormCultivo("");
-    setFormObservaciones("");
     setShowNewLoteModal(true);
   }
 
@@ -471,32 +484,34 @@ export default function GoogleMapView() {
       renderLotes(mapInstanceRef.current, lotes, showLotesLayer, nextState);
     }
     if (nextState) {
-      setStatusNotice("📐 Modo Ajuste Activo: Podés arrastrar cualquiera de las esquinas o puntos medios de los lotes para calzarlos exactos.");
+      setStatusNotice("📐 Modo Ajuste Activo: Podés arrastrar cualquiera de las esquinas o puntos medios de los trazos para calzarlos exactos.");
     } else {
       setStatusNotice("✓ Ajuste de esquinas finalizado y guardado");
       setTimeout(() => setStatusNotice(null), 3500);
     }
   }
 
-  // Guardar nuevo lote trazado
+  // Guardar nuevo trazo
   function handleSaveNewLote() {
     const campoFound = campos.find((c) => c.id === formCampoId) || {
       id: formCampoId,
       nombre: formCampoId.charAt(0).toUpperCase() + formCampoId.slice(1),
-      superficieHa: 0,
+      superficieHa: null,
+      color: "#16a34a",
     };
 
-    // Si el usuario no escribió nombre de lote, toma directamente el nombre del campo
+    // Si no ingresó nombre, asume el nombre del campo
     const finalNombre = formNombre.trim() || campoFound.nombre;
 
     const newLote: LoteGeo = {
-      id: `${formCampoId}-lote-${Date.now()}`,
+      id: `${formCampoId}-${formTipo}-${Date.now()}`,
       campoId: formCampoId,
       campoNombre: campoFound.nombre,
       nombre: finalNombre,
+      tipo: formTipo,
       superficieHa: formSuperficieHa ? parseFloat(formSuperficieHa) : (campoFound.superficieHa || null),
       coordenadas: pendingCoords,
-      color: "#22c55e",
+      color: formTipo === "perimetro_campo" ? campoFound.color : "#22c55e",
       cultivo: formCultivo.trim() || undefined,
       observaciones: formObservaciones.trim() || undefined,
     };
@@ -513,53 +528,70 @@ export default function GoogleMapView() {
       renderLotes(mapInstanceRef.current, updated, showLotesLayer, isEditingVertices);
     }
 
-    setStatusNotice(`✓ Delimitación de "${newLote.nombre}" guardada con éxito`);
+    setStatusNotice(`✓ ${formTipo === "perimetro_campo" ? "Perímetro" : "Lote"} "${newLote.nombre}" guardado con éxito`);
     setTimeout(() => setStatusNotice(null), 4000);
   }
 
-  // Eliminar delimitación de un lote
+  // ELIMINAR TRAZO / LOTE (Fácil y directo con confirmación)
   function handleDeleteLote(loteId: string) {
     const found = lotes.find((l) => l.id === loteId);
-    const nom = found ? found.nombre : "";
-    if (window.confirm(`¿Deseás eliminar la delimitación del Lote "${nom}"?`)) {
+    const nom = found ? found.nombre : "este trazo";
+    const tipoTxt = found?.tipo === "perimetro_campo" ? "el perímetro general de" : "el lote";
+
+    if (window.confirm(`¿Confirmás eliminar ${tipoTxt} "${nom}" del mapa?`)) {
       const updated = deleteLoteGeo(loteId);
       setLotes(updated);
       setSelectedLote(null);
+
       if (infoWindowRef.current) infoWindowRef.current.close();
       if (mapInstanceRef.current) {
         renderLotes(mapInstanceRef.current, updated, showLotesLayer, isEditingVertices);
       }
-      setStatusNotice(`Lote "${nom}" eliminado del mapa`);
+
+      setStatusNotice(`✓ Trazo "${nom}" eliminado del mapa`);
       setTimeout(() => setStatusNotice(null), 3500);
     }
   }
 
-  // InfoWindow de Lote al hacer clic
+  // InfoWindow al hacer clic en un polígono
   function openLoteInfoWindow(map: any, position: any, lote: LoteGeo) {
     if (!infoWindowRef.current) return;
 
+    const isPerimetro = lote.tipo === "perimetro_campo";
+
     const contentString = `
-      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px 4px; min-width: 230px; color: #0f172a;">
+      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px 4px; min-width: 240px; color: #0f172a;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-          <span style="font-size: 11px; font-weight: 700; background: #dcfce7; color: #166534; padding: 2px 7px; border-radius: 4px;">
-            Lote Delimitado
+          <span style="font-size: 11px; font-weight: 700; background: ${isPerimetro ? '#fef3c7' : '#dcfce7'}; color: ${isPerimetro ? '#92400e' : '#166534'}; padding: 2px 7px; border-radius: 4px;">
+            ${isPerimetro ? "🚩 Perímetro de Campo" : "🌾 Lote Interno"}
           </span>
           <strong style="font-size: 13px; color: #15803d;">
-            ${lote.superficieHa ? lote.superficieHa + " ha" : "Sup. a definir"}
+            ${lote.superficieHa ? lote.superficieHa + " ha" : "Sup. manual"}
           </strong>
         </div>
+
         <h3 style="margin: 0 0 4px 0; font-size: 17px; font-weight: 800; color: #0f172a;">
-          🌾 Lote ${lote.nombre}
+          ${isPerimetro ? "📍 Campo " + lote.nombre : "🌾 Lote " + lote.nombre}
         </h3>
-        <p style="margin: 0 0 4px 0; font-size: 12.5px; color: #475569;">
+
+        <p style="margin: 0 0 4px 0; font-size: 12px; color: #475569;">
           <strong>Campo:</strong> ${lote.campoNombre}<br/>
           ${lote.cultivo ? `<strong>Cultivo:</strong> ${lote.cultivo}<br/>` : ""}
           ${lote.observaciones ? `<strong>Detalle:</strong> ${lote.observaciones}<br/>` : ""}
         </p>
-        <div style="margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 8px;">
+
+        <div style="margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; flex-direction: column; gap: 6px;">
           <a href="/agricultura/${lote.campoId}" style="display: block; text-align: center; background: #166534; color: #ffffff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700;">
             Ver labores de ${lote.campoNombre} →
           </a>
+          
+          <button
+            type="button"
+            onclick="window.hjbDeleteLote('${lote.id}')"
+            style="display: block; width: 100%; text-align: center; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 5px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 700; cursor: pointer;"
+          >
+            🗑️ Eliminar este trazo
+          </button>
         </div>
       </div>
     `;
@@ -573,9 +605,11 @@ export default function GoogleMapView() {
     if (!infoWindowRef.current) return;
 
     const lotesOfCampo = lotes.filter((l) => l.campoId === campo.id);
+    const perimetros = lotesOfCampo.filter((l) => l.tipo === "perimetro_campo");
+    const internos = lotesOfCampo.filter((l) => l.tipo !== "perimetro_campo");
 
     const contentString = `
-      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px 4px; min-width: 220px; color: #0f172a;">
+      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px 4px; min-width: 230px; color: #0f172a;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
           <span style="font-size: 11px; font-weight: 700; background: #e0f2fe; color: #0369a1; padding: 2px 7px; border-radius: 4px;">
             ${campo.estado}
@@ -585,9 +619,10 @@ export default function GoogleMapView() {
         <h3 style="margin: 0 0 4px 0; font-size: 17px; font-weight: 800; color: #0f172a;">
           📍 Campo ${campo.nombre}
         </h3>
-        <p style="margin: 0 0 8px 0; font-size: 12.5px; color: #475569;">
+        <p style="margin: 0 0 8px 0; font-size: 12px; color: #475569;">
           <strong>Cultivo:</strong> ${campo.cultivoPrincipal}<br/>
-          <strong>Lotes delimitados:</strong> ${lotesOfCampo.length > 0 ? lotesOfCampo.map((l) => l.nombre).join(", ") : "Sin delimitar aún"}
+          <strong>Perímetro delimitado:</strong> ${perimetros.length > 0 ? "Sí" : "Pendiente"}<br/>
+          <strong>Lotes internos:</strong> ${internos.length > 0 ? internos.map((l) => l.nombre).join(", ") : "Ninguno aún"}
         </p>
         <div style="margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 8px;">
           <a href="/agricultura/${campo.slug}" style="display: block; text-align: center; background: #166534; color: #ffffff; text-decoration: none; padding: 7px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 700;">
@@ -650,13 +685,30 @@ export default function GoogleMapView() {
   }
 
   function handleResetLotes() {
-    if (window.confirm("¿Deseás restaurar los lotes predeterminados (incluyendo los 4 lotes de Racca sobre Ruta 40S)?")) {
+    if (window.confirm("¿Deseás restaurar los perímetros y lotes iniciales de referencia (Racca y Keuneke)?")) {
       const defs = resetAllLotesGeo();
       setLotes(defs);
+      setSelectedLote(null);
       if (mapInstanceRef.current) {
         renderLotes(mapInstanceRef.current, defs, showLotesLayer, isEditingVertices);
       }
-      setStatusNotice("✓ Lotes predeterminados de Racca restaurados.");
+      setStatusNotice("✓ Perímetros y lotes restaurados a valores de referencia.");
+      setTimeout(() => setStatusNotice(null), 4000);
+    }
+  }
+
+  function handleClearAllTrazos() {
+    if (window.confirm("¿Estás seguro de que querés borrar TODOS los trazos del mapa? Esta acción no se puede deshacer.")) {
+      const empty: LoteGeo[] = [];
+      saveLoteGeo({} as any); // trigger save
+      localStorage.setItem("hjb_lotes_geo_polygons_v04", JSON.stringify(empty));
+      setLotes(empty);
+      setSelectedLote(null);
+      if (infoWindowRef.current) infoWindowRef.current.close();
+      if (mapInstanceRef.current) {
+        renderLotes(mapInstanceRef.current, empty, showLotesLayer, isEditingVertices);
+      }
+      setStatusNotice("✓ Se han borrado todos los trazos del mapa.");
       setTimeout(() => setStatusNotice(null), 4000);
     }
   }
@@ -683,7 +735,7 @@ export default function GoogleMapView() {
             Visor Satelital de Campos y Lotes
           </h2>
           <p style={{ margin: "2px 0 0 0", fontSize: "13px", color: "var(--muted, #64748b)" }}>
-            Subdivisión de lotes dentro de cada campo con polígonos satelitales y carga manual de ha
+            Delimitación de perímetros de campos y lotes internos con ajuste en pantalla
           </p>
         </div>
 
@@ -692,7 +744,7 @@ export default function GoogleMapView() {
           <button
             type="button"
             className={isTracing ? "primaryButton" : "secondaryButton"}
-            onClick={() => (isTracing ? cancelNativeTracing() : startNativeTracing())}
+            onClick={() => (isTracing ? cancelNativeTracing() : startNativeTracing(selectedCampo?.id, "lote_interno"))}
             style={{
               fontSize: "12.5px",
               padding: "7px 14px",
@@ -703,7 +755,7 @@ export default function GoogleMapView() {
             }}
             title="Hacé clics sobre el satélite para delimitar el lote esquina por esquina"
           >
-            {isTracing ? "✕ Cancelar trazo" : "✏️ Trazar Nuevo Lote"}
+            {isTracing ? "✕ Cancelar trazo" : "✏️ Trazar Lote"}
           </button>
 
           {/* Botón Mover Vértices */}
@@ -723,6 +775,27 @@ export default function GoogleMapView() {
           >
             {isEditingVertices ? "✓ Terminar ajuste" : "📐 Mover Vértices"}
           </button>
+
+          {/* Botón Eliminar Trazo Seleccionado si hay uno activo */}
+          {selectedLote && (
+            <button
+              type="button"
+              onClick={() => handleDeleteLote(selectedLote.id)}
+              style={{
+                fontSize: "12.5px",
+                padding: "7px 12px",
+                background: "#fee2e2",
+                color: "#b91c1c",
+                border: "1px solid #fca5a5",
+                borderRadius: "8px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+              title={`Eliminar delimitación de ${selectedLote.nombre}`}
+            >
+              🗑️ Borrar &quot;{selectedLote.nombre}&quot;
+            </button>
+          )}
 
           {/* Toggle Capa de Lotes */}
           <button
@@ -797,7 +870,7 @@ export default function GoogleMapView() {
 
       {/* Contenedor Principal: Sidebar de Campos + Mapa */}
       <div className="mapGridResponsive">
-        {/* Panel Lateral: ÚNICAMENTE LISTA DE CAMPOS */}
+        {/* Panel Lateral: ÚNICAMENTE CAMPOS */}
         <div className="mapSidebarFields">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
             <strong style={{ fontSize: "14px", color: "var(--slate-800)" }}>
@@ -810,6 +883,8 @@ export default function GoogleMapView() {
             {campos.map((campo) => {
               const isSelected = selectedCampo?.id === campo.id;
               const lotesDelCampo = lotes.filter((l) => l.campoId === campo.id);
+              const perimetroCampo = lotesDelCampo.find((l) => l.tipo === "perimetro_campo");
+              const lotesInternos = lotesDelCampo.filter((l) => l.tipo !== "perimetro_campo");
 
               return (
                 <div
@@ -870,7 +945,7 @@ export default function GoogleMapView() {
                     </Link>
                   </div>
 
-                  {/* SECCIÓN DE LOTES DENTRO DEL CAMPO (Todo vive dentro del campo) */}
+                  {/* SECCIÓN INTERNA: Perímetro y Lotes de este Campo */}
                   <div
                     style={{
                       marginTop: "8px",
@@ -879,37 +954,62 @@ export default function GoogleMapView() {
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    {/* Botones de acción rápida para este campo */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px", flexWrap: "wrap", gap: "4px" }}>
                       <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--slate-700)" }}>
-                        🌾 Lotes de {campo.nombre} ({lotesDelCampo.length})
+                        Delimitaciones ({lotesDelCampo.length})
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => startNativeTracing(campo.id)}
-                        style={{
-                          background: "#f0fdf4",
-                          border: "1px solid #86efac",
-                          color: "#166534",
-                          borderRadius: "4px",
-                          padding: "2px 6px",
-                          fontSize: "10.5px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                        title={`Trazar nuevo lote para ${campo.nombre}`}
-                      >
-                        + Trazar Lote
-                      </button>
+
+                      <div style={{ display: "flex", gap: "4px" }}>
+                        <button
+                          type="button"
+                          onClick={() => startNativeTracing(campo.id, "perimetro_campo")}
+                          style={{
+                            background: perimetroCampo ? "#f1f5f9" : "#e0f2fe",
+                            border: `1px solid ${perimetroCampo ? "#cbd5e1" : "#7dd3fc"}`,
+                            color: perimetroCampo ? "#475569" : "#0369a1",
+                            borderRadius: "4px",
+                            padding: "2px 6px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                          title={`Trazar perímetro general de ${campo.nombre}`}
+                        >
+                          {perimetroCampo ? "🚩 Perímetro ✓" : "+ Perímetro Campo"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => startNativeTracing(campo.id, "lote_interno")}
+                          style={{
+                            background: "#f0fdf4",
+                            border: "1px solid #86efac",
+                            color: "#166534",
+                            borderRadius: "4px",
+                            padding: "2px 6px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                          title={`Trazar lote interno para ${campo.nombre}`}
+                        >
+                          + Lote
+                        </button>
+                      </div>
                     </div>
 
+                    {/* Lista de Trazos del Campo */}
                     {lotesDelCampo.length === 0 ? (
                       <small style={{ color: "var(--muted)", fontSize: "11px", display: "block" }}>
-                        Sin lotes trazados todavía. Presioná "+ Trazar Lote".
+                        Sin trazos. Presioná &quot;+ Perímetro Campo&quot; o &quot;+ Lote&quot;.
                       </small>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                         {lotesDelCampo.map((lote) => {
                           const isLoteActive = selectedLote?.id === lote.id;
+                          const isPerim = lote.tipo === "perimetro_campo";
+
                           return (
                             <div
                               key={lote.id}
@@ -920,8 +1020,8 @@ export default function GoogleMapView() {
                                 alignItems: "center",
                                 padding: "5px 8px",
                                 borderRadius: "6px",
-                                background: isLoteActive ? "#dcfce7" : "#f8fafc",
-                                border: `1px solid ${isLoteActive ? "#16a34a" : "#e2e8f0"}`,
+                                background: isLoteActive ? (isPerim ? "#fef3c7" : "#dcfce7") : "#f8fafc",
+                                border: `1px solid ${isLoteActive ? (isPerim ? "#d97706" : "#16a34a") : "#e2e8f0"}`,
                                 cursor: "pointer",
                               }}
                             >
@@ -931,25 +1031,28 @@ export default function GoogleMapView() {
                                     display: "inline-flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    width: "24px",
+                                    minWidth: "24px",
+                                    padding: "0 4px",
                                     height: "18px",
                                     borderRadius: "3px",
                                     background: "#ffffff",
-                                    border: "1.2px solid #16a34a",
+                                    border: `1.2px solid ${isPerim ? campo.color : "#16a34a"}`,
                                     fontWeight: 800,
                                     fontSize: "11px",
                                     color: "#0f172a",
                                   }}
                                 >
-                                  {lote.nombre}
+                                  {isPerim ? "🚩" : lote.nombre}
                                 </span>
-                                <strong style={{ fontSize: "12px", color: "var(--slate-800)" }}>
-                                  Lote {lote.nombre}
-                                </strong>
+                                <div>
+                                  <strong style={{ fontSize: "12px", color: "var(--slate-800)" }}>
+                                    {isPerim ? `Perímetro ${lote.nombre}` : `Lote ${lote.nombre}`}
+                                  </strong>
+                                </div>
                               </div>
 
                               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <span style={{ fontSize: "11px", color: "#166534", fontWeight: 700 }}>
+                                <span style={{ fontSize: "11px", color: isPerim ? "#b45309" : "#166534", fontWeight: 700 }}>
                                   {lote.superficieHa !== null ? `${lote.superficieHa} ha` : "Manual"}
                                 </span>
                                 <button
@@ -963,12 +1066,13 @@ export default function GoogleMapView() {
                                     border: "none",
                                     color: "#ef4444",
                                     cursor: "pointer",
-                                    padding: "0 2px",
-                                    fontSize: "11px",
+                                    padding: "2px 4px",
+                                    fontSize: "13px",
+                                    fontWeight: 700,
                                   }}
-                                  title="Eliminar lote"
+                                  title="Eliminar este trazo"
                                 >
-                                  ×
+                                  🗑️
                                 </button>
                               </div>
                             </div>
@@ -981,15 +1085,26 @@ export default function GoogleMapView() {
               );
             })}
 
-            <div style={{ marginTop: "6px", textAlign: "center" }}>
+            {/* Acciones de reseteo o limpieza */}
+            <div style={{ marginTop: "10px", display: "flex", justifyContent: "space-between", gap: "6px" }}>
               <button
                 type="button"
                 onClick={handleResetLotes}
                 className="thResetBtn"
                 style={{ fontSize: "11px", color: "var(--brand-700)" }}
-                title="Restaurar lotes predeterminados (incluye los 4 de Racca)"
+                title="Restaurar ejemplos de Racca y Keuneke"
               >
-                Restaurar 4 lotes de Racca
+                Restaurar Racca y Keuneke
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearAllTrazos}
+                className="thResetBtn"
+                style={{ fontSize: "11px", color: "#b91c1c" }}
+                title="Borrar todos los polígonos dibujados"
+              >
+                Borrar todos los trazos
               </button>
             </div>
           </div>
@@ -1021,7 +1136,7 @@ export default function GoogleMapView() {
               }}
             >
               <span>
-                ✏️ <strong>Trazando lote</strong>: Clic en cada esquina ({tracingCount} {tracingCount === 1 ? "vértice" : "vértices"})
+                ✏️ <strong>Trazando {formTipo === "perimetro_campo" ? "Perímetro de Campo" : "Lote"}</strong>: Clic en cada esquina ({tracingCount} {tracingCount === 1 ? "vértice" : "vértices"})
               </span>
 
               <button
@@ -1039,7 +1154,7 @@ export default function GoogleMapView() {
                   cursor: tracingCount >= 3 ? "pointer" : "not-allowed",
                 }}
               >
-                ✓ Guardar Lote
+                ✓ Guardar Trazo
               </button>
 
               <button
@@ -1127,16 +1242,16 @@ export default function GoogleMapView() {
         </div>
       </div>
 
-      {/* Modal para Guardar Nuevo Lote Trazado */}
+      {/* Modal para Guardar Nuevo Trazo */}
       {showNewLoteModal && (
         <div className="modalBackdrop" onClick={() => setShowNewLoteModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "480px" }}>
             <div className="modalHeader">
               <div>
                 <p className="eyebrow" style={{ color: "var(--brand-700)", fontWeight: 700 }}>
-                  Nuevo Lote Delimitado
+                  Delimitación Geográfica
                 </p>
-                <h2>Guardar Lote Trazado</h2>
+                <h2>Guardar Trazo en el Mapa</h2>
               </div>
               <button type="button" className="iconButton" onClick={() => setShowNewLoteModal(false)}>
                 ×
@@ -1144,6 +1259,61 @@ export default function GoogleMapView() {
             </div>
 
             <div style={{ padding: "18px 24px", display: "flex", flexDirection: "column", gap: "14px" }}>
+              {/* Selector de Tipo de Trazo: Perímetro de Campo vs Lote Interno */}
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)", display: "block", marginBottom: "6px" }}>
+                  ¿Qué estás delimitando? *
+                </label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormTipo("perimetro_campo");
+                      const found = campos.find((c) => c.id === formCampoId);
+                      if (found) {
+                        setFormNombre(found.nombre);
+                        if (found.superficieHa) setFormSuperficieHa(String(found.superficieHa));
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: `1.5px solid ${formTipo === "perimetro_campo" ? "#0369a1" : "#cbd5e1"}`,
+                      background: formTipo === "perimetro_campo" ? "#e0f2fe" : "#ffffff",
+                      color: formTipo === "perimetro_campo" ? "#0369a1" : "#475569",
+                      fontWeight: 700,
+                      fontSize: "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    🚩 Perímetro de Campo
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormTipo("lote_interno");
+                      setFormNombre("");
+                      setFormSuperficieHa("");
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: `1.5px solid ${formTipo === "lote_interno" ? "#16a34a" : "#cbd5e1"}`,
+                      background: formTipo === "lote_interno" ? "#dcfce7" : "#ffffff",
+                      color: formTipo === "lote_interno" ? "#166534" : "#475569",
+                      fontWeight: 700,
+                      fontSize: "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    🌾 Lote Interno
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)" }}>
                   Campo al que pertenece *
@@ -1156,8 +1326,9 @@ export default function GoogleMapView() {
                     const newId = e.target.value;
                     setFormCampoId(newId);
                     const found = campos.find((c) => c.id === newId);
-                    if (found && found.superficieHa) {
-                      setFormSuperficieHa(String(found.superficieHa));
+                    if (formTipo === "perimetro_campo" && found) {
+                      setFormNombre(found.nombre);
+                      if (found.superficieHa) setFormSuperficieHa(String(found.superficieHa));
                     }
                   }}
                 >
@@ -1171,7 +1342,7 @@ export default function GoogleMapView() {
 
               <div>
                 <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)" }}>
-                  Identificación / Nombre del Lote (Opcional)
+                  {formTipo === "perimetro_campo" ? "Nombre del Establecimiento" : "Identificación / Nombre del Lote (Opcional)"}
                 </label>
                 <input
                   type="text"
@@ -1179,10 +1350,12 @@ export default function GoogleMapView() {
                   style={{ marginTop: "4px" }}
                   value={formNombre}
                   onChange={(e) => setFormNombre(e.target.value)}
-                  placeholder={`Opcional (si se deja vacío dirá "${campos.find((c) => c.id === formCampoId)?.nombre || "Campo"}")`}
+                  placeholder={formTipo === "perimetro_campo" ? "Ej: Keuneke, Racca..." : `Ej: 1, 2, 3a (si se deja vacío dirá "${campos.find((c) => c.id === formCampoId)?.nombre || 'Campo'}")`}
                 />
                 <small style={{ color: "var(--muted)", fontSize: "11px", marginTop: "3px", display: "block" }}>
-                  💡 Si el campo es un lote único sin divisiones internas, dejalo vacío y la tarjeta sobre el satélite dirá directamente el <strong>nombre del campo</strong>.
+                  {formTipo === "perimetro_campo"
+                    ? "Este texto identificará todo el contorno exterior del campo."
+                    : "Si el campo es un lote único sin divisiones internas, podés dejarlo vacío y dirá directamente el nombre del campo."}
                 </small>
               </div>
 
@@ -1197,7 +1370,7 @@ export default function GoogleMapView() {
                   style={{ marginTop: "4px" }}
                   value={formSuperficieHa}
                   onChange={(e) => setFormSuperficieHa(e.target.value)}
-                  placeholder="Ej: 20, 25, 29, 48..."
+                  placeholder="Ej: 20, 25, 48, 57..."
                 />
                 <div style={{ marginTop: "4px", background: "#f8fafc", padding: "8px 10px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
                   <small style={{ color: "#475569", fontSize: "11px", display: "block", lineHeight: 1.35 }}>
@@ -1208,7 +1381,7 @@ export default function GoogleMapView() {
 
               <div>
                 <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)" }}>
-                  Cultivo / Ocupación Actual (Opcional)
+                  Cultivo / Destino (Opcional)
                 </label>
                 <input
                   type="text"
@@ -1244,7 +1417,7 @@ export default function GoogleMapView() {
                 className="primaryButton"
                 onClick={handleSaveNewLote}
               >
-                Guardar Lote en Campo
+                Guardar en el Mapa
               </button>
             </div>
           </div>

@@ -91,21 +91,40 @@ export interface LoteGeo {
   id: string;
   campoId: string;
   campoNombre: string;
-  nombre: string; // e.g. "3a", "3b", "1", "2"
-  superficieHa: number | null; // Carga manual estricta (no cálculo automático de mapa)
+  nombre: string; // e.g. "3a", "1", "2", o el nombre del campo si es perímetro
+  tipo?: "perimetro_campo" | "lote_interno"; // Perímetro general del campo vs lote interior
+  superficieHa: number | null; // Carga manual estricta
   coordenadas: Array<{ lat: number; lng: number }>;
   color?: string;
   cultivo?: string;
   observaciones?: string;
 }
 
-// Lotes iniciales pre-configurados para Racca sobre Ruta Provincial 40S (según foto operativa)
+// Lotes y perímetros iniciales pre-configurados (Racca y Keuneke como referencia)
 export const DEFAULT_LOTES_GEO: LoteGeo[] = [
+  // --- RACCA: Perímetro exterior y sus 4 lotes internos ---
+  {
+    id: "racca-perimetro",
+    campoId: "racca",
+    campoNombre: "Racca",
+    nombre: "Racca",
+    tipo: "perimetro_campo",
+    superficieHa: 100,
+    coordenadas: [
+      { lat: -32.2382, lng: -61.6126 },
+      { lat: -32.2382, lng: -61.6020 },
+      { lat: -32.2472, lng: -61.6020 },
+      { lat: -32.2472, lng: -61.6126 },
+    ],
+    color: "#d97706",
+    observaciones: "Perímetro general del establecimiento Racca (100 ha)",
+  },
   {
     id: "racca-lote-3a",
     campoId: "racca",
     campoNombre: "Racca",
     nombre: "3a",
+    tipo: "lote_interno",
     superficieHa: 25,
     coordenadas: [
       { lat: -32.2382, lng: -61.6126 },
@@ -122,6 +141,7 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     campoId: "racca",
     campoNombre: "Racca",
     nombre: "3b",
+    tipo: "lote_interno",
     superficieHa: 25,
     coordenadas: [
       { lat: -32.2382, lng: -61.6073 },
@@ -138,6 +158,7 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     campoId: "racca",
     campoNombre: "Racca",
     nombre: "1",
+    tipo: "lote_interno",
     superficieHa: 25,
     coordenadas: [
       { lat: -32.2427, lng: -61.6126 },
@@ -154,6 +175,7 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     campoId: "racca",
     campoNombre: "Racca",
     nombre: "2",
+    tipo: "lote_interno",
     superficieHa: 25,
     coordenadas: [
       { lat: -32.2427, lng: -61.6073 },
@@ -165,10 +187,62 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     cultivo: "Alfalfa",
     observaciones: "Subdivisión sur-este de Racca",
   },
+
+  // --- KEUNEKE: Perímetro exterior y sus 2 lotes internos ---
+  {
+    id: "keuneke-perimetro",
+    campoId: "keuneke",
+    campoNombre: "Keuneke",
+    nombre: "Keuneke",
+    tipo: "perimetro_campo",
+    superficieHa: 57,
+    coordenadas: [
+      { lat: -32.2230, lng: -61.7135 },
+      { lat: -32.2230, lng: -61.7045 },
+      { lat: -32.2305, lng: -61.7045 },
+      { lat: -32.2305, lng: -61.7135 },
+    ],
+    color: "#0891b2",
+    observaciones: "Perímetro general del establecimiento Keuneke (57 ha)",
+  },
+  {
+    id: "keuneke-lote-1",
+    campoId: "keuneke",
+    campoNombre: "Keuneke",
+    nombre: "1",
+    tipo: "lote_interno",
+    superficieHa: 48,
+    coordenadas: [
+      { lat: -32.2230, lng: -61.7135 },
+      { lat: -32.2230, lng: -61.7065 },
+      { lat: -32.2305, lng: -61.7065 },
+      { lat: -32.2305, lng: -61.7135 },
+    ],
+    color: "#22c55e",
+    cultivo: "Maíz",
+    observaciones: "Lote 1 de Keuneke (48 ha)",
+  },
+  {
+    id: "keuneke-lote-2",
+    campoId: "keuneke",
+    campoNombre: "Keuneke",
+    nombre: "2",
+    tipo: "lote_interno",
+    superficieHa: 9,
+    coordenadas: [
+      { lat: -32.2230, lng: -61.7065 },
+      { lat: -32.2230, lng: -61.7045 },
+      { lat: -32.2305, lng: -61.7045 },
+      { lat: -32.2305, lng: -61.7065 },
+    ],
+    color: "#22c55e",
+    cultivo: "Soja 1ra",
+    observaciones: "Lote 2 de Keuneke (9 ha)",
+  },
 ];
 
 const GEO_STORAGE_KEY = "hjb_campos_geo_coords_v2";
-const LOTES_GEO_STORAGE_KEY = "hjb_lotes_geo_polygons_v03";
+const LOTES_GEO_STORAGE_KEY = "hjb_lotes_geo_polygons_v04";
 
 export function getCamposGeo(): CampoGeo[] {
   if (typeof window === "undefined") return DEFAULT_CAMPOS_GEO;
