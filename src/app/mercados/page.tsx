@@ -18,22 +18,16 @@ import {
 
 const CATEGORIAS: { id: CategoriaValor; label: string; icon: string; desc: string }[] = [
   {
+    id: "Macro & Combustibles",
+    label: "Macroeconomía & Combustible",
+    icon: "💵",
+    desc: "Tipo de cambio oficial BNA Divisas, inflación IPC y gas oil agropecuario.",
+  },
+  {
     id: "Granos",
     label: "Granos",
     icon: "🌾",
     desc: "Cotizaciones de cereales y oleaginosas (granos.ar / Pizarra Rosario BCR).",
-  },
-  {
-    id: "Pellets & Concentrados",
-    label: "Pellets & Concentrados",
-    icon: "🥣",
-    desc: "Suplementos proteicos y subproductos agroindustriales para dietas de tambo.",
-  },
-  {
-    id: "Líquidos de Fumigación",
-    label: "Líquidos de Fumigación",
-    icon: "🧪",
-    desc: "Herbicidas, coadyuvantes, insecticidas y fungicidas para pulverización y barbecho.",
   },
   {
     id: "Ensilajes & Pasturas",
@@ -48,10 +42,16 @@ const CATEGORIAS: { id: CategoriaValor; label: string; icon: string; desc: strin
     desc: "Rollos henificados de reserva forrajera con peso promedio de referencia.",
   },
   {
-    id: "Macro & Combustibles",
-    label: "Macroeconomía & Combustible",
-    icon: "💵",
-    desc: "Tipo de cambio oficial BNA Divisas, inflación IPC y gas oil agropecuario.",
+    id: "Pellets & Concentrados",
+    label: "Pellets & Concentrados",
+    icon: "🥣",
+    desc: "Suplementos proteicos y subproductos agroindustriales para dietas de tambo.",
+  },
+  {
+    id: "Líquidos de Fumigación",
+    label: "Líquidos de Fumigación",
+    icon: "🧪",
+    desc: "Herbicidas, coadyuvantes, insecticidas y fungicidas para pulverización y barbecho.",
   },
 ];
 
@@ -135,12 +135,12 @@ export default function MercadosPage() {
 
   const filterTabs = [
     { id: "Todas", label: `📋 Todos (${items.length} Insumos)` },
+    { id: "Macro & Combustibles", label: "💵 Macro & Combustibles" },
     { id: "Granos", label: "🌾 Granos" },
-    { id: "Pellets & Concentrados", label: "🥣 Pellets & Concentrados" },
-    { id: "Líquidos de Fumigación", label: "🧪 Líquidos de Fumigación" },
     { id: "Ensilajes & Pasturas", label: "🌿 Ensilajes & Pasturas" },
     { id: "Rollos Forrajeros", label: "🚜 Rollos Forrajeros" },
-    { id: "Macro & Combustibles", label: "💵 Macro & Combustibles" },
+    { id: "Pellets & Concentrados", label: "🥣 Pellets & Concentrados" },
+    { id: "Líquidos de Fumigación", label: "🧪 Líquidos de Fumigación" },
   ];
 
   return (

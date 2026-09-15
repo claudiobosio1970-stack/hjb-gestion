@@ -1,12 +1,12 @@
 "use client";
 
 export type CategoriaValor =
+  | "Macro & Combustibles"
   | "Granos"
-  | "Pellets & Concentrados"
-  | "Líquidos de Fumigación"
   | "Ensilajes & Pasturas"
   | "Rollos Forrajeros"
-  | "Macro & Combustibles";
+  | "Pellets & Concentrados"
+  | "Líquidos de Fumigación";
 
 export type FuenteValor =
   | "API DolarApi"
@@ -46,7 +46,50 @@ function toArs(usd: number | null, tc: number, decimals: number = 2): number | n
 
 export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   // ==========================================
-  // 1. GRANOS
+  // 1. MACROECONOMÍA Y COMBUSTIBLE
+  // ==========================================
+  {
+    id: "dolar-bna",
+    nombre: "Dólar BNA (Divisas venta)",
+    categoria: "Macro & Combustibles",
+    valorArs: 1495,
+    valorUsd: 1.0,
+    unidadArs: "$",
+    unidadUsd: "USD",
+    fuente: "API DolarApi",
+    esEditableManual: true,
+    nota: "Tipo de cambio oficial BNA para liquidaciones y paridad",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "inflacion",
+    nombre: "Inflación",
+    categoria: "Macro & Combustibles",
+    valorArs: 2.1,
+    valorUsd: 2.1,
+    unidadArs: "%",
+    unidadUsd: "%",
+    fuente: "API ArgentinaDatos",
+    esEditableManual: true,
+    nota: "Índice de Precios al Consumidor (IPC)",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "gasoil",
+    nombre: "Gas oil",
+    categoria: "Macro & Combustibles",
+    valorArs: 2200,
+    valorUsd: toUsd(2200, BASE_TC, 2),
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "API Secretaría de Energía",
+    esEditableManual: true,
+    nota: "Gas Oil Grado 2 para maquinaria y laboreos",
+    fechaActualizacion: "18/8/26",
+  },
+
+  // ==========================================
+  // 2. GRANOS
   // ==========================================
   {
     id: "maiz",
@@ -115,146 +158,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
 
   // ==========================================
-  // 2. PELLETS & CONCENTRADOS
-  // ==========================================
-  {
-    id: "pellet-soja",
-    nombre: "Pellet de soja",
-    categoria: "Pellets & Concentrados",
-    valorArs: 404,
-    valorUsd: 0.27,
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Concentrado proteico puesto en tambo (Equiv. $404.000 / Tn · USD 270 / Tn)",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "pellet-trigo",
-    nombre: "Pellet de trigo",
-    categoria: "Pellets & Concentrados",
-    valorArs: 222,
-    valorUsd: toUsd(222, BASE_TC, 3),
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fletePct: 6,
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Pellet de trigo puesto en tambo con flete incluido (Equiv. $222.000 / Tn)",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "semilla-algodon",
-    nombre: "Semilla de algodón",
-    categoria: "Pellets & Concentrados",
-    valorArs: 255,
-    valorUsd: toUsd(255, BASE_TC, 3),
-    unidadArs: "$/kg",
-    unidadUsd: "USD/kg",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Semilla de algodón puesta en tambo con flete incluido (Equiv. $255.000 / Tn)",
-    fechaActualizacion: "18/8/26",
-  },
-
-  // ==========================================
-  // 3. LÍQUIDOS DE FUMIGACIÓN
-  // ==========================================
-  {
-    id: "glifosato",
-    nombre: "Glifosato",
-    categoria: "Líquidos de Fumigación",
-    valorArs: 7475,
-    valorUsd: 5.0,
-    unidadArs: "$/lt",
-    unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Herbicida sistémico concentrado soluble",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "atrazina",
-    nombre: "Atrazina",
-    categoria: "Líquidos de Fumigación",
-    valorArs: 8225,
-    valorUsd: 5.5,
-    unidadArs: "$/lt",
-    unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Herbicida selectivo para maíz y sorgo",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "dos-cuatro-d",
-    nombre: "2,4-D",
-    categoria: "Líquidos de Fumigación",
-    valorArs: 8970,
-    valorUsd: 6.0,
-    unidadArs: "$/lt",
-    unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Herbicida hormonal para hoja ancha",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "coadyuvante",
-    nombre: "Coadyuvante",
-    categoria: "Líquidos de Fumigación",
-    valorArs: 5230,
-    valorUsd: 3.5,
-    unidadArs: "$/lt",
-    unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Tensioactivo / humectante / antievaporante",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "cletodim",
-    nombre: "Cletodim",
-    categoria: "Líquidos de Fumigación",
-    valorArs: 14950,
-    valorUsd: 10.0,
-    unidadArs: "$/lt",
-    unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Graminicida para control en hoja ancha",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "insecticida",
-    nombre: "Insecticida",
-    categoria: "Líquidos de Fumigación",
-    valorArs: 17940,
-    valorUsd: 12.0,
-    unidadArs: "$/lt",
-    unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Control de orugas y chinches en lote",
-    fechaActualizacion: "18/8/26",
-  },
-  {
-    id: "fungicida",
-    nombre: "Fungicida",
-    categoria: "Líquidos de Fumigación",
-    valorArs: 22425,
-    valorUsd: 15.0,
-    unidadArs: "$/lt",
-    unidadUsd: "USD/lt",
-    fuente: "Manual HJB",
-    esEditableManual: true,
-    nota: "Control de royas y tizón foliar",
-    fechaActualizacion: "18/8/26",
-  },
-
-  // ==========================================
-  // 4. ENSILAJES Y PASTURAS
+  // 3. ENSILAJES Y PASTURAS
   // ==========================================
   {
     id: "silo-maiz-kg",
@@ -286,56 +190,56 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     id: "pastura-alfalfa-kg",
     nombre: "Pastura de alfalfa",
     categoria: "Ensilajes & Pasturas",
-    valorArs: 13.3,
-    valorUsd: toUsd(13.3, BASE_TC, 4),
+    valorArs: 43.8,
+    valorUsd: toUsd(43.8, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Pastoreo directo de alfalfa en lote",
+    nota: "Alfalfa consumo directo en pastoreo rotativo",
     fechaActualizacion: "18/8/26",
   },
   {
     id: "pastura-avena-kg",
     nombre: "Pastura de avena",
     categoria: "Ensilajes & Pasturas",
-    valorArs: 10.6,
-    valorUsd: toUsd(10.6, BASE_TC, 4),
+    valorArs: 31.9,
+    valorUsd: toUsd(31.9, BASE_TC, 3),
     unidadArs: "$/kg",
     unidadUsd: "USD/kg",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Verdeo de invierno en pastoreo directo",
+    nota: "Verdeo de invierno en pastoreo",
     fechaActualizacion: "18/8/26",
   },
 
   // ==========================================
-  // 5. ROLLOS FORRAJEROS
+  // 4. ROLLOS FORRAJEROS
   // ==========================================
   {
     id: "rollo-alfalfa",
     nombre: "Rollo de alfalfa",
     categoria: "Rollos Forrajeros",
-    valorArs: 80600,
-    valorUsd: toUsd(80600, BASE_TC, 1),
+    valorArs: 34500,
+    valorUsd: toUsd(34500, BASE_TC, 1),
     unidadArs: "$/Rollo",
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Rollo de primera calidad confeccionado (Equiv. $161 / kg en ~500 kg)",
+    nota: "Rollo henificado de alfalfa de primera (Equiv. $69 / kg en ~500 kg)",
     fechaActualizacion: "18/8/26",
   },
   {
     id: "rollo-avena",
     nombre: "Rollo de avena",
     categoria: "Rollos Forrajeros",
-    valorArs: 56420,
-    valorUsd: toUsd(56420, BASE_TC, 1),
+    valorArs: 27600,
+    valorUsd: toUsd(27600, BASE_TC, 1),
     unidadArs: "$/Rollo",
     unidadUsd: "USD/Rollo",
     fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Rollo forrajero avena confeccionado (Equiv. $113 / kg en ~500 kg)",
+    nota: "Rollo de avena entera henificada (Equiv. $55,20 / kg en ~500 kg)",
     fechaActualizacion: "18/8/26",
   },
   {
@@ -366,50 +270,148 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
 
   // ==========================================
-  // 6. MACROECONOMÍA Y COMBUSTIBLE
+  // 5. PELLETS & CONCENTRADOS
   // ==========================================
   {
-    id: "dolar-bna",
-    nombre: "Dólar BNA (Divisas venta)",
-    categoria: "Macro & Combustibles",
-    valorArs: 1495,
-    valorUsd: 1.0,
-    unidadArs: "$",
-    unidadUsd: "USD",
-    fuente: "API DolarApi",
+    id: "pellet-soja",
+    nombre: "Pellet de soja",
+    categoria: "Pellets & Concentrados",
+    valorArs: 489700,
+    valorUsd: 327.56,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Tipo de cambio oficial BNA para liquidaciones y paridad",
-    fechaActualizacion: "18/8/26",
+    fletePct: 7,
+    nota: "Concentrado proteico con 7% flete incluido (Equiv. $489,70 / kg)",
+    fechaActualizacion: "14/9/26",
   },
   {
-    id: "inflacion",
-    nombre: "Inflación",
-    categoria: "Macro & Combustibles",
-    valorArs: 2.1,
-    valorUsd: 2.1,
-    unidadArs: "%",
-    unidadUsd: "%",
-    fuente: "API ArgentinaDatos",
+    id: "pellet-trigo",
+    nombre: "Pellet de trigo",
+    categoria: "Pellets & Concentrados",
+    valorArs: 235400,
+    valorUsd: 157.46,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Índice de Precios al Consumidor (IPC)",
-    fechaActualizacion: "18/8/26",
+    fletePct: 7,
+    nota: "Afrechillo / subproducto de molienda con flete (Equiv. $235,40 / kg)",
+    fechaActualizacion: "14/9/26",
   },
   {
-    id: "gasoil",
-    nombre: "Gas oil",
-    categoria: "Macro & Combustibles",
-    valorArs: 2200,
-    valorUsd: toUsd(2200, BASE_TC, 2),
+    id: "semilla-algodon",
+    nombre: "Semilla de algodón",
+    categoria: "Pellets & Concentrados",
+    valorArs: 345000,
+    valorUsd: 230.77,
+    unidadArs: "$/Tn",
+    unidadUsd: "USD/Tn",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    fletePct: 8,
+    nota: "Suplemento graso y proteico tambo con flete (Equiv. $345,00 / kg)",
+    fechaActualizacion: "14/9/26",
+  },
+
+  // ==========================================
+  // 6. LÍQUIDOS DE FUMIGACIÓN
+  // ==========================================
+  {
+    id: "glifosato",
+    nombre: "Glifosato",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 7475,
+    valorUsd: 5.0,
     unidadArs: "$/lt",
     unidadUsd: "USD/lt",
-    fuente: "API Secretaría de Energía",
+    fuente: "Manual HJB",
     esEditableManual: true,
-    nota: "Gas Oil Grado 2 para maquinaria y laboreos",
+    nota: "Herbicida sistémico no selectivo (control malezas)",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "atrazina",
+    nombre: "Atrazina",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 8225,
+    valorUsd: 5.5,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Herbicida pre-emergente maíz y sorgo",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "dos-cuatro-d",
+    nombre: "2,4-D",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 8970,
+    valorUsd: 6.0,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Herbicida hormonal para malezas de hoja ancha",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "coadyuvante",
+    nombre: "Coadyuvante",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 5230,
+    valorUsd: 3.5,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Tensioactivo / antievaporante para caldo de pulverización",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "cletodim",
+    nombre: "Cletodim",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 14950,
+    valorUsd: 10.0,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Graminicida selectivo post-emergente",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "insecticida",
+    nombre: "Insecticida",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 17940,
+    valorUsd: 12.0,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Control de orugas y chinches en soja y maíz",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "fungicida",
+    nombre: "Fungicida",
+    categoria: "Líquidos de Fumigación",
+    valorArs: 22425,
+    valorUsd: 15.0,
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Control de royas y tizón foliar",
     fechaActualizacion: "18/8/26",
   },
 ];
 
-const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v06";
+const STORAGE_KEY = "hjb_valores_moviles_bimonetario_v07";
 const LAST_SYNC_KEY = "hjb_valores_moviles_last_sync";
 
 export function getValoresMoviles(): ValorMovil[] {
@@ -449,21 +451,28 @@ export function updateFromArs(items: ValorMovil[], id: string, nuevoArs: number 
   }
 
   if (id === "dolar-bna") {
-    copy[idx] = { ...copy[idx], valorArs: nuevoArs, valorUsd: 1.0, fechaActualizacion: today };
+    const nuevoTc = nuevoArs && nuevoArs > 0 ? nuevoArs : BASE_TC;
+    copy[idx] = { ...copy[idx], valorArs: nuevoArs, fechaActualizacion: today };
+    // Recalcular el resto de los valores ARS basados en su USD
+    for (let i = 0; i < copy.length; i++) {
+      if (copy[i].id !== "dolar-bna" && copy[i].id !== "inflacion" && copy[i].valorUsd !== null) {
+        copy[i] = {
+          ...copy[i],
+          valorArs: toArs(copy[i].valorUsd, nuevoTc, copy[i].unidadArs.includes("kg") ? 2 : 0),
+        };
+      }
+    }
     return copy;
   }
 
-  const decimals = (copy[idx].unidadArs.includes("/kg") || copy[idx].unidadArs.includes("/lt")) ? 3 : 2;
-  const nuevoUsd = toUsd(nuevoArs, tc, decimals);
-
+  const isKg = copy[idx].unidadArs.includes("kg");
+  const usdDecimals = isKg ? 3 : 2;
   copy[idx] = {
     ...copy[idx],
     valorArs: nuevoArs,
-    valorUsd: nuevoUsd,
+    valorUsd: toUsd(nuevoArs, tc, usdDecimals),
     fechaActualizacion: today,
   };
-
-  updateNotesAfterEdit(copy[idx]);
   return copy;
 }
 
@@ -480,227 +489,166 @@ export function updateFromUsd(items: ValorMovil[], id: string, nuevoUsd: number 
     return copy;
   }
 
-  const nuevoArs = toArs(nuevoUsd, tc, 2);
-
+  const isKg = copy[idx].unidadArs.includes("kg");
+  const arsDecimals = isKg ? 2 : 0;
   copy[idx] = {
     ...copy[idx],
-    valorArs: nuevoArs,
     valorUsd: nuevoUsd,
+    valorArs: toArs(nuevoUsd, tc, arsDecimals),
     fechaActualizacion: today,
   };
-
-  updateNotesAfterEdit(copy[idx]);
   return copy;
 }
 
-function updateNotesAfterEdit(item: ValorMovil) {
-  if (typeof item.valorArs !== "number") return;
-  if (item.id === "pellet-soja") {
-    const tnArs = Math.round(item.valorArs * 1000);
-    const tnUsd = ((item.valorUsd || 0) * 1000).toFixed(1);
-    item.nota = `Concentrado proteico puesto en tambo (Equiv. $${tnArs.toLocaleString("es-AR")} / Tn · USD ${tnUsd} / Tn)`;
-  } else if (item.id === "pellet-trigo") {
-    const tnArs = Math.round(item.valorArs * 1000);
-    item.nota = `Pellet de trigo puesto en tambo con flete incluido (Equiv. $${tnArs.toLocaleString("es-AR")} / Tn)`;
-  } else if (item.id === "semilla-algodon") {
-    const tnArs = Math.round(item.valorArs * 1000);
-    item.nota = `Semilla de algodón puesta en tambo con flete incluido (Equiv. $${tnArs.toLocaleString("es-AR")} / Tn)`;
-  } else if (item.id === "maiz") {
-    item.nota = `Equiv: $${(item.valorArs / 1000).toFixed(2)} / kg para mixer`;
-  } else if (item.id === "soja") {
-    item.nota = `Equiv: $${Math.round(item.valorArs / 1000)} / kg`;
-  } else if (item.id === "trigo") {
-    item.nota = `Equiv: $${(item.valorArs / 1000).toFixed(2)} / kg`;
-  } else if (item.id === "sorgo") {
-    item.nota = `Equiv: $${(item.valorArs / 1000).toFixed(2)} / kg`;
-  } else if (item.id === "girasol") {
-    item.nota = `Equiv: $${(item.valorArs / 1000).toFixed(2)} / kg`;
-  } else if (item.id === "rollo-alfalfa") {
-    const kgArs = (item.valorArs / 500).toFixed(1);
-    item.nota = `Rollo de primera calidad confeccionado (Equiv. $${kgArs} / kg en ~500 kg)`;
-  } else if (item.id === "rollo-avena") {
-    const kgArs = (item.valorArs / 500).toFixed(1);
-    item.nota = `Rollo forrajero avena confeccionado (Equiv. $${kgArs} / kg en ~500 kg)`;
-  } else if (item.id === "rollo-chala-maiz") {
-    const kgArs = (item.valorArs / 400).toFixed(1);
-    item.nota = `Rastrojo de maíz para volumen / mantenimiento (Equiv. $${kgArs} / kg en ~400 kg)`;
-  } else if (item.id === "rollo-gramineas") {
-    const kgArs = (item.valorArs / 500).toFixed(1);
-    item.nota = `Rollo de pasto consociado / gramíneas (Equiv. $${kgArs} / kg en ~500 kg)`;
-  }
+export function getLastSyncTime(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(LAST_SYNC_KEY);
 }
 
-export async function syncApisLive(): Promise<{ success: boolean; updatedCount: number; details: string[] }> {
-  const current = getValoresMoviles();
-  const details: string[] = [];
-  let updatedCount = 0;
-  const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
-  let activeTc = getDolarBnaVenta();
+export function setLastSyncTime(timeStr: string) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LAST_SYNC_KEY, timeStr);
+}
 
-  // 1. Dólar BNA
+export async function syncApisLive(): Promise<{ success: boolean; details: string[] }> {
+  const details: string[] = [];
+  const items = getValoresMoviles();
+  let updated = [...items];
+  const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+
+  // 1. Dólar Oficial BNA Divisas Venta
+  let tc = BASE_TC;
   try {
-    const res = await fetch("https://dolarapi.com/v1/ambito/dolares/bna", { cache: "no-store" });
+    const res = await fetch("https://dolarapi.com/v1/dolares/oficial", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      const venta = typeof data.venta === "number" ? data.venta : parseFloat(data.venta);
-      if (!isNaN(venta) && venta > 0) {
-        activeTc = venta;
-        const idx = current.findIndex((x) => x.id === "dolar-bna");
-        if (idx >= 0) {
-          current[idx].valorArs = venta;
-          current[idx].valorUsd = 1.0;
-          current[idx].fechaActualizacion = today;
-          current[idx].fuente = "API DolarApi";
-          details.push(`Dólar BNA: $${venta.toLocaleString("es-AR")}`);
-          updatedCount++;
-        }
+      if (typeof data.venta === "number" && data.venta > 0) {
+        tc = data.venta;
+        updated = updated.map((it) =>
+          it.id === "dolar-bna"
+            ? { ...it, valorArs: tc, valorUsd: 1.0, fechaActualizacion: today }
+            : it
+        );
+        details.push(`Dólar BNA venta: $${tc.toLocaleString("es-AR")}`);
       }
     }
   } catch (err) {
-    console.warn("DolarApi warning:", err);
+    console.warn("No se pudo obtener Dólar Oficial BNA:", err);
   }
 
-  // 2. Inflación
+  // 2. Inflación mensual IPC
   try {
-    const res = await fetch("https://api.argentinadatos.com/v1/finanzas/indices/inflacion", { cache: "no-store" });
+    const res = await fetch("https://argentinadatos-proxy.vercel.app/api/finanzas/indices/inflacion", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         const last = data[data.length - 1];
-        if (last && typeof last.valor === "number") {
-          const idx = current.findIndex((x) => x.id === "inflacion");
-          if (idx >= 0) {
-            current[idx].valorArs = last.valor;
-            current[idx].valorUsd = last.valor;
-            current[idx].fechaActualizacion = today;
-            current[idx].nota = `Último IPC (${last.fecha})`;
-            current[idx].fuente = "API ArgentinaDatos";
-            details.push(`Inflación: ${last.valor}%`);
-            updatedCount++;
-          }
+        if (typeof last.valor === "number") {
+          updated = updated.map((it) =>
+            it.id === "inflacion"
+              ? { ...it, valorArs: last.valor, valorUsd: last.valor, nota: `IPC mensual (${last.fecha || "último dato"})`, fechaActualizacion: today }
+              : it
+          );
+          details.push(`Inflación IPC: ${last.valor}%`);
         }
       }
     }
   } catch (err) {
-    console.warn("ArgentinaDatos warning:", err);
+    console.warn("No se pudo obtener Inflación:", err);
   }
 
-  // 3. Combustibles
+  // 3. Granos Pizarra Rosario BCR vía granos.ar
   try {
-    const res = await fetch(
-      "https://datos.energia.gob.ar/api/3/action/datastore_search?resource_id=80ac25de-a44a-4445-9215-090cf55cfda5&filters=%7B%22producto%22%3A%22Gas%20Oil%20Grado%202%22%7D&limit=5",
-      { cache: "no-store" }
-    );
+    const res = await fetch("https://api.granos.ar/pizarra/rosario/latest", { cache: "no-store" });
     if (res.ok) {
-      const json = await res.json();
-      const records = json.result?.records;
-      if (Array.isArray(records) && records.length > 0) {
-        const prices = records.map((r: any) => r.precio).filter((p: any) => typeof p === "number" && p > 500);
-        if (prices.length > 0) {
-          const medianPrice = prices.sort((a: number, b: number) => a - b)[Math.floor(prices.length / 2)];
-          const idx = current.findIndex((x) => x.id === "gasoil");
-          if (idx >= 0) {
-            current[idx].valorArs = medianPrice;
-            current[idx].valorUsd = toUsd(medianPrice, activeTc, 2);
-            current[idx].fechaActualizacion = today;
-            current[idx].fuente = "API Secretaría de Energía";
-            details.push(`Gas Oil: $${medianPrice.toLocaleString("es-AR")}/lt`);
-            updatedCount++;
+      const data = await res.json();
+      const mapPizarra: Record<string, { ars: number; usd?: number }> = {};
+      if (Array.isArray(data)) {
+        for (const g of data) {
+          const name = String(g.grano || g.nombre || "").toLowerCase();
+          const precioArs = Number(g.precio || g.valor || g.precioArs);
+          if (name && !isNaN(precioArs) && precioArs > 0) {
+            mapPizarra[name] = { ars: precioArs, usd: Number(g.precioUsd) || undefined };
           }
+        }
+      } else if (data && typeof data === "object") {
+        for (const [k, v] of Object.entries(data)) {
+          const val = v as any;
+          const precioArs = Number(val.precio || val.valor || val.precioArs || val);
+          if (!isNaN(precioArs) && precioArs > 0) {
+            mapPizarra[k.toLowerCase()] = { ars: precioArs, usd: Number(val.precioUsd) || undefined };
+          }
+        }
+      }
+
+      const matchGrano = (id: string, keys: string[]) => {
+        for (const k of keys) {
+          if (mapPizarra[k]) return mapPizarra[k];
+        }
+        return null;
+      };
+
+      const granosKeys: Record<string, string[]> = {
+        maiz: ["maiz", "maíz", "corn"],
+        soja: ["soja", "soybean", "soy"],
+        trigo: ["trigo", "wheat"],
+        sorgo: ["sorgo", "sorghum"],
+        girasol: ["girasol", "sunflower"],
+      };
+
+      for (const [gId, keys] of Object.entries(granosKeys)) {
+        const found = matchGrano(gId, keys);
+        if (found) {
+          const arsVal = found.ars;
+          const usdVal = found.usd && found.usd > 0 ? found.usd : toUsd(arsVal, tc, 2);
+          updated = updated.map((it) =>
+            it.id === gId
+              ? {
+                  ...it,
+                  valorArs: arsVal,
+                  valorUsd: usdVal,
+                  fuente: "API Granos.ar (Pizarra BCR)",
+                  fechaActualizacion: today,
+                }
+              : it
+          );
+          details.push(`${gId.toUpperCase()}: $${arsVal.toLocaleString("es-AR")} / Tn`);
         }
       }
     }
   } catch (err) {
-    console.warn("Secretaría de Energía warning:", err);
+    console.warn("No se pudo sincronizar cotizaciones de granos.ar:", err);
   }
 
-  // 4. Granos Pizarra Rosario (BCR) vía API granos.ar
-  try {
-    const res = await fetch("https://granosar.lfcaucino.workers.dev/api/v1/pizarra", { cache: "no-store" });
-    if (res.ok) {
-      const json = await res.json();
-      const granos = json.data?.granos;
-      if (granos) {
-        const updatePizarraItem = (id: string, g: { ars_tn: number; usd_tn: number }) => {
-          const idx = current.findIndex((x) => x.id === id);
-          if (idx >= 0 && g && typeof g.ars_tn === "number") {
-            current[idx].valorArs = g.ars_tn;
-            current[idx].valorUsd = g.usd_tn;
-            current[idx].fechaActualizacion = today;
-            current[idx].fuente = "API Granos.ar (Pizarra BCR)";
-            updateNotesAfterEdit(current[idx]);
-            updatedCount++;
-          }
-        };
-
-        updatePizarraItem("soja", granos.soja);
-        updatePizarraItem("maiz", granos.maiz);
-        updatePizarraItem("trigo", granos.trigo);
-        updatePizarraItem("sorgo", granos.sorgo);
-        updatePizarraItem("girasol", granos.girasol);
-
-        details.push(
-          `Granos: Soja $${granos.soja.ars_tn.toLocaleString("es-AR")} · Maíz $${granos.maiz.ars_tn.toLocaleString("es-AR")} · Trigo $${granos.trigo.ars_tn.toLocaleString("es-AR")}`
-        );
-      }
-    }
-  } catch (err) {
-    console.warn("Granos.ar API warning:", err);
-  }
-
-  saveValoresMoviles(current);
-
-  if (typeof window !== "undefined") {
-    localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
-  }
+  saveValoresMoviles(updated);
+  const timeNow = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) + " hs (" + today + ")";
+  setLastSyncTime(timeNow);
 
   return {
-    success: updatedCount > 0,
-    updatedCount,
+    success: details.length > 0,
     details,
   };
 }
 
 export async function checkDailyAutoSync(): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  const lastSyncStr = localStorage.getItem(LAST_SYNC_KEY);
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  if (lastSyncStr && lastSyncStr.slice(0, 10) === todayStr) {
-    return false;
+  const today = new Date().toLocaleDateString("es-AR");
+  const lastSync = getLastSyncTime();
+  if (!lastSync || !lastSync.includes(today)) {
+    try {
+      const res = await syncApisLive();
+      return res.success;
+    } catch {
+      return false;
+    }
   }
-
-  try {
-    await syncApisLive();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function getLastSyncTime(): string | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(LAST_SYNC_KEY);
-  if (!raw) return null;
-  try {
-    const d = new Date(raw);
-    return d.toLocaleString("es-AR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return null;
-  }
+  return false;
 }
 
 export function getPrecioReferencia(id: string, moneda: "ARS" | "USD" = "ARS"): number {
   const items = getValoresMoviles();
   let item = items.find((x) => x.id === id);
   if (!item) {
-    // Mapeo retrocompatible
     if (id === "maiz-kg" || id === "maiz-pizarra") item = items.find((x) => x.id === "maiz");
     else if (id === "soja-pizarra") item = items.find((x) => x.id === "soja");
     else if (id === "trigo-pizarra") item = items.find((x) => x.id === "trigo");
