@@ -7,10 +7,13 @@ import {
   CategoriaValor,
   ValorMovil,
   checkDailyAutoSync,
+  getDolarBnaVenta,
   getLastSyncTime,
   getValoresMoviles,
   saveValoresMoviles,
   syncApisLive,
+  updateFromArs,
+  updateFromUsd,
 } from "@/lib/valoresMovilesData";
 
 const CATEGORIAS: { id: CategoriaValor; label: string; icon: string; desc: string }[] = [
@@ -18,25 +21,25 @@ const CATEGORIAS: { id: CategoriaValor; label: string; icon: string; desc: strin
     id: "Macro & Combustibles",
     label: "Macroeconomía & Combustible",
     icon: "💵",
-    desc: "Variables oficiales para liquidación, costos de laboreo y ajuste por inflación.",
+    desc: "Variables oficiales de paridad cambiaria, inflación y combustible para maquinaria.",
   },
   {
     id: "Granos & Concentrados",
     label: "Granos & Concentrados (Dietas)",
     icon: "🌾",
-    desc: "Insumos concentrados proteicos y energéticos para la ración del tambo.",
+    desc: "Insumos energéticos y proteicos para la formulación de raciones del tambo.",
   },
   {
     id: "Ensilajes & Pasturas",
     label: "Ensilajes & Pasturas (Tambo)",
     icon: "🌿",
-    desc: "Valores por kilo de materia verde/ensilada para formulación de dietas.",
+    desc: "Valores por kilogramo de materia verde/ensilada consumida en pastoreo o mixer.",
   },
   {
     id: "Rollos Forrajeros",
     label: "Rollos Forrajeros",
     icon: "🚜",
-    desc: "Valores por rollo y costo derivado por kilogramo de fibra henificada.",
+    desc: "Costo por rollo y valor equivalente por kilogramo de fibra seca henificada.",
   },
 ];
 
@@ -52,16 +55,18 @@ export default function MercadosPage() {
     setItems(getValoresMoviles());
     setLastSync(getLastSyncTime());
 
-    // Chequeo de sincronización automática diaria (1 vez al día)
+    // Sincronización automática diaria en segundo plano (1 vez por día)
     checkDailyAutoSync().then((ran) => {
       if (ran) {
         setItems(getValoresMoviles());
         setLastSync(getLastSyncTime());
-        setFeedback({ msg: "Se sincronizaron automáticamente las APIs del día.", type: "info" });
+        setFeedback({ msg: "Se ejecutó la actualización automática diaria de las APIs.", type: "info" });
         setTimeout(() => setFeedback(null), 5000);
       }
     });
   }, []);
+
+  const tcActivo = getDolarBnaVenta();
 
   async function handleSyncApis() {
     setSyncing(true);
@@ -77,65 +82,34 @@ export default function MercadosPage() {
         });
       } else {
         setFeedback({
-          msg: "Las APIs ya se encuentran al día.",
+          msg: "Las cotizaciones ya se encuentran actualizadas.",
           type: "info",
         });
       }
     } catch {
-      setFeedback({ msg: "Hubo una demora al conectar con las APIs. Se mantienen los valores guardados.", type: "info" });
+      setFeedback({ msg: "Hubo una demora al conectar con los servidores externos. Se preservan los valores activos.", type: "info" });
     } finally {
       setSyncing(false);
       setTimeout(() => setFeedback(null), 6000);
     }
   }
 
-  function handleValueChange(id: string, newValor: number | null) {
-    setItems((prev) => {
-      const copy = [...prev];
-      const idx = copy.findIndex((x) => x.id === id);
-      if (idx >= 0) {
-        const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
-        copy[idx] = {
-          ...copy[idx],
-          valor: newValor,
-          fechaActualizacion: today,
-        };
-
-        // Derivaciones automáticas al cambiar unidades mayores
-        if (id === "pellet-soja-tn" && typeof newValor === "number") {
-          const kgIdx = copy.findIndex((x) => x.id === "pellet-soja-kg");
-          if (kgIdx >= 0) copy[kgIdx].valor = Math.round(newValor / 1000);
-        }
-        if (id === "pellet-trigo-tn" && typeof newValor === "number") {
-          const kgIdx = copy.findIndex((x) => x.id === "pellet-trigo-kg");
-          if (kgIdx >= 0) copy[kgIdx].valor = Math.round(newValor / 1000);
-        }
-        if (id === "rollo-alfalfa-rollo" && typeof newValor === "number") {
-          const kgIdx = copy.findIndex((x) => x.id === "rollo-alfalfa-kg");
-          if (kgIdx >= 0) copy[kgIdx].valor = Math.round(newValor / 500);
-        }
-        if (id === "rollo-avena-rollo" && typeof newValor === "number") {
-          const kgIdx = copy.findIndex((x) => x.id === "rollo-avena-kg");
-          if (kgIdx >= 0) copy[kgIdx].valor = Math.round(newValor / 500);
-        }
-        if (id === "rollo-chala-maiz-rollo" && typeof newValor === "number") {
-          const kgIdx = copy.findIndex((x) => x.id === "rollo-chala-maiz-kg");
-          if (kgIdx >= 0) copy[kgIdx].valor = Math.round(newValor / 400);
-        }
-        if (id === "rollo-gramineas-rollo" && typeof newValor === "number") {
-          const kgIdx = copy.findIndex((x) => x.id === "rollo-gramineas-kg");
-          if (kgIdx >= 0) copy[kgIdx].valor = Math.round(newValor / 500);
-        }
-      }
-      return copy;
-    });
+  function handleEditArs(id: string, newArs: number | null) {
+    const updated = updateFromArs(items, id, newArs);
+    setItems(updated);
     setHasUnsavedChanges(true);
   }
 
-  function handleSaveManual() {
+  function handleEditUsd(id: string, newUsd: number | null) {
+    const updated = updateFromUsd(items, id, newUsd);
+    setItems(updated);
+    setHasUnsavedChanges(true);
+  }
+
+  function handleSave() {
     saveValoresMoviles(items);
     setHasUnsavedChanges(false);
-    setFeedback({ msg: "Valores guardados correctamente. Quedan activos para dietas y labores.", type: "success" });
+    setFeedback({ msg: "Precios de referencia guardados. Quedan activos para todo el sistema HJB.", type: "success" });
     setTimeout(() => setFeedback(null), 4000);
   }
 
@@ -152,16 +126,16 @@ export default function MercadosPage() {
         <div>
           <div className="badgeRow" style={{ marginBottom: "6px" }}>
             <span className="pill badgeGreen">1-Valores Móviles HJB</span>
-            <span className="pill badgeSlate">Actualización Diaria</span>
+            <span className="pill badgeSlate">Bimonetario (ARS / USD)</span>
             {lastSync && (
               <span className="pill badgeBlue" style={{ fontSize: "11.5px" }}>
                 Sincronizado: {lastSync}
               </span>
             )}
           </div>
-          <h1>Valores Móviles & Mercados</h1>
+          <h1>Valores Móviles & Precios de Referencia</h1>
           <p className="muted">
-            Cotizaciones oficiales en vivo y precios de insumos para el cálculo de dietas del tambo y costos de labores.
+            Tabla central bimonetaria de precios e insumos. Sirve de referencia para el cálculo de dietas del tambo y labores agrícolas.
           </p>
         </div>
 
@@ -172,7 +146,7 @@ export default function MercadosPage() {
             style={{ display: "flex", alignItems: "center", gap: "6px" }}
             onClick={handleSyncApis}
             disabled={syncing}
-            title="Consulta las APIs oficiales de Dólar BNA, Inflación y Combustibles"
+            title="Sincroniza en vivo Dólar BNA, Inflación y Gasoil"
           >
             {syncing ? "⏳ Sincronizando..." : "🔄 Sincronizar APIs ahora"}
           </button>
@@ -180,11 +154,45 @@ export default function MercadosPage() {
           <button
             type="button"
             className="primaryButton"
-            onClick={handleSaveManual}
+            onClick={handleSave}
             style={{ display: "flex", alignItems: "center", gap: "6px" }}
           >
             💾 Guardar cambios
           </button>
+        </div>
+      </div>
+
+      {/* Banner explicativo de Paridad y Tipo de Cambio Activo */}
+      <div
+        style={{
+          background: "#f0fdf4",
+          border: "1px solid #bbf7d0",
+          borderRadius: "8px",
+          padding: "12px 18px",
+          marginBottom: "16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "12px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ fontSize: "22px" }}>💵</span>
+          <div>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: "#166534" }}>
+              Tipo de Cambio Activo: 1 USD = ${tcActivo.toLocaleString("es-AR")} ARS (BNA Venta)
+            </div>
+            <div style={{ fontSize: "12px", color: "#15803d" }}>
+              Podés editar en el casillero de <strong>Pesos ($)</strong> o en el de <strong>Dólares (USD)</strong>; el sistema convierte automáticamente el valor opuesto.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: "#166534", background: "#dcfce7", padding: "4px 8px", borderRadius: "6px" }}>
+            Referencia Central del Sistema
+          </span>
         </div>
       </div>
 
@@ -225,10 +233,10 @@ export default function MercadosPage() {
             alignItems: "center",
           }}
         >
-          <span>⚠️ Tenés modificaciones manuales sin guardar en los precios.</span>
+          <span>⚠️ Tenés modificaciones manuales de precios sin guardar.</span>
           <button
             type="button"
-            onClick={handleSaveManual}
+            onClick={handleSave}
             style={{
               background: "#b45309",
               color: "#ffffff",
@@ -244,32 +252,32 @@ export default function MercadosPage() {
         </div>
       )}
 
-      {/* Tarjetas de Métricas Principales */}
+      {/* Tarjetas de Métricas Principales (Pesos + USD) */}
       <div className="metricsGrid five">
         <MetricCard
-          label="Dólar BNA (Venta)"
-          value={dolarItem?.valor ? `$${dolarItem.valor.toLocaleString("es-AR")}` : "—"}
-          note="Vía DolarApi en vivo"
+          label="Dólar BNA Venta"
+          value={dolarItem?.valorArs ? `$${dolarItem.valorArs.toLocaleString("es-AR")}` : "—"}
+          note="Oficial Divisas Venta"
         />
         <MetricCard
           label="Inflación IPC"
-          value={inflacionItem?.valor ? `${inflacionItem.valor}%` : "—"}
+          value={inflacionItem?.valorArs ? `${inflacionItem.valorArs}%` : "—"}
           note={inflacionItem?.nota || "ArgentinaDatos"}
         />
         <MetricCard
           label="Gas Oil Grado 2"
-          value={gasoilItem?.valor ? `$${gasoilItem.valor.toLocaleString("es-AR")}` : "—"}
-          note="Por litro para maquinaria"
+          value={gasoilItem?.valorArs ? `$${gasoilItem.valorArs.toLocaleString("es-AR")}` : "—"}
+          note={gasoilItem?.valorUsd ? `USD ${gasoilItem.valorUsd} / lt` : "Por litro"}
         />
         <MetricCard
           label="Maíz Dieta"
-          value={maizItem?.valor ? `$${maizItem.valor.toLocaleString("es-AR")}` : "—"}
-          note="Por kilo puesto en mixer"
+          value={maizItem?.valorArs ? `$${maizItem.valorArs.toLocaleString("es-AR")}` : "—"}
+          note={maizItem?.valorUsd ? `USD ${maizItem.valorUsd} / kg` : "Puesto en mixer"}
         />
         <MetricCard
           label="Pellet Soja"
-          value={pelletItem?.valor ? `$${pelletItem.valor.toLocaleString("es-AR")}` : "—"}
-          note="Por kilo concentrado proteico"
+          value={pelletItem?.valorArs ? `$${pelletItem.valorArs.toLocaleString("es-AR")}` : "—"}
+          note={pelletItem?.valorUsd ? `USD ${pelletItem.valorUsd} / kg` : "Concentrado"}
         />
       </div>
 
@@ -309,121 +317,155 @@ export default function MercadosPage() {
                   <thead>
                     <tr>
                       <th style={{ minWidth: "220px" }}>Producto / Insumo</th>
-                      <th style={{ width: "160px" }}>Valor Activo</th>
+                      <th style={{ width: "190px", textAlign: "right" }}>Precio en Pesos ($ ARS)</th>
+                      <th style={{ width: "190px", textAlign: "right" }}>Precio en Dólares (USD)</th>
                       <th style={{ width: "90px" }}>Unidad</th>
-                      <th style={{ width: "140px" }}>U$D / Flete</th>
-                      <th style={{ width: "170px" }}>Origen</th>
-                      <th style={{ width: "110px" }}>Fecha</th>
-                      <th>Detalle / Nota</th>
+                      <th style={{ width: "140px" }}>Detalle / Flete</th>
+                      <th style={{ width: "160px" }}>Origen</th>
+                      <th style={{ width: "100px" }}>Fecha</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {categoryItems.map((item) => (
-                      <tr key={item.id}>
-                        {/* Nombre */}
-                        <td>
-                          <strong style={{ fontSize: "14px", color: "var(--slate-950)" }}>
-                            {item.nombre}
-                          </strong>
-                          {item.origenCalculo && (
-                            <small style={{ display: "block", color: "var(--brand-700)", fontSize: "11px", marginTop: "2px" }}>
-                              ↳ {item.origenCalculo}
-                            </small>
-                          )}
-                        </td>
+                    {categoryItems.map((item) => {
+                      const isPercentage = item.unidadArs === "%";
 
-                        {/* Input Valor Editable */}
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{ color: "var(--slate-500)", fontWeight: 600, fontSize: "13px" }}>
-                              {item.unidad === "%" ? "" : "$"}
-                            </span>
-                            <input
-                              type="number"
-                              step="any"
-                              value={item.valor ?? ""}
-                              placeholder="S/C"
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? null : parseFloat(e.target.value);
-                                handleValueChange(item.id, isNaN(val as number) ? null : val);
-                              }}
-                              style={{
-                                width: "105px",
-                                padding: "6px 8px",
-                                borderRadius: "6px",
-                                border: "1px solid var(--line)",
-                                fontWeight: 700,
-                                fontSize: "14px",
-                                color: "var(--slate-900)",
-                                background: "#ffffff",
-                                textAlign: "right",
-                              }}
-                            />
-                            {item.unidad === "%" && (
-                              <span style={{ color: "var(--slate-500)", fontWeight: 700 }}>%</span>
+                      return (
+                        <tr key={item.id}>
+                          {/* Nombre del Producto */}
+                          <td>
+                            <strong style={{ fontSize: "14px", color: "var(--slate-950)" }}>
+                              {item.nombre}
+                            </strong>
+                            {item.origenCalculo && (
+                              <small style={{ display: "block", color: "var(--brand-700)", fontSize: "11px", marginTop: "2px" }}>
+                                ↳ {item.origenCalculo}
+                              </small>
                             )}
-                          </div>
-                        </td>
+                            {item.nota && (
+                              <small style={{ display: "block", color: "var(--slate-500)", fontSize: "11px", marginTop: "1px" }}>
+                                {item.nota}
+                              </small>
+                            )}
+                          </td>
 
-                        {/* Unidad */}
-                        <td>
-                          <span style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--slate-700)" }}>
-                            {item.unidad}
-                          </span>
-                        </td>
+                          {/* Casillero en PESOS ($ ARS) */}
+                          <td style={{ textAlign: "right" }}>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#f8fafc", padding: "3px 6px", borderRadius: "6px", border: "1px solid var(--line)" }}>
+                              <span style={{ color: "var(--slate-500)", fontWeight: 700, fontSize: "12px" }}>
+                                {isPercentage ? "" : "$"}
+                              </span>
+                              <input
+                                type="number"
+                                step="any"
+                                value={item.valorArs ?? ""}
+                                placeholder="S/C"
+                                onChange={(e) => {
+                                  const val = e.target.value === "" ? null : parseFloat(e.target.value);
+                                  handleEditArs(item.id, isNaN(val as number) ? null : val);
+                                }}
+                                style={{
+                                  width: "100px",
+                                  padding: "4px 6px",
+                                  borderRadius: "4px",
+                                  border: "1px solid #cbd5e1",
+                                  fontWeight: 700,
+                                  fontSize: "13.5px",
+                                  color: "var(--slate-900)",
+                                  background: "#ffffff",
+                                  textAlign: "right",
+                                }}
+                              />
+                              {isPercentage && <span style={{ fontWeight: 700, fontSize: "12px" }}>%</span>}
+                              <span style={{ fontSize: "11px", color: "var(--slate-500)", fontWeight: 600 }}>ARS</span>
+                            </div>
+                          </td>
 
-                        {/* Valor Secundario (U$D o Flete) */}
-                        <td>
-                          {item.valorSecundario ? (
-                            <span
-                              style={{
-                                display: "inline-block",
-                                padding: "2px 8px",
-                                borderRadius: "4px",
-                                background: "#fef08a",
-                                color: "#854d0e",
-                                fontWeight: 700,
-                                fontSize: "12px",
-                              }}
-                            >
-                              {item.valorSecundario} {item.unidadSecundaria || ""}
+                          {/* Casillero en DÓLARES (USD U$D) */}
+                          <td style={{ textAlign: "right" }}>
+                            {isPercentage ? (
+                              <span style={{ color: "var(--slate-400)", fontSize: "12px" }}>N/A</span>
+                            ) : (
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#fefce8", padding: "3px 6px", borderRadius: "6px", border: "1px solid #fef08a" }}>
+                                <span style={{ color: "#854d0e", fontWeight: 700, fontSize: "12px" }}>U$D</span>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={item.valorUsd ?? ""}
+                                  placeholder="S/C"
+                                  onChange={(e) => {
+                                    const val = e.target.value === "" ? null : parseFloat(e.target.value);
+                                    handleEditUsd(item.id, isNaN(val as number) ? null : val);
+                                  }}
+                                  style={{
+                                    width: "90px",
+                                    padding: "4px 6px",
+                                    borderRadius: "4px",
+                                    border: "1px solid #fde047",
+                                    fontWeight: 700,
+                                    fontSize: "13.5px",
+                                    color: "#713f12",
+                                    background: "#ffffff",
+                                    textAlign: "right",
+                                  }}
+                                />
+                                <span style={{ fontSize: "11px", color: "#a16207", fontWeight: 600 }}>USD</span>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Unidad */}
+                          <td>
+                            <span style={{ fontSize: "12.5px", fontWeight: 600, color: "var(--slate-700)" }}>
+                              {item.unidadArs}
                             </span>
-                          ) : (
-                            <span style={{ color: "var(--slate-400)" }}>—</span>
-                          )}
-                        </td>
+                          </td>
 
-                        {/* Fuente / Origen */}
-                        <td>
-                          <span
-                            className={
-                              item.fuente.startsWith("API")
+                          {/* Detalle / Flete */}
+                          <td>
+                            {item.fletePct ? (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  padding: "2px 8px",
+                                  borderRadius: "4px",
+                                  background: "#ffedd5",
+                                  color: "#9a3412",
+                                  fontWeight: 700,
+                                  fontSize: "12px",
+                                }}
+                              >
+                                Flete {item.fletePct}%
+                              </span>
+                            ) : (
+                              <span style={{ color: "var(--slate-400)", fontSize: "12px" }}>—</span>
+                            )}
+                          </td>
+
+                          {/* Origen / Fuente */}
+                          <td>
+                            <span
+                              className={
+                                item.fuente.startsWith("API")
                                 ? "pill badgeGreen"
                                 : item.fuente.startsWith("Derivado")
                                 ? "pill badgeSlate"
                                 : "pill badgeBlue"
-                            }
-                            style={{ fontSize: "11px", fontWeight: 600 }}
-                          >
-                            {item.fuente}
-                          </span>
-                        </td>
+                              }
+                              style={{ fontSize: "11px", fontWeight: 600 }}
+                            >
+                              {item.fuente}
+                            </span>
+                          </td>
 
-                        {/* Fecha Actualización */}
-                        <td>
-                          <span style={{ fontSize: "12px", color: "var(--slate-600)" }}>
-                            {item.fechaActualizacion}
-                          </span>
-                        </td>
-
-                        {/* Nota */}
-                        <td>
-                          <span style={{ fontSize: "12px", color: "var(--slate-600)" }}>
-                            {item.nota || "—"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                          {/* Fecha Actualización */}
+                          <td>
+                            <span style={{ fontSize: "12px", color: "var(--slate-600)" }}>
+                              {item.fechaActualizacion}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -432,14 +474,14 @@ export default function MercadosPage() {
         })}
       </div>
 
-      {/* Caja explicativa de cómo se conecta esto con el resto de HJB */}
+      {/* Nota de Arquitectura: Referencia Central para todo el sistema */}
       <section className="panel" style={{ marginTop: "24px", background: "#f8fafc", border: "1px dashed var(--line)" }}>
         <h3 style={{ fontSize: "15px", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
-          <span>💡</span>
-          <span>¿Cómo utiliza HJB estos Valores Móviles en el sistema?</span>
+          <span>🏛️</span>
+          <span>Referencia Central de Costos para HJB</span>
         </h3>
         <p style={{ fontSize: "13px", color: "var(--slate-700)", lineHeight: 1.5, margin: 0 }}>
-          Todos los valores listados en esta tabla quedan centralizados en el sistema. Cuando se avance con la formulación de las <strong>dietas de las vacas</strong> (kilos de silo de maíz, avena, maíz molido, pellet de soja, rollos), el sistema multiplicará automáticamente los kilos por estos valores vigentes para obtener el costo de alimentación por vaca/día y por litro de leche. De la misma forma, las labores agrícolas calculan el costo de combustible con el precio de gasoil cargado aquí.
+          Esta sección actúa como la <strong>fuente única de verdad</strong> de precios de la empresa. Cada vez que se modifica un valor aquí (sea por la actualización automática de las APIs o porque lo editaste en pesos o dólares), el cambio se propaga de manera inmediata. Los futuros módulos de <strong>Dietas del Tambo</strong> (para valorizar kilos de ración) y <strong>Costos de Labores</strong> (consumo de gasoil e insumos en cada lote) consultan directamente estos precios.
         </p>
       </section>
     </AppShell>
