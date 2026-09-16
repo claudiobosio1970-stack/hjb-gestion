@@ -48,6 +48,26 @@ const MAQUINARIAS_PRESET = [
   "Sin asignar",
 ];
 
+function isLaborSinInsumos(tipo: string): boolean {
+  const t = (tipo || "").toLowerCase();
+  return (
+    t.includes("subsol") ||
+    t.includes("disco") ||
+    t.includes("rastra") ||
+    t.includes("rolad") ||
+    t.includes("laboreo") ||
+    t.includes("desmalez") ||
+    t.includes("arado") ||
+    t.includes("escarific") ||
+    t.includes("cincel")
+  );
+}
+
+function isBiofertilizacion(tipo: string): boolean {
+  const t = (tipo || "").toLowerCase();
+  return t.includes("biofertiliz");
+}
+
 function getDefaultMaquinaria(tipo: string): string {
   const t = (tipo || "").toLowerCase();
   if (t.includes("fumiga") || t.includes("pulveri") || t.includes("barbecho")) {
@@ -72,8 +92,13 @@ function newInput(producto = ""): ActivityInput {
   };
 }
 
-function emptyActivity(campo = "Aguilera", lote = "Lote Único", campana = "2026/27"): Activity {
+function emptyActivity(campo = "Aguilera", lote = "Lote Único", campana = "2026/27", tipo = "Fertilización"): Activity {
   const now = new Date().toISOString();
+  const allLots = agricultureData.listLotes(campo);
+  const found = allLots.find((l) => l.nombre === lote);
+  const lotHa = found?.superficieHa || null;
+  const sinInsumos = isLaborSinInsumos(tipo);
+
   return {
     id: "",
     campo,
@@ -81,16 +106,16 @@ function emptyActivity(campo = "Aguilera", lote = "Lote Único", campana = "2026
     campana,
     cultivo: "",
     cultivoAntecesor: "",
-    tipo: "Fertilización",
+    tipo,
     estado: "Planificada",
     fechaPlanificada: "",
     fechaReal: "",
-    superficiePlanificada: null,
-    superficieReal: null,
+    superficiePlanificada: lotHa,
+    superficieReal: lotHa,
     superficieNota: "",
-    insumos: [newInput("")],
+    insumos: sinInsumos ? [] : [newInput("")],
     metodoAplicacion: "Terrestre",
-    maquinaria: "Tractor Case 150",
+    maquinaria: getDefaultMaquinaria(tipo),
     operador: "Sin asignar",
     observaciones: "",
     discrepancia: "",
@@ -151,13 +176,19 @@ export default function NewActivityModal({
       );
     } else {
       const c = fixedCampo || "Aguilera";
-      const lots = LOTES_POR_CAMPO[c] || ["Lote Único"];
-      const newAct = emptyActivity(c, fixedLote || lots[0], fixedCampana || "2026/27");
+      const dynamicLots = agricultureData.listLotes(c);
+      const lotNames = dynamicLots.map((l) => l.nombre);
+      const lots = lotNames.length > 0 ? lotNames : LOTES_POR_CAMPO[c] || ["Lote Único"];
+      const chosenLote = fixedLote || lots[0];
+      const newAct = emptyActivity(c, chosenLote, fixedCampana || "2026/27");
       setForm(newAct);
       setIsMultiLote(false);
       setShowProduccion(false);
     }
   }, [open, fixedCampo, fixedLote, fixedCampana, editingActivity]);
+
+  const [bioTipo, setBioTipo] = useState<"liquida" | "solida">("liquida");
+  const [bioCantidadUnidades, setBioCantidadUnidades] = useState<number | "">("");
 
   if (!open) return null;
 
@@ -167,15 +198,90 @@ export default function NewActivityModal({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function applyBiofertilizacion(tipoBio: "liquida" | "solida", unidades: number | "", supOverride?: number | null) {
+    setBioTipo(tipoBio);
+    setBioCantidadUnidades(unidades);
+
+    if (!unidades || Number(unidades) <= 0) {
+      return;
+    }
+
+    const cant = Number(unidades);
+    const supActive = supOverride !== undefined ? supOverride : (isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada);
+    const supVal = supActive && supActive > 0 ? supActive : 1;
+
+    if (tipoBio === "liquida") {
+      // 1 tanque = 12 m3 = 12 kL
+      const totalKl = Number((cant * 12).toFixed(2));
+      const dosisKlHa = Number((totalKl / supVal).toFixed(2));
+      const bioInput: ActivityInput = {
+        id: "bio-efluente-liq",
+        producto: "Efluente Tambo (Líquido)",
+        unidad: "kL/ha",
+        dosisPlanificada: dosisKlHa,
+        dosisReal: isReal ? dosisKlHa : null,
+        cantidadTotal: totalKl,
+        unidadTotal: "kL",
+        observacion: `${cant} tanques de 12 m³ (${totalKl} kL totales)`,
+      };
+      setForm((prev) => ({
+        ...prev,
+        insumos: [bioInput],
+      }));
+    } else {
+      // 1 carro = 5 toneladas
+      const totalTn = Number((cant * 5).toFixed(2));
+      const dosisTnHa = Number((totalTn / supVal).toFixed(2));
+      const bioInput: ActivityInput = {
+        id: "bio-estiercol-sol",
+        producto: "Estiércol Tambo (Sólido)",
+        unidad: "t/ha",
+        dosisPlanificada: dosisTnHa,
+        dosisReal: isReal ? dosisTnHa : null,
+        cantidadTotal: totalTn,
+        unidadTotal: "tn",
+        observacion: `${cant} carros de 5 tn (${totalTn} tn totales)`,
+      };
+      setForm((prev) => ({
+        ...prev,
+        insumos: [bioInput],
+      }));
+    }
+  }
+
   function handleCampoChange(nuevoCampo: string) {
-    const dynamicLots = agricultureData.listLotes(nuevoCampo).map((l) => l.nombre);
-    const nuevosLotes = dynamicLots.length > 0 ? dynamicLots : LOTES_POR_CAMPO[nuevoCampo] || ["Lote Único"];
+    const dynamicLots = agricultureData.listLotes(nuevoCampo);
+    const lotNames = dynamicLots.map((l) => l.nombre);
+    const nuevosLotes = lotNames.length > 0 ? lotNames : LOTES_POR_CAMPO[nuevoCampo] || ["Lote Único"];
+    const firstLote = nuevosLotes[0];
+    const found = dynamicLots.find((l) => l.nombre === firstLote);
+    const ha = found?.superficieHa || null;
     setForm((prev) => ({
       ...prev,
       campo: nuevoCampo,
-      lote: nuevosLotes[0],
+      lote: firstLote,
+      superficiePlanificada: ha !== null ? ha : prev.superficiePlanificada,
+      superficieReal: ha !== null ? ha : prev.superficieReal,
       cultivo: prev.cultivo || "",
     }));
+    if (isBiofertilizacion(form.tipo) && bioCantidadUnidades) {
+      applyBiofertilizacion(bioTipo, bioCantidadUnidades, ha);
+    }
+  }
+
+  function handleLoteChange(nuevoLote: string) {
+    const dynamicLots = agricultureData.listLotes(form.campo);
+    const found = dynamicLots.find((l) => l.nombre === nuevoLote);
+    const ha = found?.superficieHa || null;
+    setForm((prev) => ({
+      ...prev,
+      lote: nuevoLote,
+      superficiePlanificada: ha !== null ? ha : prev.superficiePlanificada,
+      superficieReal: ha !== null ? ha : prev.superficieReal,
+    }));
+    if (isBiofertilizacion(form.tipo) && bioCantidadUnidades) {
+      applyBiofertilizacion(bioTipo, bioCantidadUnidades, ha);
+    }
   }
 
   // Lógica interactiva de selección de múltiples lotes
@@ -305,8 +411,13 @@ export default function NewActivityModal({
       ? (form.cultivo?.trim() || "Barbecho")
       : (form.cultivo || "");
 
+    const validInsumos = form.insumos.filter(
+      (i) => (i.producto && i.producto.trim().length > 0) || i.cantidadTotal || i.dosisReal || i.dosisPlanificada
+    );
+
     const activityToSave: Activity = {
       ...form,
+      insumos: validInsumos,
       cultivo: finalCultivo,
       id: form.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `act-${Date.now()}`),
       campo: isMultiLote ? (form.campo || "Multicampo") : form.campo,
@@ -433,7 +544,7 @@ export default function NewActivityModal({
                   <select
                     className="input"
                     value={form.lote || allLoteOptions[0]}
-                    onChange={(e) => set("lote", e.target.value)}
+                    onChange={(e) => handleLoteChange(e.target.value)}
                   >
                     {allLoteOptions.map((l) => (
                       <option key={l} value={l}>
@@ -570,7 +681,7 @@ export default function NewActivityModal({
                   <select
                     className="input"
                     value={form.lote || allLoteOptions[0]}
-                    onChange={(e) => set("lote", e.target.value)}
+                    onChange={(e) => handleLoteChange(e.target.value)}
                   >
                     {allLoteOptions.map((l) => (
                       <option key={l} value={l}>
@@ -790,14 +901,24 @@ export default function NewActivityModal({
                 onChange={(e) => {
                   const newTipo = e.target.value;
                   const newMaq = getDefaultMaquinaria(newTipo);
-                  setForm((prev) => ({
-                    ...prev,
-                    tipo: newTipo,
-                    maquinaria: newMaq,
-                    cultivo: newTipo.toLowerCase().includes("barbecho")
-                      ? "Barbecho"
-                      : (prev.cultivo === "Barbecho" ? "" : prev.cultivo),
-                  }));
+                  const sinInsumos = isLaborSinInsumos(newTipo);
+                  setForm((prev) => {
+                    let nextInsumos = prev.insumos;
+                    if (sinInsumos && prev.insumos.length <= 1 && (!prev.insumos[0] || !prev.insumos[0].producto)) {
+                      nextInsumos = [];
+                    } else if (!sinInsumos && prev.insumos.length === 0 && !isBiofertilizacion(newTipo)) {
+                      nextInsumos = [newInput("")];
+                    }
+                    return {
+                      ...prev,
+                      tipo: newTipo,
+                      maquinaria: newMaq,
+                      cultivo: newTipo.toLowerCase().includes("barbecho")
+                        ? "Barbecho"
+                        : (prev.cultivo === "Barbecho" ? "" : prev.cultivo),
+                      insumos: nextInsumos,
+                    };
+                  });
                   const isCosechaPicado =
                     newTipo.toLowerCase().includes("cosecha") ||
                     newTipo.toLowerCase().includes("picado") ||
@@ -961,7 +1082,132 @@ export default function NewActivityModal({
             </p>
           </div>
 
-          {form.insumos.length === 0 ? (
+          {isBiofertilizacion(form.tipo) && (
+            <div
+              style={{
+                padding: "14px 16px",
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                borderRadius: "10px",
+                marginBottom: "16px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
+                <div>
+                  <strong style={{ fontSize: "13.5px", color: "#166534" }}>
+                    🐄 Biofertilización en Lotes del Tambo
+                  </strong>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#15803d" }}>
+                    Cargá directamente la cantidad de tanques o carros aplicados en el lote:
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button
+                    type="button"
+                    onClick={() => applyBiofertilizacion("liquida", bioCantidadUnidades)}
+                    style={{
+                      padding: "5px 10px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      border: "1px solid",
+                      borderColor: bioTipo === "liquida" ? "#0284c7" : "#cbd5e1",
+                      background: bioTipo === "liquida" ? "#0284c7" : "#ffffff",
+                      color: bioTipo === "liquida" ? "#ffffff" : "#475569",
+                    }}
+                  >
+                    💧 Líquida (Tanques de 12 m³)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyBiofertilizacion("solida", bioCantidadUnidades)}
+                    style={{
+                      padding: "5px 10px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      border: "1px solid",
+                      borderColor: bioTipo === "solida" ? "#16a34a" : "#cbd5e1",
+                      background: bioTipo === "solida" ? "#16a34a" : "#ffffff",
+                      color: bioTipo === "solida" ? "#ffffff" : "#475569",
+                    }}
+                  >
+                    🚜 Sólida (Carros de 5 tn)
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <div style={{ minWidth: "220px" }}>
+                  <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#166534", display: "block", marginBottom: "4px" }}>
+                    {bioTipo === "liquida"
+                      ? "Cantidad de Tanques aplicados (12 m³ c/u):"
+                      : "Cantidad de Carros aplicados (5 tn c/u):"}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    className="input"
+                    value={bioCantidadUnidades}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : "";
+                      applyBiofertilizacion(bioTipo, val);
+                    }}
+                    placeholder={bioTipo === "liquida" ? "ej: 4 tanques" : "ej: 6 carros"}
+                    style={{ fontWeight: 700, fontSize: "13.5px", borderColor: "#86efac" }}
+                  />
+                </div>
+
+                {Number(bioCantidadUnidades) > 0 && (
+                  <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "8px", border: "1px solid #bbf7d0", fontSize: "12px", color: "#166534" }}>
+                    {bioTipo === "liquida" ? (
+                      <span>
+                        ✓ <strong>{Number(bioCantidadUnidades) * 12} kL (m³) totales</strong> aplicados · Dosis calculada: <strong>{((Number(bioCantidadUnidades) * 12) / (isReal ? (form.superficieReal || 1) : (form.superficiePlanificada || 1))).toFixed(2)} kL/ha</strong> sobre {isReal ? (form.superficieReal || 0) : (form.superficiePlanificada || 0)} ha
+                      </span>
+                    ) : (
+                      <span>
+                        ✓ <strong>{Number(bioCantidadUnidades) * 5} toneladas totales</strong> aplicadas · Dosis calculada: <strong>{((Number(bioCantidadUnidades) * 5) / (isReal ? (form.superficieReal || 1) : (form.superficiePlanificada || 1))).toFixed(2)} tn/ha</strong> sobre {isReal ? (form.superficieReal || 0) : (form.superficiePlanificada || 0)} ha
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isLaborSinInsumos(form.tipo) && form.insumos.length === 0 ? (
+            <div
+              style={{
+                padding: "16px 20px",
+                background: "var(--slate-50)",
+                borderRadius: "8px",
+                border: "1px dashed var(--slate-300)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "12px",
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
+                  ✓ Labor mecánica de suelo sin insumos ({form.tipo})
+                </strong>
+                <p style={{ margin: "3px 0 0", fontSize: "12px", color: "var(--slate-500)" }}>
+                  Para esta labor no se requiere cargar productos ni agroquímicos. Podés guardar directamente la labor.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="secondaryButton smallButton"
+                onClick={addInput}
+              >
+                + Agregar insumo si fuese necesario
+              </button>
+            </div>
+          ) : form.insumos.length === 0 ? (
             <div style={{ padding: "16px", background: "var(--slate-50)", borderRadius: "8px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
               Esta labor no registra insumos cargados.
             </div>
