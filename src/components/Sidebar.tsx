@@ -84,7 +84,7 @@ const secondaryNav = [
   },
   {
     name: "Insumos & Stock",
-    href: "/agricultura/aguilera#insumos",
+    href: "/insumos",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="m7.5 4.27 9 5.15"/>

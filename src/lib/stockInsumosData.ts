@@ -1,0 +1,518 @@
+"use client";
+
+import { Activity, agricultureData, realQuantity, plannedQuantity } from "./agricultureData";
+import { getDolarBnaVenta, getPrecioReferencia, getValoresMoviles } from "./valoresMovilesData";
+
+export type CategoriaInsumo =
+  | "Fitosanitarios"
+  | "Semillas"
+  | "Fertilizantes"
+  | "Forrajes & Granos"
+  | "Combustibles";
+
+export interface InsumoStockItem {
+  id: string;
+  nombre: string;
+  categoria: CategoriaInsumo;
+  unidad: string;
+  stockInicial: number;
+  stockMinimoAlerta: number;
+  ubicacion: string;
+  valorMovilId: string;
+  aliasLabores: string[];
+  // Campos calculados
+  stockActual: number;
+  consumoAgricola: number;
+  ingresosCompras: number;
+  precioUnitarioArs: number;
+  precioUnitarioUsd: number;
+  valorTotalArs: number;
+  valorTotalUsd: number;
+  enAlerta: boolean;
+  porcentajeStock: number; // % sobre stock inicial
+}
+
+export interface MovimientoStockItem {
+  id: string;
+  insumoId: string;
+  insumoNombre: string;
+  fecha: string;
+  tipo: "Ingreso / Compra" | "Consumo Agrícola" | "Consumo Ganadería" | "Ajuste de Inventario";
+  cantidad: number; // Positivo para ingresos, negativo para consumos
+  unidad: string;
+  detalle: string;
+  remitoProveedor?: string;
+  costoArs?: number;
+}
+
+export interface IngresoStockManual {
+  id: string;
+  insumoId: string;
+  fecha: string;
+  cantidad: number;
+  remitoProveedor: string;
+  costoUnitarioArs?: number;
+  observaciones?: string;
+}
+
+// =========================================================================
+// INVENTARIO BASE Y CATÁLOGO DE INSUMOS DE HJB
+// =========================================================================
+export const INSUMOS_BASE_CATALOGO: Omit<
+  InsumoStockItem,
+  | "stockActual"
+  | "consumoAgricola"
+  | "ingresosCompras"
+  | "precioUnitarioArs"
+  | "precioUnitarioUsd"
+  | "valorTotalArs"
+  | "valorTotalUsd"
+  | "enAlerta"
+  | "porcentajeStock"
+>[] = [
+  // 1. FITOSANITARIOS & AGROQUÍMICOS
+  {
+    id: "glifosato",
+    nombre: "Glifosato 66% (Concentrado Soluble)",
+    categoria: "Fitosanitarios",
+    unidad: "Lts",
+    stockInicial: 1200,
+    stockMinimoAlerta: 300,
+    ubicacion: "Depósito de Químicos - Aguilera",
+    valorMovilId: "glifosato",
+    aliasLabores: ["glifosato", "glifo", "roundup", "glifosato 66%"],
+  },
+  {
+    id: "2-4-d",
+    nombre: "2,4-D Enlist Colex-D / Dédalo Elite",
+    categoria: "Fitosanitarios",
+    unidad: "Lts",
+    stockInicial: 800,
+    stockMinimoAlerta: 200,
+    ubicacion: "Depósito de Químicos - Aguilera",
+    valorMovilId: "2-4-d",
+    aliasLabores: ["2,4-d", "2-4-d", "2.4-d", "enlist", "dédalo", "dedalo elite"],
+  },
+  {
+    id: "atrazina",
+    nombre: "Atrazina 90% Granulada (WG)",
+    categoria: "Fitosanitarios",
+    unidad: "kg",
+    stockInicial: 650,
+    stockMinimoAlerta: 150,
+    ubicacion: "Depósito de Químicos - Aguilera",
+    valorMovilId: "atrazina",
+    aliasLabores: ["atrazina", "atrazina 90%", "atrazina wg"],
+  },
+  {
+    id: "cletodim",
+    nombre: "Cletodim 24% EC (Graminicida)",
+    categoria: "Fitosanitarios",
+    unidad: "Lts",
+    stockInicial: 250,
+    stockMinimoAlerta: 80,
+    ubicacion: "Depósito de Químicos - Aguilera",
+    valorMovilId: "cletodim",
+    aliasLabores: ["cletodim", "graminicida", "cletodim 24%"],
+  },
+  {
+    id: "coadyuvante",
+    nombre: "Coadyuvante / Aceite Vegetal Metilado",
+    categoria: "Fitosanitarios",
+    unidad: "Lts",
+    stockInicial: 350,
+    stockMinimoAlerta: 100,
+    ubicacion: "Depósito de Químicos - Aguilera",
+    valorMovilId: "coadyuvante",
+    aliasLabores: ["coadyuvante", "aceite", "aceite metilado", "tensioactivo"],
+  },
+  {
+    id: "paraquat",
+    nombre: "Paraquat 27.6% (Desecante / Quemador)",
+    categoria: "Fitosanitarios",
+    unidad: "Lts",
+    stockInicial: 400,
+    stockMinimoAlerta: 100,
+    ubicacion: "Depósito de Químicos - Aguilera",
+    valorMovilId: "paraquat",
+    aliasLabores: ["paraquat", "cerillo", "desecante"],
+  },
+
+  // 2. SEMILLAS
+  {
+    id: "semilla-maiz",
+    nombre: "Semilla Maíz Híbrido VT3P / VIP3",
+    categoria: "Semillas",
+    unidad: "Bolsas",
+    stockInicial: 140,
+    stockMinimoAlerta: 30,
+    ubicacion: "Galpón de Semillas - Aguilera",
+    valorMovilId: "semilla-maiz",
+    aliasLabores: ["maíz", "maiz", "semilla maíz", "semilla maiz", "maíz híbrido", "dekalb", "pioneer"],
+  },
+  {
+    id: "semilla-soja",
+    nombre: "Semilla Soja Primera DM / Enlist",
+    categoria: "Semillas",
+    unidad: "Bolsas",
+    stockInicial: 220,
+    stockMinimoAlerta: 50,
+    ubicacion: "Galpón de Semillas - Aguilera",
+    valorMovilId: "semilla-soja",
+    aliasLabores: ["soja", "semilla soja", "soja 1ra", "soja dm", "don mario"],
+  },
+  {
+    id: "semilla-alfalfa",
+    nombre: "Semilla Alfalfa Monarca Pelleteada",
+    categoria: "Semillas",
+    unidad: "kg",
+    stockInicial: 450,
+    stockMinimoAlerta: 100,
+    ubicacion: "Galpón de Semillas - Tambo",
+    valorMovilId: "semilla-alfalfa",
+    aliasLabores: ["alfalfa", "semilla alfalfa", "monarca"],
+  },
+  {
+    id: "semilla-avena",
+    nombre: "Semilla Avena / Vicia (Verdeo de Invierno)",
+    categoria: "Semillas",
+    unidad: "kg",
+    stockInicial: 1200,
+    stockMinimoAlerta: 300,
+    ubicacion: "Galpón de Semillas - Tambo",
+    valorMovilId: "semilla-avena",
+    aliasLabores: ["avena", "vicia", "verdeo", "centeno"],
+  },
+
+  // 3. FERTILIZANTES Y ENMIENDAS
+  {
+    id: "urea",
+    nombre: "Urea Granulada 46-0-0",
+    categoria: "Fertilizantes",
+    unidad: "kg",
+    stockInicial: 18000,
+    stockMinimoAlerta: 4000,
+    ubicacion: "Silo Fertilizante Sólido - Tambo",
+    valorMovilId: "urea",
+    aliasLabores: ["urea", "urea granulada", "nitrógeno", "fertilizante nitrogenado"],
+  },
+  {
+    id: "map",
+    nombre: "MAP (Fosfato Monoamónico 11-52-0)",
+    categoria: "Fertilizantes",
+    unidad: "kg",
+    stockInicial: 12000,
+    stockMinimoAlerta: 3000,
+    ubicacion: "Silo Fertilizante Sólido - Tambo",
+    valorMovilId: "map",
+    aliasLabores: ["map", "fosfato", "monoamónico", "fósforo"],
+  },
+  {
+    id: "biofertilizante-liq",
+    nombre: "Biofertilizante Líquido (Efluente Tratado)",
+    categoria: "Fertilizantes",
+    unidad: "kL",
+    stockInicial: 350,
+    stockMinimoAlerta: 50,
+    ubicacion: "Laguna de Efluentes - Tambo",
+    valorMovilId: "biofertilizante-liq",
+    aliasLabores: ["biofertilizante", "efluente", "purín", "biofertilización"],
+  },
+  {
+    id: "enmienda-solida",
+    nombre: "Enmienda Orgánica Sólida / Compost",
+    categoria: "Fertilizantes",
+    unidad: "Tn",
+    stockInicial: 85,
+    stockMinimoAlerta: 20,
+    ubicacion: "Playa de Estiércol Sólido - Tambo",
+    valorMovilId: "enmienda-solida",
+    aliasLabores: ["enmienda", "estiércol", "compost"],
+  },
+
+  // 4. FORRAJES, GRANOS Y ALIMENTACIÓN
+  {
+    id: "maiz-grano",
+    nombre: "Maíz Grano / Partido",
+    categoria: "Forrajes & Granos",
+    unidad: "kg",
+    stockInicial: 45000,
+    stockMinimoAlerta: 10000,
+    ubicacion: "Silo Chapa - Ganadería",
+    valorMovilId: "maiz",
+    aliasLabores: ["maíz grano", "maíz partido", "maiz grano", "maiz"],
+  },
+  {
+    id: "silo-maiz",
+    nombre: "Silo de Maíz Picado Fino (Bolsa)",
+    categoria: "Forrajes & Granos",
+    unidad: "kg",
+    stockInicial: 120000,
+    stockMinimoAlerta: 25000,
+    ubicacion: "Silobolsa #1 - Tambo",
+    valorMovilId: "silo-maiz-kg",
+    aliasLabores: ["silo", "silo de maíz", "silo picado"],
+  },
+  {
+    id: "pellet-soja",
+    nombre: "Pellet de Soja Proteico (Harina)",
+    categoria: "Forrajes & Granos",
+    unidad: "kg",
+    stockInicial: 14000,
+    stockMinimoAlerta: 3000,
+    ubicacion: "Galpón de Raciones - Tambo",
+    valorMovilId: "pellet-soja",
+    aliasLabores: ["pellet", "pellet de soja", "pellet soja"],
+  },
+  {
+    id: "rollo-alfalfa",
+    nombre: "Rollos de Alfalfa Primera Henificada",
+    categoria: "Forrajes & Granos",
+    unidad: "Rollos",
+    stockInicial: 160,
+    stockMinimoAlerta: 40,
+    ubicacion: "Tinglado de Forrajes",
+    valorMovilId: "rollo-alfalfa",
+    aliasLabores: ["rollo alfalfa", "rollos alfalfa", "rollo de alfalfa"],
+  },
+  {
+    id: "rollo-rastrojo",
+    nombre: "Rollos de Rastrojo / Chala",
+    categoria: "Forrajes & Granos",
+    unidad: "Rollos",
+    stockInicial: 110,
+    stockMinimoAlerta: 30,
+    ubicacion: "Tinglado de Forrajes",
+    valorMovilId: "rollo-rastrojo",
+    aliasLabores: ["rollo rastrojo", "rollo chala"],
+  },
+  {
+    id: "balanceado-iniciador",
+    nombre: "Balanceado Iniciador Terneros Guachera",
+    categoria: "Forrajes & Granos",
+    unidad: "kg",
+    stockInicial: 2500,
+    stockMinimoAlerta: 600,
+    ubicacion: "Depósito Guachera",
+    valorMovilId: "balanceado-iniciador",
+    aliasLabores: ["balanceado", "iniciador", "balanceado terneros"],
+  },
+
+  // 5. COMBUSTIBLES
+  {
+    id: "gasoil",
+    nombre: "Gas oil Agropecuario Grado 2 (DIESEL 500)",
+    categoria: "Combustibles",
+    unidad: "Lts",
+    stockInicial: 8500,
+    stockMinimoAlerta: 2000,
+    ubicacion: "Tanque Surtidor Central 12.000 Lts",
+    valorMovilId: "gasoil",
+    aliasLabores: ["gas oil", "gasoil", "diesel", "combustible"],
+  },
+];
+
+// LocalStorage Keys
+const STORAGE_INGRESOS_STOCK = "hjb_stock_ingresos_manuales_v01";
+
+// =========================================================================
+// MÉTODOS DE PERSISTENCIA Y RECUPERACIÓN DE INGRESOS MANUALES
+// =========================================================================
+export function getIngresosManuales(): IngresoStockManual[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_INGRESOS_STOCK);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveIngresosManuales(ingresos: IngresoStockManual[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_INGRESOS_STOCK, JSON.stringify(ingresos));
+}
+
+export function registrarIngresoStock(nuevo: Omit<IngresoStockManual, "id">): IngresoStockManual {
+  const all = getIngresosManuales();
+  const id = `ingreso-${Date.now()}`;
+  const item: IngresoStockManual = { ...nuevo, id };
+  all.unshift(item);
+  saveIngresosManuales(all);
+  return item;
+}
+
+// =========================================================================
+// FUNCIÓN PRINCIPAL: CÁLCULO DE STOCK DISPONIBLE Y CRUCE CON LABORES Y VALORES MÓVILES
+// =========================================================================
+export function getStockActualInsumos(): {
+  items: InsumoStockItem[];
+  movimientos: MovimientoStockItem[];
+  valorTotalGeneralArs: number;
+  valorTotalGeneralUsd: number;
+  totalInsumos: number;
+  insumosEnAlerta: number;
+} {
+  const activities: Activity[] = agricultureData.listActivities();
+  const ingresosManuales = getIngresosManuales();
+  const dolarBNA = getDolarBnaVenta();
+
+  const movimientos: MovimientoStockItem[] = [];
+
+  // Mapa de consumos agrícolas por insumoId
+  const consumosMap = new Map<string, number>();
+
+  // 1. Descontar consumos reales de labores agrícolas
+  for (const act of activities) {
+    // Descontamos labores que hayan sido "Realizada"
+    if (act.estado === "Realizada" && act.insumos && act.insumos.length > 0) {
+      const supHa = act.superficieReal || act.superficiePlanificada || 0;
+      for (const input of act.insumos) {
+        const prodName = input.producto.toLowerCase().trim();
+        // Buscar el insumo en el catálogo
+        const matched = INSUMOS_BASE_CATALOGO.find((cat) => {
+          if (cat.id === prodName) return true;
+          if (cat.nombre.toLowerCase().includes(prodName) || prodName.includes(cat.nombre.toLowerCase())) return true;
+          return cat.aliasLabores.some((alias) => prodName.includes(alias) || alias.includes(prodName));
+        });
+
+        if (matched) {
+          // Calcular cantidad aplicada
+          let cantidadAplicada = realQuantity(act, input);
+          if (!cantidadAplicada && input.cantidadTotal) {
+            cantidadAplicada = input.cantidadTotal;
+          }
+          if (!cantidadAplicada && (input.dosisReal || input.dosisPlanificada) && supHa > 0) {
+            cantidadAplicada = (input.dosisReal || input.dosisPlanificada || 0) * supHa;
+          }
+          if (cantidadAplicada && cantidadAplicada > 0) {
+            cantidadAplicada = Math.round(cantidadAplicada * 10) / 10;
+            const current = consumosMap.get(matched.id) || 0;
+            consumosMap.set(matched.id, current + cantidadAplicada);
+
+            movimientos.push({
+              id: `mov-agri-${act.id}-${input.id}`,
+              insumoId: matched.id,
+              insumoNombre: matched.nombre,
+              fecha: act.fechaReal || act.fechaPlanificada,
+              tipo: "Consumo Agrícola",
+              cantidad: -cantidadAplicada,
+              unidad: matched.unidad,
+              detalle: `Labor "${act.tipo}" en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · ${supHa} ha`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Sumar ingresos manuales / compras registradas
+  const ingresosMap = new Map<string, number>();
+  for (const ing of ingresosManuales) {
+    const current = ingresosMap.get(ing.insumoId) || 0;
+    ingresosMap.set(ing.insumoId, current + ing.cantidad);
+
+    const catItem = INSUMOS_BASE_CATALOGO.find((x) => x.id === ing.insumoId);
+    movimientos.push({
+      id: ing.id,
+      insumoId: ing.insumoId,
+      insumoNombre: catItem?.nombre || ing.insumoId,
+      fecha: ing.fecha,
+      tipo: "Ingreso / Compra",
+      cantidad: ing.cantidad,
+      unidad: catItem?.unidad || "unidades",
+      detalle: `Ingreso de Stock · ${ing.remitoProveedor} ${ing.observaciones ? `(${ing.observaciones})` : ""}`,
+      remitoProveedor: ing.remitoProveedor,
+      costoArs: ing.costoUnitarioArs ? ing.costoUnitarioArs * ing.cantidad : undefined,
+    });
+  }
+
+  // Ordenar movimientos recientes primero
+  movimientos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+  // 3. Armar lista completa de items con valorización económica
+  let valorTotalGeneralArs = 0;
+  let valorTotalGeneralUsd = 0;
+  let insumosEnAlerta = 0;
+
+  const items: InsumoStockItem[] = INSUMOS_BASE_CATALOGO.map((base) => {
+    const consumo = Math.round((consumosMap.get(base.id) || 0) * 10) / 10;
+    const ingreso = Math.round((ingresosMap.get(base.id) || 0) * 10) / 10;
+    const stockActual = Math.max(0, Math.round((base.stockInicial + ingreso - consumo) * 10) / 10);
+    const enAlerta = stockActual <= base.stockMinimoAlerta;
+    if (enAlerta) insumosEnAlerta++;
+
+    // Obtener precio de referencia desde Valores Móviles
+    let precioArs = getPrecioReferencia(base.valorMovilId, "ARS");
+    let precioUsd = getPrecioReferencia(base.valorMovilId, "USD");
+
+    // Ajuste de unidades si es necesario (ej: $/Tn ➔ $/kg)
+    if (base.valorMovilId === "maiz" || base.valorMovilId === "pellet-soja" || base.valorMovilId === "soja") {
+      precioArs = precioArs > 0 ? precioArs / 1000 : 295.2;
+      precioUsd = precioUsd > 0 ? precioUsd / 1000 : 0.193;
+    } else if (base.id === "semilla-maiz") {
+      precioUsd = 150;
+      precioArs = precioUsd * dolarBNA;
+    } else if (base.id === "semilla-soja") {
+      precioUsd = 45;
+      precioArs = precioUsd * dolarBNA;
+    } else if (base.id === "semilla-alfalfa") {
+      precioUsd = 12;
+      precioArs = precioUsd * dolarBNA;
+    } else if (base.id === "semilla-avena") {
+      precioUsd = 0.85;
+      precioArs = precioUsd * dolarBNA;
+    } else if (base.id === "balanceado-iniciador") {
+      precioArs = 340;
+      precioUsd = Number((340 / dolarBNA).toFixed(3));
+    } else if (base.id === "rollo-rastrojo") {
+      precioArs = 22000;
+      precioUsd = Number((22000 / dolarBNA).toFixed(2));
+    } else if (base.id === "enmienda-solida") {
+      precioArs = 15000;
+      precioUsd = Number((15000 / dolarBNA).toFixed(2));
+    } else if (base.id === "biofertilizante-liq") {
+      precioArs = 1200;
+      precioUsd = Number((1200 / dolarBNA).toFixed(2));
+    } else if (!precioArs || precioArs <= 0) {
+      if (precioUsd > 0) precioArs = precioUsd * dolarBNA;
+      else {
+        precioArs = 100;
+        precioUsd = Number((100 / dolarBNA).toFixed(2));
+      }
+    }
+
+    const valorTotalArs = Math.round(stockActual * precioArs);
+    const valorTotalUsd = Number((stockActual * precioUsd).toFixed(2));
+
+    valorTotalGeneralArs += valorTotalArs;
+    valorTotalGeneralUsd += valorTotalUsd;
+
+    const porcentajeStock = Math.min(
+      100,
+      Math.max(0, Math.round((stockActual / (base.stockInicial + ingreso || 1)) * 100))
+    );
+
+    return {
+      ...base,
+      stockActual,
+      consumoAgricola: consumo,
+      ingresosCompras: ingreso,
+      precioUnitarioArs: Math.round(precioArs * 100) / 100,
+      precioUnitarioUsd: Number(precioUsd.toFixed(3)),
+      valorTotalArs,
+      valorTotalUsd,
+      enAlerta,
+      porcentajeStock,
+    };
+  });
+
+  return {
+    items,
+    movimientos,
+    valorTotalGeneralArs,
+    valorTotalGeneralUsd: Number(valorTotalGeneralUsd.toFixed(2)),
+    totalInsumos: items.length,
+    insumosEnAlerta,
+  };
+}
