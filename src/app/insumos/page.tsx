@@ -324,34 +324,40 @@ export default function InsumosPage() {
                     </td>
 
                     <td style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: item.enAlerta ? "#991b1b" : "var(--slate-900)" }}>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: item.stockActual > 0 ? (item.enAlerta ? "#991b1b" : "var(--slate-900)") : "#64748b" }}>
                         {item.stockActual.toLocaleString("es-AR")} {item.unidad}
                       </div>
-                      <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
-                        Inicial: {item.stockInicial.toLocaleString("es-AR")} {item.unidad}
+                      <div style={{ fontSize: "11px", color: "var(--slate-400)" }}>
+                        {item.ingresosCompras > 0 ? `Ingresados: +${item.ingresosCompras} ${item.unidad}` : "Sin ingresos aún"}
                       </div>
                     </td>
 
                     <td style={{ textAlign: "center" }}>
-                      {item.enAlerta ? (
+                      {item.ingresosCompras === 0 && item.stockActual === 0 ? (
+                        <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
+                          Sin existencias (0)
+                        </span>
+                      ) : item.enAlerta ? (
                         <span className="pill badgeAmber" style={{ fontSize: "11px", fontWeight: 700 }}>
                           ⚠️ Reponer (Mín: {item.stockMinimoAlerta} {item.unidad})
                         </span>
                       ) : (
                         <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
-                          ✓ Normal ({item.stockMinimoAlerta} mín)
+                          ✓ Con Stock
                         </span>
                       )}
-                      <div style={{ width: "100%", height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginTop: "5px" }}>
-                        <div
-                          style={{
-                            width: `${item.porcentajeStock}%`,
-                            height: "100%",
-                            background: item.enAlerta ? "#dc2626" : "#16a34a",
-                            borderRadius: "999px",
-                          }}
-                        />
-                      </div>
+                      {item.ingresosCompras > 0 && (
+                        <div style={{ width: "100%", height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginTop: "5px" }}>
+                          <div
+                            style={{
+                              width: `${item.porcentajeStock}%`,
+                              height: "100%",
+                              background: item.enAlerta ? "#dc2626" : "#16a34a",
+                              borderRadius: "999px",
+                            }}
+                          />
+                        </div>
+                      )}
                     </td>
 
                     <td style={{ textAlign: "right" }}>
