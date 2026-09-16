@@ -121,8 +121,8 @@ export default function ActivityTable({
       // 3. Filtro Cultivo
       if (filters.cultivo !== "Todos") {
         const q = filters.cultivo.toLowerCase();
-        const cultMatch = act.cultivo.toLowerCase().includes(q);
-        if (!cultMatch) return false;
+        const cult = (act.cultivo || (act.tipo === "Barbecho" ? "Barbecho" : "")).toLowerCase();
+        if (!cult.includes(q)) return false;
       }
 
       // 4. Filtro Labor (Trabajo)
@@ -176,7 +176,7 @@ export default function ActivityTable({
     return sortActivitiesRecentFirst(filtered);
   }, [activities, filters]);
 
-  const CULTIVOS_OPTIONS = ["Maíz", "Trigo", "Soja", "Girasol", "Alfalfa", "Avena", "Forrajes"];
+  const CULTIVOS_OPTIONS = ["Maíz", "Trigo", "Soja", "Girasol", "Alfalfa", "Avena", "Forrajes", "Barbecho"];
   const LABORES_OPTIONS = ["Siembra", "Fertilización", "Biofertilización", "Fumigación", "Barbecho", "Cosecha", "Picado", "Rollos", "Monitoreo"];
 
   return (
@@ -425,7 +425,7 @@ export default function ActivityTable({
                     {/* Cultivo */}
                     <td>
                       <strong style={{ fontSize: "14px", color: "var(--slate-900)", display: "block" }}>
-                        {activity.cultivo}
+                        {activity.cultivo || (activity.tipo === "Barbecho" ? "Barbecho" : "—")}
                       </strong>
                       {activity.cultivoAntecesor && (
                         <small style={{ color: "var(--slate-500)", fontStyle: "italic", display: "block", marginTop: "3px" }}>

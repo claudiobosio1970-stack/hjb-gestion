@@ -50,7 +50,7 @@ const MAQUINARIAS_PRESET = [
 
 function getDefaultMaquinaria(tipo: string): string {
   const t = (tipo || "").toLowerCase();
-  if (t.includes("fumiga") || t.includes("pulveri")) {
+  if (t.includes("fumiga") || t.includes("pulveri") || t.includes("barbecho")) {
     return "Fumigador Metalford";
   }
   if (t.includes("cosecha") || t.includes("picado") || t.includes("rollo")) {
@@ -301,8 +301,13 @@ export default function NewActivityModal({
     }
 
     const now = new Date().toISOString();
+    const finalCultivo = form.tipo === "Barbecho"
+      ? (form.cultivo?.trim() || "Barbecho")
+      : (form.cultivo || "");
+
     const activityToSave: Activity = {
       ...form,
+      cultivo: finalCultivo,
       id: form.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `act-${Date.now()}`),
       campo: isMultiLote ? (form.campo || "Multicampo") : form.campo,
       lote: isMultiLote ? (form.lote || (form.lotesAfectados || []).join(", ")) : (form.lote || "Lote Único"),
@@ -437,12 +442,12 @@ export default function NewActivityModal({
                 </select>
               </div>
               <div>
-                <label>Cultivo (opcional)</label>
+                <label>Cultivo {form.tipo === "Barbecho" ? "(Barbecho general)" : "(opcional)"}</label>
                 <input
                   className="input"
                   value={form.cultivo}
                   onChange={(e) => set("cultivo", e.target.value)}
-                  placeholder="ej: Maíz, Soja, o dejar en blanco..."
+                  placeholder={form.tipo === "Barbecho" ? "Barbecho (sin cultivo comercial)" : "ej: Maíz, Soja, o dejar en blanco..."}
                   list="cultivos-preset"
                 />
                 <datalist id="cultivos-preset">
@@ -573,12 +578,12 @@ export default function NewActivityModal({
                   </select>
                 </div>
                 <div>
-                  <label>Cultivo (opcional)</label>
+                  <label>Cultivo {form.tipo === "Barbecho" ? "(Barbecho general)" : "(opcional)"}</label>
                   <input
                     className="input"
                     value={form.cultivo}
                     onChange={(e) => set("cultivo", e.target.value)}
-                    placeholder="ej: Maíz, Soja, o dejar en blanco..."
+                    placeholder={form.tipo === "Barbecho" ? "Barbecho (sin cultivo comercial)" : "ej: Maíz, Soja, o dejar en blanco..."}
                     list="cultivos-preset"
                   />
                   <datalist id="cultivos-preset">
@@ -607,12 +612,12 @@ export default function NewActivityModal({
                     </select>
                   </div>
                   <div>
-                    <label>Cultivo objetivo o destino (opcional)</label>
+                    <label>Cultivo objetivo o destino {form.tipo === "Barbecho" ? "(Barbecho)" : "(opcional)"}</label>
                     <input
                       className="input"
                       value={form.cultivo}
                       onChange={(e) => set("cultivo", e.target.value)}
-                      placeholder="ej: Barbecho, Maíz, o dejar en blanco..."
+                      placeholder={form.tipo === "Barbecho" ? "Barbecho (sin cultivo comercial)" : "ej: Barbecho, Maíz, o dejar en blanco..."}
                       list="cultivos-preset"
                     />
                   </div>
@@ -773,6 +778,7 @@ export default function NewActivityModal({
                     ...prev,
                     tipo: newTipo,
                     maquinaria: newMaq,
+                    cultivo: newTipo === "Barbecho" ? "Barbecho" : (prev.cultivo === "Barbecho" ? "" : prev.cultivo),
                   }));
                   if (newTipo === "Cosecha" || newTipo === "Picado" || newTipo === "Rollos") {
                     setShowProduccion(true);
