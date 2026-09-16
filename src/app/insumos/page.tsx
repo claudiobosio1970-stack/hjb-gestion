@@ -9,7 +9,9 @@ import {
   MovimientoStockItem,
   getStockActualInsumos,
   registrarIngresoStock,
+  HJB_STOCK_SYNC_EVENT,
 } from "@/lib/stockInsumosData";
+import { HJB_AGRICULTURE_SYNC_EVENT } from "@/lib/agricultureData";
 
 export default function InsumosPage() {
   const [data, setData] = useState<{
@@ -53,6 +55,17 @@ export default function InsumosPage() {
 
   useEffect(() => {
     cargarDatos();
+
+    function onSync() {
+      cargarDatos();
+    }
+
+    window.addEventListener(HJB_STOCK_SYNC_EVENT, onSync);
+    window.addEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+    return () => {
+      window.removeEventListener(HJB_STOCK_SYNC_EVENT, onSync);
+      window.removeEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+    };
   }, []);
 
   function triggerFeedback(msg: string) {

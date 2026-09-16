@@ -17,6 +17,7 @@ import {
   Lote,
   SoilAnalysis,
   agricultureData,
+  HJB_AGRICULTURE_SYNC_EVENT,
 } from "@/lib/agricultureData";
 import { LOTES_POR_CAMPO, ROTACIONES_HISTORICAS } from "@/lib/historicalData";
 import { campos } from "@/lib/mockData";
@@ -66,6 +67,15 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
 
   useEffect(() => {
     refresh();
+
+    function onSync() {
+      refresh();
+    }
+
+    window.addEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+    return () => {
+      window.removeEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+    };
   }, [campoNombre]);
 
   const lotesDisponibles = lotes.length > 0 ? lotes.map((l) => l.nombre) : LOTES_POR_CAMPO[campoNombre] || ["Lote Único"];

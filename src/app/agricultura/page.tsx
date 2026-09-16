@@ -7,7 +7,7 @@ import MetricCard from "@/components/MetricCard";
 import NewActivityModal from "@/components/NewActivityModal";
 import ActivityTable from "@/components/ActivityTable";
 import { campos } from "@/lib/mockData";
-import { Activity, agricultureData } from "@/lib/agricultureData";
+import { Activity, agricultureData, HJB_AGRICULTURE_SYNC_EVENT } from "@/lib/agricultureData";
 
 export default function AgriculturaPage() {
   const [open, setOpen] = useState(false);
@@ -30,6 +30,15 @@ export default function AgriculturaPage() {
 
   useEffect(() => {
     refresh();
+
+    function onSync() {
+      refresh();
+    }
+
+    window.addEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+    return () => {
+      window.removeEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+    };
   }, []);
 
   return (

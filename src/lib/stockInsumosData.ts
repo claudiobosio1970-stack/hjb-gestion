@@ -1,7 +1,9 @@
 "use client";
 
-import { Activity, agricultureData, realQuantity, plannedQuantity } from "./agricultureData";
+import { Activity, agricultureData, realQuantity, plannedQuantity, sanitizeForFirestore } from "./agricultureData";
 import { getDolarBnaVenta, getPrecioReferencia, getValoresMoviles } from "./valoresMovilesData";
+import { db } from "./firebase";
+import { collection, doc, setDoc, onSnapshot } from "firebase/firestore";
 
 export type CategoriaInsumo =
   | "Fitosanitarios"
@@ -315,6 +317,14 @@ export const INSUMOS_BASE_CATALOGO: Omit<
 // LocalStorage Keys
 const STORAGE_INGRESOS_STOCK = "hjb_stock_ingresos_manuales_v01";
 
+export const HJB_STOCK_SYNC_EVENT = "hjb_stock_sync";
+
+export function notifyStockSync() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(HJB_STOCK_SYNC_EVENT));
+  }
+}
+
 // =========================================================================
 // MÉTODOS DE PERSISTENCIA Y RECUPERACIÓN DE INGRESOS MANUALES
 // =========================================================================
@@ -333,12 +343,54 @@ export function saveIngresosManuales(ingresos: IngresoStockManual[]) {
   localStorage.setItem(STORAGE_INGRESOS_STOCK, JSON.stringify(ingresos));
 }
 
+let isStockFirestoreSyncInitialized = false;
+
+export function initStockFirestoreSync() {
+  if (typeof window === "undefined" || isStockFirestoreSyncInitialized || !db) return;
+  isStockFirestoreSyncInitialized = true;
+
+  try {
+    const col = collection(db, "stock_ingresos");
+    onSnapshot(
+      col,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remote: IngresoStockManual[] = [];
+          snapshot.forEach((d) => remote.push(d.data() as IngresoStockManual));
+          remote.sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+          saveIngresosManuales(remote);
+          notifyStockSync();
+        }
+      },
+      (error) => {
+        console.warn("Firestore sync stock error:", error);
+      }
+    );
+  } catch (err) {
+    console.warn("Stock Firestore init error:", err);
+  }
+}
+
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    initStockFirestoreSync();
+  }, 100);
+}
+
 export function registrarIngresoStock(nuevo: Omit<IngresoStockManual, "id">): IngresoStockManual {
   const all = getIngresosManuales();
   const id = `ingreso-${Date.now()}`;
   const item: IngresoStockManual = { ...nuevo, id };
   all.unshift(item);
   saveIngresosManuales(all);
+  notifyStockSync();
+
+  if (typeof window !== "undefined" && db) {
+    setDoc(doc(db, "stock_ingresos", item.id), sanitizeForFirestore(item)).catch((err) => {
+      console.error("Error al guardar ingreso de stock en Firestore:", err);
+    });
+  }
+
   return item;
 }
 

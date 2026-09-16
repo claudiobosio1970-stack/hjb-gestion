@@ -1,5 +1,13 @@
 import { HISTORIAL_AGRICOLA_HJB, HistoricalActivity } from "./historicalData";
 import { sortActivitiesRecentFirst } from "./dateUtils";
+import { db } from "./firebase";
+import {
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+} from "firebase/firestore";
 
 export type ActivityStatus = "Planificada" | "Realizada" | "Cancelada";
 
@@ -338,6 +346,124 @@ function writeArray<T>(key: string, value: T[]) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+export const HJB_AGRICULTURE_SYNC_EVENT = "hjb_agriculture_sync";
+
+export function notifyAgricultureSync() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(HJB_AGRICULTURE_SYNC_EVENT));
+  }
+}
+
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as any;
+  }
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeForFirestore(item)) as any;
+  }
+  if (typeof data === "object") {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        result[key] = sanitizeForFirestore(value);
+      }
+    }
+    return result as any;
+  }
+  return data;
+}
+
+let isFirestoreSyncInitialized = false;
+
+export function initAgricultureFirestoreSync() {
+  if (typeof window === "undefined" || isFirestoreSyncInitialized || !db) return;
+  isFirestoreSyncInitialized = true;
+
+  try {
+    // 1. Sincronización en vivo de actividades
+    const activitiesCol = collection(db, "activities");
+    onSnapshot(
+      activitiesCol,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteActivities: Activity[] = [];
+          snapshot.forEach((d) => {
+            remoteActivities.push(d.data() as Activity);
+          });
+          const sorted = sortActivitiesRecentFirst(remoteActivities);
+          writeArray(KEYS.activities, sorted);
+          notifyAgricultureSync();
+        } else {
+          // Si Firestore está vacío pero el dispositivo ya tiene datos guardados, migrarlos a la nube
+          const local = readArray<Activity>(KEYS.activities);
+          if (local.length > 0) {
+            local.forEach((act) => {
+              setDoc(doc(db, "activities", act.id), sanitizeForFirestore(act)).catch(console.error);
+            });
+          }
+        }
+      },
+      (error) => {
+        console.warn("Firestore sync activities error:", error);
+      }
+    );
+
+    // 2. Sincronización en vivo de lotes
+    const lotesCol = collection(db, "lotes");
+    onSnapshot(
+      lotesCol,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteLotes: Lote[] = [];
+          snapshot.forEach((d) => {
+            remoteLotes.push(d.data() as Lote);
+          });
+          writeArray(KEYS.lotes, remoteLotes);
+          notifyAgricultureSync();
+        } else {
+          // Si no hay lotes en la nube, inicializar con los lotes predeterminados
+          INITIAL_LOTES.forEach((lote) => {
+            setDoc(doc(db, "lotes", lote.id), sanitizeForFirestore(lote)).catch(console.error);
+          });
+        }
+      },
+      (error) => {
+        console.warn("Firestore sync lotes error:", error);
+      }
+    );
+
+    // 3. Sincronización de análisis de suelos
+    onSnapshot(
+      collection(db, "soils"),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remote: SoilAnalysis[] = [];
+          snapshot.forEach((d) => remote.push(d.data() as SoilAnalysis));
+          writeArray(KEYS.soils, remote);
+          notifyAgricultureSync();
+        }
+      },
+      (error) => console.warn("Firestore sync soils error:", error)
+    );
+
+    // 4. Sincronización de documentos
+    onSnapshot(
+      collection(db, "documents"),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remote: DocumentRecord[] = [];
+          snapshot.forEach((d) => remote.push(d.data() as DocumentRecord));
+          writeArray(KEYS.documents, remote);
+          notifyAgricultureSync();
+        }
+      },
+      (error) => console.warn("Firestore sync documents error:", error)
+    );
+  } catch (err) {
+    console.error("Error al iniciar sincronización Firestore:", err);
+  }
+}
+
 function initializeActivities() {
   if (typeof window === "undefined") return;
   if (window.localStorage.getItem(KEYS.migrated)) return;
@@ -345,6 +471,13 @@ function initializeActivities() {
   // Inicialización limpia para inicio de campaña 2026/27 (sin datos de prueba)
   writeArray(KEYS.activities, []);
   window.localStorage.setItem(KEYS.migrated, "1");
+}
+
+// Iniciar sincronización automáticamente en cliente
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    initAgricultureFirestoreSync();
+  }, 100);
 }
 
 const localRepository: AgricultureRepository = {
@@ -361,10 +494,24 @@ const localRepository: AgricultureRepository = {
     else all.unshift(activity);
     const sorted = sortActivitiesRecentFirst(all);
     writeArray(KEYS.activities, sorted);
+    notifyAgricultureSync();
+
+    if (typeof window !== "undefined" && db) {
+      setDoc(doc(db, "activities", activity.id), sanitizeForFirestore(activity)).catch((err) => {
+        console.error("Error guardando actividad en Firestore:", err);
+      });
+    }
   },
 
   deleteActivity(id) {
     writeArray(KEYS.activities, this.listActivities().filter((x) => x.id !== id));
+    notifyAgricultureSync();
+
+    if (typeof window !== "undefined" && db) {
+      deleteDoc(doc(db, "activities", id)).catch((err) => {
+        console.error("Error eliminando actividad en Firestore:", err);
+      });
+    }
   },
 
   listLotes(campo?: string) {
@@ -385,10 +532,24 @@ const localRepository: AgricultureRepository = {
     if (index >= 0) all[index] = lote;
     else all.push(lote);
     writeArray(KEYS.lotes, all);
+    notifyAgricultureSync();
+
+    if (typeof window !== "undefined" && db) {
+      setDoc(doc(db, "lotes", lote.id), sanitizeForFirestore(lote)).catch((err) => {
+        console.error("Error guardando lote en Firestore:", err);
+      });
+    }
   },
 
   deleteLote(id: string) {
     writeArray(KEYS.lotes, this.listLotes().filter((x) => x.id !== id));
+    notifyAgricultureSync();
+
+    if (typeof window !== "undefined" && db) {
+      deleteDoc(doc(db, "lotes", id)).catch((err) => {
+        console.error("Error eliminando lote en Firestore:", err);
+      });
+    }
   },
 
   listSoilAnalyses() {
@@ -401,6 +562,13 @@ const localRepository: AgricultureRepository = {
     if (index >= 0) all[index] = analysis;
     else all.unshift(analysis);
     writeArray(KEYS.soils, all);
+    notifyAgricultureSync();
+
+    if (typeof window !== "undefined" && db) {
+      setDoc(doc(db, "soils", analysis.id), sanitizeForFirestore(analysis)).catch((err) => {
+        console.error("Error guardando análisis de suelo en Firestore:", err);
+      });
+    }
   },
 
   listDocuments() {
@@ -413,6 +581,13 @@ const localRepository: AgricultureRepository = {
     if (index >= 0) all[index] = document;
     else all.unshift(document);
     writeArray(KEYS.documents, all);
+    notifyAgricultureSync();
+
+    if (typeof window !== "undefined" && db) {
+      setDoc(doc(db, "documents", document.id), sanitizeForFirestore(document)).catch((err) => {
+        console.error("Error guardando documento en Firestore:", err);
+      });
+    }
   },
 };
 
