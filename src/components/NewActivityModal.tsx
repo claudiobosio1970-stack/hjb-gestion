@@ -30,6 +30,8 @@ const CULTIVOS_PRESET = [
 ];
 
 const MAQUINARIAS_PRESET = [
+  "Fumigador Metalford",
+  "Tractor Case 150",
   ...INITIAL_EQUIPMENT.map((eq) => `${eq.nombre} (${eq.marca} ${eq.modelo})`),
   "Tractor John Deere 6120E (120 HP)",
   "Tractor John Deere 5705 (85 HP)",
@@ -46,7 +48,18 @@ const MAQUINARIAS_PRESET = [
   "Sin asignar",
 ];
 
-function newInput(producto = "Urea granulada"): ActivityInput {
+function getDefaultMaquinaria(tipo: string): string {
+  const t = (tipo || "").toLowerCase();
+  if (t.includes("fumiga") || t.includes("pulveri")) {
+    return "Fumigador Metalford";
+  }
+  if (t.includes("cosecha") || t.includes("picado") || t.includes("rollo")) {
+    return "";
+  }
+  return "Tractor Case 150";
+}
+
+function newInput(producto = ""): ActivityInput {
   return {
     id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `inp-${Math.random().toString(36).substring(2, 9)}`,
     producto,
@@ -66,7 +79,7 @@ function emptyActivity(campo = "Aguilera", lote = "Lote Único", campana = "2026
     campo,
     lote,
     campana,
-    cultivo: campo === "Tambo" ? "Maíz Silo" : "Maíz",
+    cultivo: "",
     cultivoAntecesor: "",
     tipo: "Fertilización",
     estado: "Planificada",
@@ -75,9 +88,9 @@ function emptyActivity(campo = "Aguilera", lote = "Lote Único", campana = "2026
     superficiePlanificada: null,
     superficieReal: null,
     superficieNota: "",
-    insumos: [newInput()],
+    insumos: [newInput("")],
     metodoAplicacion: "Terrestre",
-    maquinaria: "Sin asignar",
+    maquinaria: "Tractor Case 150",
     operador: "Sin asignar",
     observaciones: "",
     discrepancia: "",
@@ -161,7 +174,7 @@ export default function NewActivityModal({
       ...prev,
       campo: nuevoCampo,
       lote: nuevosLotes[0],
-      cultivo: nuevoCampo === "Tambo" ? "Maíz Silo" : prev.cultivo || "Maíz",
+      cultivo: prev.cultivo || "",
     }));
   }
 
@@ -234,7 +247,7 @@ export default function NewActivityModal({
   }
 
   function addInput() {
-    setForm((prev) => ({ ...prev, insumos: [...prev.insumos, newInput("Otro")] }));
+    setForm((prev) => ({ ...prev, insumos: [...prev.insumos, newInput("")] }));
   }
 
   function removeInput(id: string) {
@@ -424,12 +437,12 @@ export default function NewActivityModal({
                 </select>
               </div>
               <div>
-                <label>Cultivo</label>
+                <label>Cultivo (opcional)</label>
                 <input
                   className="input"
                   value={form.cultivo}
                   onChange={(e) => set("cultivo", e.target.value)}
-                  placeholder="ej: Maíz, Soja 2da..."
+                  placeholder="ej: Maíz, Soja, o dejar en blanco..."
                   list="cultivos-preset"
                 />
                 <datalist id="cultivos-preset">
@@ -560,12 +573,12 @@ export default function NewActivityModal({
                   </select>
                 </div>
                 <div>
-                  <label>Cultivo</label>
+                  <label>Cultivo (opcional)</label>
                   <input
                     className="input"
                     value={form.cultivo}
                     onChange={(e) => set("cultivo", e.target.value)}
-                    placeholder="ej: Maíz, Soja 2da..."
+                    placeholder="ej: Maíz, Soja, o dejar en blanco..."
                     list="cultivos-preset"
                   />
                   <datalist id="cultivos-preset">
@@ -594,12 +607,12 @@ export default function NewActivityModal({
                     </select>
                   </div>
                   <div>
-                    <label>Cultivo objetivo o destino</label>
+                    <label>Cultivo objetivo o destino (opcional)</label>
                     <input
                       className="input"
                       value={form.cultivo}
                       onChange={(e) => set("cultivo", e.target.value)}
-                      placeholder="ej: Barbecho químico, Maíz, Soja..."
+                      placeholder="ej: Barbecho, Maíz, o dejar en blanco..."
                       list="cultivos-preset"
                     />
                   </div>
@@ -755,9 +768,16 @@ export default function NewActivityModal({
                 value={form.tipo}
                 onChange={(e) => {
                   const newTipo = e.target.value;
-                  set("tipo", newTipo);
+                  const newMaq = getDefaultMaquinaria(newTipo);
+                  setForm((prev) => ({
+                    ...prev,
+                    tipo: newTipo,
+                    maquinaria: newMaq,
+                  }));
                   if (newTipo === "Cosecha" || newTipo === "Picado" || newTipo === "Rollos") {
                     setShowProduccion(true);
+                  } else {
+                    setShowProduccion(false);
                   }
                 }}
               >
@@ -901,58 +921,20 @@ export default function NewActivityModal({
               />
             </div>
           </div>
-
-          {/* Si es Realizada y además se desea mantener/editar fecha o superficie planificada original */}
-          {isReal && (
-            <div className="formGrid two" style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px dashed var(--slate-200)" }}>
-              <div>
-                <label style={{ fontSize: "11.5px", color: "var(--slate-600)" }}>
-                  Fecha Planificada original (opcional)
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  value={form.fechaPlanificada || ""}
-                  onChange={(e) => set("fechaPlanificada", e.target.value)}
-                  placeholder="ej: Octubre 2025 o 01/10/2025"
-                  style={{ fontSize: "12px" }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: "11.5px", color: "var(--slate-600)" }}>
-                  Superficie Planificada original (ha)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input"
-                  value={form.superficiePlanificada ?? ""}
-                  onChange={(e) => set("superficiePlanificada", e.target.value ? Number(e.target.value) : null)}
-                  placeholder="ha planificadas"
-                  style={{ fontSize: "12px" }}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* SECCIÓN 4: Insumos y Dosis */}
         <div className="formSection">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <div>
-              <h3>Insumos y Dosis</h3>
-              <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
-                Productos, fertilizantes, semillas o agroquímicos aplicados sobre la superficie seleccionada.
-              </p>
-            </div>
-            <button type="button" className="secondaryButton smallButton" onClick={addInput}>
-              + Agregar insumo
-            </button>
+          <div style={{ marginBottom: "12px" }}>
+            <h3>Insumos y Dosis</h3>
+            <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
+              Productos, fertilizantes, semillas o agroquímicos aplicados sobre la superficie seleccionada.
+            </p>
           </div>
 
           {form.insumos.length === 0 ? (
             <div style={{ padding: "16px", background: "var(--slate-50)", borderRadius: "8px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
-              Esta labor no registra insumos cargados. Hacé clic en <strong>+ Agregar insumo</strong> si querés detallar alguno.
+              Esta labor no registra insumos cargados.
             </div>
           ) : (
             <div className="inputLines">
@@ -1056,37 +1038,42 @@ export default function NewActivityModal({
                       </div>
                     </div>
 
-                    <div className="formGrid two" style={{ marginTop: "8px" }}>
-                      <div>
-                        <label style={{ fontSize: "11px", color: "var(--slate-600)" }}>
-                          Observación del insumo (opcional)
-                        </label>
-                        <input
-                          className="input"
-                          value={input.observacion || ""}
-                          onChange={(e) => updateInput(input.id, { observacion: e.target.value })}
-                          placeholder="ej: Dosis calculada s/análisis, en cabeceras..."
-                          style={{ fontSize: "12px" }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: "11px", color: "var(--slate-600)" }}>
-                          Unidad de cantidad total (opcional)
-                        </label>
-                        <input
-                          className="input"
-                          value={input.unidadTotal || ""}
-                          onChange={(e) => updateInput(input.id, { unidadTotal: e.target.value })}
-                          placeholder="ej: kg, L, litros, bolsas, tn"
-                          style={{ fontSize: "12px" }}
-                        />
-                      </div>
+                    <div style={{ marginTop: "8px" }}>
+                      <label style={{ fontSize: "11px", color: "var(--slate-600)" }}>
+                        Observación del insumo (opcional)
+                      </label>
+                      <input
+                        className="input"
+                        value={input.observacion || ""}
+                        onChange={(e) => updateInput(input.id, { observacion: e.target.value })}
+                        placeholder="ej: Dosis calculada s/análisis, en cabeceras..."
+                        style={{ fontSize: "12px" }}
+                      />
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
+
+          <div style={{ marginTop: "14px" }}>
+            <button
+              type="button"
+              className="secondaryButton"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 16px",
+                fontSize: "13px",
+                fontWeight: 600,
+                borderRadius: "8px",
+              }}
+              onClick={addInput}
+            >
+              + Agregar insumo
+            </button>
+          </div>
 
           <datalist id="productos-preset">
             {productos.map((p) => (
@@ -1103,141 +1090,143 @@ export default function NewActivityModal({
           </datalist>
         </div>
 
-        {/* SECCIÓN 5: Producción / Rendimiento */}
-        <div className="formSection">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-            <div>
-              <h3>Resultado Productivo / Cosecha / Forraje</h3>
-              <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
-                Rinde por hectárea, volumen cosechado y destino productivo.
-              </p>
+        {/* SECCIÓN 5: Producción / Rendimiento (Solo en Cosecha, Picado o Rollos) */}
+        {(form.tipo === "Cosecha" || form.tipo === "Picado" || form.tipo === "Rollos") && (
+          <div className="formSection">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <div>
+                <h3>Resultado Productivo / Cosecha / Forraje</h3>
+                <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
+                  Rinde por hectárea, volumen cosechado y destino productivo.
+                </p>
+              </div>
+
+              {showProduccion ? (
+                <button
+                  type="button"
+                  className="textDanger"
+                  style={{ fontSize: "12px" }}
+                  onClick={() => {
+                    setShowProduccion(false);
+                    set("produccion", undefined);
+                  }}
+                >
+                  Quitar datos de producción
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="secondaryButton smallButton"
+                  onClick={() => {
+                    setShowProduccion(true);
+                    if (!form.produccion) {
+                      set("produccion", {
+                        rendimiento: null,
+                        unidadRendimiento: form.tipo === "Picado" ? "m/ha" : form.tipo === "Rollos" ? "rollos/ha" : "qq/ha",
+                        cantidad: null,
+                        unidad: form.tipo === "Picado" ? "metros silo" : form.tipo === "Rollos" ? "rollos" : "kg",
+                        destino: form.tipo === "Picado" ? "Silo" : form.tipo === "Rollos" ? "Rollos" : "Grano",
+                      });
+                    }
+                  }}
+                >
+                  + Cargar rendimiento / cosecha
+                </button>
+              )}
             </div>
 
-            {showProduccion ? (
-              <button
-                type="button"
-                className="textDanger"
-                style={{ fontSize: "12px" }}
-                onClick={() => {
-                  setShowProduccion(false);
-                  set("produccion", undefined);
-                }}
-              >
-                Quitar datos de producción
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="secondaryButton smallButton"
-                onClick={() => {
-                  setShowProduccion(true);
-                  if (!form.produccion) {
-                    set("produccion", {
-                      rendimiento: null,
-                      unidadRendimiento: form.tipo === "Picado" ? "m/ha" : form.tipo === "Rollos" ? "rollos/ha" : "qq/ha",
-                      cantidad: null,
-                      unidad: form.tipo === "Picado" ? "metros silo" : form.tipo === "Rollos" ? "rollos" : "kg",
-                      destino: form.tipo === "Picado" ? "Silo" : form.tipo === "Rollos" ? "Rollos" : "Grano",
-                    });
-                  }
-                }}
-              >
-                + Cargar rendimiento / cosecha
-              </button>
+            {showProduccion && (
+              <div className="formGrid fourForm">
+                <div>
+                  <label>Rendimiento</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input"
+                    value={form.produccion?.rendimiento ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : null;
+                      set("produccion", {
+                        rendimiento: val,
+                        unidadRendimiento: form.produccion?.unidadRendimiento || (form.tipo === "Picado" ? "m/ha" : form.tipo === "Rollos" ? "rollos/ha" : "qq/ha"),
+                        cantidad: form.produccion?.cantidad ?? null,
+                        unidad: form.produccion?.unidad || (form.tipo === "Picado" ? "metros silo" : form.tipo === "Rollos" ? "rollos" : "kg"),
+                        destino: form.produccion?.destino || (form.tipo === "Picado" ? "Silo" : form.tipo === "Rollos" ? "Rollos" : "Grano"),
+                      });
+                    }}
+                    placeholder="ej: 39.37"
+                  />
+                </div>
+                <div>
+                  <label>Unidad Rendimiento</label>
+                  <select
+                    className="input"
+                    value={form.produccion?.unidadRendimiento || "qq/ha"}
+                    onChange={(e) => {
+                      set("produccion", {
+                        ...form.produccion,
+                        unidadRendimiento: e.target.value as any,
+                        cantidad: form.produccion?.cantidad ?? null,
+                        unidad: form.produccion?.unidad || "kg",
+                        rendimiento: form.produccion?.rendimiento ?? null,
+                      });
+                    }}
+                  >
+                    <option value="qq/ha">qq/ha (Quintales/ha)</option>
+                    <option value="m/ha">m/ha (Metros silo/ha)</option>
+                    <option value="rollos/ha">rollos/ha</option>
+                    <option value="kg/ha">kg/ha</option>
+                    <option value="t/ha">t/ha</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Producción Total</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="input"
+                    value={form.produccion?.cantidad ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : null;
+                      set("produccion", {
+                        ...form.produccion,
+                        cantidad: val,
+                        unidad: form.produccion?.unidad || "kg",
+                        rendimiento: form.produccion?.rendimiento ?? null,
+                        unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                      });
+                    }}
+                    placeholder="Total kilos / metros"
+                  />
+                </div>
+                <div>
+                  <label>Destino</label>
+                  <select
+                    className="input"
+                    value={form.produccion?.destino || "Grano"}
+                    onChange={(e) => {
+                      set("produccion", {
+                        ...form.produccion,
+                        destino: e.target.value as any,
+                        cantidad: form.produccion?.cantidad ?? null,
+                        unidad: form.produccion?.unidad || "kg",
+                        rendimiento: form.produccion?.rendimiento ?? null,
+                        unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                      });
+                    }}
+                  >
+                    <option value="Grano">Grano</option>
+                    <option value="Silo">Silo</option>
+                    <option value="Rollos">Rollos</option>
+                    <option value="Forraje Tambo">Forraje Tambo</option>
+                    <option value="Pastoreo">Pastoreo</option>
+                    <option value="Venta directa">Venta directa</option>
+                  </select>
+                </div>
+              </div>
             )}
           </div>
-
-          {showProduccion && (
-            <div className="formGrid fourForm">
-              <div>
-                <label>Rendimiento</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input"
-                  value={form.produccion?.rendimiento ?? ""}
-                  onChange={(e) => {
-                    const val = e.target.value ? Number(e.target.value) : null;
-                    set("produccion", {
-                      rendimiento: val,
-                      unidadRendimiento: form.produccion?.unidadRendimiento || (form.tipo === "Picado" ? "m/ha" : form.tipo === "Rollos" ? "rollos/ha" : "qq/ha"),
-                      cantidad: form.produccion?.cantidad ?? null,
-                      unidad: form.produccion?.unidad || (form.tipo === "Picado" ? "metros silo" : form.tipo === "Rollos" ? "rollos" : "kg"),
-                      destino: form.produccion?.destino || (form.tipo === "Picado" ? "Silo" : form.tipo === "Rollos" ? "Rollos" : "Grano"),
-                    });
-                  }}
-                  placeholder="ej: 39.37"
-                />
-              </div>
-              <div>
-                <label>Unidad Rendimiento</label>
-                <select
-                  className="input"
-                  value={form.produccion?.unidadRendimiento || "qq/ha"}
-                  onChange={(e) => {
-                    set("produccion", {
-                      ...form.produccion,
-                      unidadRendimiento: e.target.value as any,
-                      cantidad: form.produccion?.cantidad ?? null,
-                      unidad: form.produccion?.unidad || "kg",
-                      rendimiento: form.produccion?.rendimiento ?? null,
-                    });
-                  }}
-                >
-                  <option value="qq/ha">qq/ha (Quintales/ha)</option>
-                  <option value="m/ha">m/ha (Metros silo/ha)</option>
-                  <option value="rollos/ha">rollos/ha</option>
-                  <option value="kg/ha">kg/ha</option>
-                  <option value="t/ha">t/ha</option>
-                </select>
-              </div>
-              <div>
-                <label>Producción Total</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  className="input"
-                  value={form.produccion?.cantidad ?? ""}
-                  onChange={(e) => {
-                    const val = e.target.value ? Number(e.target.value) : null;
-                    set("produccion", {
-                      ...form.produccion,
-                      cantidad: val,
-                      unidad: form.produccion?.unidad || "kg",
-                      rendimiento: form.produccion?.rendimiento ?? null,
-                      unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
-                    });
-                  }}
-                  placeholder="Total kilos / metros"
-                />
-              </div>
-              <div>
-                <label>Destino</label>
-                <select
-                  className="input"
-                  value={form.produccion?.destino || "Grano"}
-                  onChange={(e) => {
-                    set("produccion", {
-                      ...form.produccion,
-                      destino: e.target.value as any,
-                      cantidad: form.produccion?.cantidad ?? null,
-                      unidad: form.produccion?.unidad || "kg",
-                      rendimiento: form.produccion?.rendimiento ?? null,
-                      unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
-                    });
-                  }}
-                >
-                  <option value="Grano">Grano</option>
-                  <option value="Silo">Silo</option>
-                  <option value="Rollos">Rollos</option>
-                  <option value="Forraje Tambo">Forraje Tambo</option>
-                  <option value="Pastoreo">Pastoreo</option>
-                  <option value="Venta directa">Venta directa</option>
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* SECCIÓN 6: Maquinaria y Operador */}
         <div className="formSection">
@@ -1247,7 +1236,7 @@ export default function NewActivityModal({
               <label>Maquinaria utilizada</label>
               <input
                 className="input"
-                value={form.maquinaria || "Sin asignar"}
+                value={form.maquinaria || ""}
                 onChange={(e) => set("maquinaria", e.target.value)}
                 placeholder="Seleccionar o escribir maquinaria..."
                 list="maquinarias-preset"
