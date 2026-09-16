@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Activity, agricultureData, Lote, LoteStatus } from "@/lib/agricultureData";
+import ActivityTable from "@/components/ActivityTable";
+import NewActivityModal from "@/components/NewActivityModal";
 
 export const CULTIVOS_SUGERIDOS = [
   "Maíz Grano",
@@ -59,7 +61,19 @@ export function LoteModal({
   useEffect(() => {
     if (!open) return;
     if (editingLote) {
-      setForm({ ...editingLote });
+      setForm({
+        ...emptyLote(campoNombre),
+        ...editingLote,
+        nombre: editingLote.nombre || "",
+        superficieHa:
+          editingLote.superficieHa !== null && editingLote.superficieHa !== undefined
+            ? Number(editingLote.superficieHa)
+            : null,
+        cultivoActual: editingLote.cultivoActual || "",
+        estado: editingLote.estado || "En producción",
+        aptitudSuelo: editingLote.aptitudSuelo || "",
+        observaciones: editingLote.observaciones || "",
+      });
     } else {
       setForm(emptyLote(campoNombre));
     }
@@ -75,13 +89,17 @@ export function LoteModal({
 
     const loteToSave: Lote = {
       ...form,
-      id: form.id || `lote-${campoNombre.toLowerCase()}-${Date.now()}`,
+      id: form.id || editingLote?.id || `lote-${campoNombre.toLowerCase()}-${Date.now()}`,
       campo: campoNombre,
       nombre: form.nombre.trim(),
       superficieHa:
         form.superficieHa !== null && form.superficieHa !== undefined && form.superficieHa !== ("" as any)
           ? Number(form.superficieHa)
           : null,
+      cultivoActual: form.cultivoActual?.trim() || "",
+      estado: form.estado || "En producción",
+      aptitudSuelo: form.aptitudSuelo?.trim() || "",
+      observaciones: form.observaciones?.trim() || "",
       updatedAt: new Date().toISOString(),
     };
 
@@ -246,6 +264,11 @@ export default function LotesPanel({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingLote, setEditingLote] = useState<Lote | null>(null);
 
+  // Estado para entrar a un lote específico y cargar actividades directamente
+  const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+
   function openCreate() {
     setEditingLote(null);
     setModalOpen(true);
@@ -261,6 +284,30 @@ export default function LotesPanel({
     setEditingLote(null);
   }
 
+  // Mantener el lote activo siempre sincronizado con la lista más reciente de lotes
+  const activeLote = useMemo(() => {
+    if (!selectedLote) return null;
+    return (
+      lotes.find(
+        (l) =>
+          l.id === selectedLote.id ||
+          (l.campo.toLowerCase() === selectedLote.campo.toLowerCase() &&
+            l.nombre.toLowerCase() === selectedLote.nombre.toLowerCase())
+      ) || selectedLote
+    );
+  }, [selectedLote, lotes]);
+
+  const activeLoteActivities = useMemo(() => {
+    if (!activeLote) return [];
+    return activities.filter((act) => {
+      const matchesLote = (act.lote || "").toLowerCase() === activeLote.nombre.toLowerCase();
+      const matchesGrupal =
+        act.esGrupal &&
+        act.lotesAfectados?.some((la) => la.toLowerCase().includes(activeLote.nombre.toLowerCase()));
+      return matchesLote || matchesGrupal;
+    });
+  }, [activities, activeLote]);
+
   // Métricas resumidas de los lotes de este campo
   const stats = useMemo(() => {
     const totalSuperficie = lotes.reduce((acc, l) => acc + (l.superficieHa || 0), 0);
@@ -274,6 +321,248 @@ export default function LotesPanel({
     };
   }, [lotes]);
 
+  // VISTA 1: DETALLE DE UN LOTE ESPECÍFICO (Para cargar labores seguidas en este lote)
+  if (activeLote) {
+    return (
+      <div>
+        {/* Barra de navegación superior y acciones del lote */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "12px",
+            marginBottom: "20px",
+          }}
+        >
+          <div>
+            <button
+              type="button"
+              className="thResetBtn"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--brand-700)",
+                marginBottom: "8px",
+                cursor: "pointer",
+              }}
+              onClick={() => setSelectedLote(null)}
+            >
+              ← Volver a todos los lotes de {campoNombre}
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0 }}>
+                {campoNombre} — {activeLote.nombre}
+              </h2>
+              <span className="pill badgeGreen" style={{ fontSize: "14px", fontWeight: 700 }}>
+                {activeLote.superficieHa ? `${activeLote.superficieHa} ha` : "Superficie a definir"}
+              </span>
+              <span
+                className={`pill ${
+                  activeLote.estado === "En producción"
+                    ? "badgeGreen"
+                    : activeLote.estado === "Pastoreo"
+                    ? "badgeTeal"
+                    : activeLote.estado === "Barbecho / Descanso"
+                    ? "badgeSlate"
+                    : "badgeAmber"
+                }`}
+                style={{ fontSize: "12px" }}
+              >
+                {activeLote.estado}
+              </span>
+              {activeLote.cultivoActual && (
+                <span className="pill badgePurple" style={{ fontSize: "12px" }}>
+                  🌾 Cultivo: {activeLote.cultivoActual}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="tableAction"
+              style={{ padding: "8px 16px", fontWeight: 700, borderColor: "var(--line)" }}
+              onClick={() => openEdit(activeLote)}
+            >
+              ✏️ Editar Lote
+            </button>
+            <button
+              type="button"
+              className="primaryButton"
+              style={{
+                padding: "8px 20px",
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "14px",
+              }}
+              onClick={() => {
+                setEditingActivity(null);
+                setActivityModalOpen(true);
+              }}
+            >
+              + Cargar labor en {activeLote.nombre}
+            </button>
+          </div>
+        </div>
+
+        {/* Ficha Resumen de Lote */}
+        <div
+          className="tableCard"
+          style={{
+            padding: "16px 20px",
+            marginBottom: "24px",
+            background: "#ffffff",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "16px",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: "11.5px", textTransform: "uppercase", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.5px" }}>
+              Superficie
+            </div>
+            <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--slate-900)", marginTop: "3px" }}>
+              {activeLote.superficieHa ? `${activeLote.superficieHa} ha` : "Sin definir"}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: "11.5px", textTransform: "uppercase", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.5px" }}>
+              Cultivo Actual
+            </div>
+            <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--slate-900)", marginTop: "4px" }}>
+              {activeLote.cultivoActual || "Sin cultivo asignado"}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: "11.5px", textTransform: "uppercase", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.5px" }}>
+              Aptitud de Suelo
+            </div>
+            <div style={{ fontSize: "14px", color: "var(--slate-700)", marginTop: "4px" }}>
+              {activeLote.aptitudSuelo || "Agrícola"}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: "11.5px", textTransform: "uppercase", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.5px" }}>
+              Labores en Historial
+            </div>
+            <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--brand-700)", marginTop: "3px" }}>
+              {activeLoteActivities.length} {activeLoteActivities.length === 1 ? "labor" : "labores"}
+            </div>
+          </div>
+
+          {activeLote.observaciones && (
+            <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--line)", paddingTop: "10px", fontSize: "13px", color: "var(--slate-600)", fontStyle: "italic" }}>
+              <strong>Observaciones:</strong> {activeLote.observaciones}
+            </div>
+          )}
+        </div>
+
+        {/* Sección Tabla de Labores del Lote */}
+        <div style={{ marginBottom: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: "17px", color: "var(--slate-900)" }}>
+              Historial de Labores de {activeLote.nombre} ({activeLoteActivities.length})
+            </h3>
+            <p className="muted" style={{ margin: "2px 0 0 0", fontSize: "13px" }}>
+              Todas las labores agrícolas realizadas o planificadas exclusivamente en este lote.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="primaryButton"
+            style={{ padding: "6px 14px", fontSize: "13px" }}
+            onClick={() => {
+              setEditingActivity(null);
+              setActivityModalOpen(true);
+            }}
+          >
+            + Nueva labor aquí
+          </button>
+        </div>
+
+        {activeLoteActivities.length === 0 ? (
+          <div
+            className="emptyState"
+            style={{
+              padding: "45px 20px",
+              textAlign: "center",
+              background: "#ffffff",
+              borderRadius: "10px",
+              border: "1px dashed var(--line)",
+              marginBottom: "20px",
+            }}
+          >
+            <div style={{ fontSize: "32px", marginBottom: "8px" }}>🌱</div>
+            <h4 style={{ margin: "0 0 6px 0", color: "var(--slate-800)", fontSize: "16px" }}>
+              Todavía no hay labores registradas en {activeLote.nombre}
+            </h4>
+            <p className="muted" style={{ margin: "0 0 16px 0", fontSize: "13px" }}>
+              Cargá la primera labor directamente en este lote (con las hectáreas y datos ya listos).
+            </p>
+            <button
+              type="button"
+              className="primaryButton"
+              onClick={() => {
+                setEditingActivity(null);
+                setActivityModalOpen(true);
+              }}
+            >
+              + Cargar primera labor en {activeLote.nombre}
+            </button>
+          </div>
+        ) : (
+          <ActivityTable
+            activities={activeLoteActivities}
+            onEdit={(act) => {
+              setEditingActivity(act);
+              setActivityModalOpen(true);
+            }}
+            onSaved={onChanged}
+            showCampo={false}
+          />
+        )}
+
+        {/* Modal de Lote para edición */}
+        <LoteModal
+          open={modalOpen}
+          onClose={closeModal}
+          campoNombre={campoNombre}
+          editingLote={editingLote}
+          onSaved={onChanged}
+        />
+
+        {/* Modal de Carga de Labor con Lote Preseleccionado */}
+        <NewActivityModal
+          open={activityModalOpen}
+          onClose={() => {
+            setActivityModalOpen(false);
+            setEditingActivity(null);
+          }}
+          onSaved={() => {
+            onChanged();
+            setActivityModalOpen(false);
+            setEditingActivity(null);
+          }}
+          fixedCampo={campoNombre}
+          fixedLote={activeLote.nombre}
+          editingActivity={editingActivity}
+        />
+      </div>
+    );
+  }
+
+  // VISTA 2: LISTA DE TODOS LOS LOTES DEL CAMPO
   return (
     <div>
       {/* Barra Superior con Métricas y Botón + Nuevo Lote */}
@@ -290,7 +579,7 @@ export default function LotesPanel({
         <div>
           <h2>Lotes y Potreros de {campoNombre}</h2>
           <p className="muted" style={{ margin: "2px 0 0 0" }}>
-            Superficie asignada, cultivo actual, estado productivo y aptitud de suelo de cada lote.
+            Hacé clic en cualquier lote para entrar, ver su historial completo y cargar labores directamente.
           </p>
           <div className="badgeRow" style={{ marginTop: "8px" }}>
             <span className="pill badgeSlate">{stats.count} lotes configurados</span>
@@ -324,7 +613,18 @@ export default function LotesPanel({
             }).length;
 
             return (
-              <div key={lote.id} className="fieldCardModern borderActive" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div
+                key={lote.id}
+                className="fieldCardModern borderActive"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  cursor: "pointer",
+                  transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                }}
+                onClick={() => setSelectedLote(lote)}
+              >
                 <div>
                   <div className="fieldCardTop">
                     <span className="fieldName" style={{ fontSize: "16px", fontWeight: 700 }}>
@@ -389,14 +689,47 @@ export default function LotesPanel({
                   </div>
                 </div>
 
-                <div style={{ borderTop: "1px solid var(--line)", paddingTop: "12px", display: "flex", justifyContent: "flex-end" }}>
+                <div
+                  style={{
+                    borderTop: "1px solid var(--line)",
+                    paddingTop: "12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
                   <button
                     type="button"
                     className="tableAction"
-                    style={{ padding: "6px 14px", fontWeight: 600 }}
-                    onClick={() => openEdit(lote)}
+                    style={{ padding: "6px 12px", fontWeight: 600, fontSize: "12.5px" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEdit(lote);
+                    }}
+                    title="Editar los datos del lote"
                   >
                     ✏️ Editar Lote
+                  </button>
+
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    style={{
+                      padding: "6px 14px",
+                      fontWeight: 700,
+                      fontSize: "12.5px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedLote(lote);
+                    }}
+                    title="Entrar a este lote para ver su historial y cargar labores"
+                  >
+                    Entrar y Cargar →
                   </button>
                 </div>
               </div>

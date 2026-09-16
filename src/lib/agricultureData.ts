@@ -130,18 +130,18 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Keuneke",
     nombre: "Lote 1",
     superficieHa: 48,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola Clase I",
-    observaciones: "48 ha",
+    observaciones: "",
   },
   {
     id: "keuneke-lote-2",
     campo: "Keuneke",
     nombre: "Lote 2",
     superficieHa: 9,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola Clase I",
-    observaciones: "9 ha",
+    observaciones: "",
   },
   // Racca (100 ha - 4 lotes delimitados de 25 ha)
   {
@@ -149,36 +149,36 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Racca",
     nombre: "Lote 1",
     superficieHa: 25,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola de alta productividad",
-    observaciones: "25 ha",
+    observaciones: "",
   },
   {
     id: "racca-lote-2",
     campo: "Racca",
     nombre: "Lote 2",
     superficieHa: 25,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola de alta productividad",
-    observaciones: "25 ha",
+    observaciones: "",
   },
   {
     id: "racca-lote-3a",
     campo: "Racca",
     nombre: "Lote 3a",
     superficieHa: 25,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola de alta productividad",
-    observaciones: "25 ha",
+    observaciones: "",
   },
   {
     id: "racca-lote-3b",
     campo: "Racca",
     nombre: "Lote 3b",
     superficieHa: 25,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola de alta productividad",
-    observaciones: "25 ha",
+    observaciones: "",
   },
   // Kitty (29 ha - 1 lote)
   {
@@ -186,9 +186,9 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Kitty",
     nombre: "Lote Único",
     superficieHa: 29,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola de alta productividad",
-    observaciones: "Lote único de 29 ha",
+    observaciones: "",
   },
   // Aguilera (20 ha - 1 lote)
   {
@@ -196,9 +196,9 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Aguilera",
     nombre: "Lote Único",
     superficieHa: 20,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola Clase I-II",
-    observaciones: "Lote único de 20 ha",
+    observaciones: "",
   },
   // Tambo (73 ha - 9 lotes)
   {
@@ -206,81 +206,81 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 1",
     superficieHa: 7,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
-    observaciones: "7 ha",
+    observaciones: "",
   },
   {
     id: "tambo-lote-2",
     campo: "Tambo",
     nombre: "Lote 2",
     superficieHa: 10,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
-    observaciones: "10 ha",
+    observaciones: "",
   },
   {
     id: "tambo-lote-3",
     campo: "Tambo",
     nombre: "Lote 3",
     superficieHa: 11,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
-    observaciones: "11 ha",
+    observaciones: "",
   },
   {
     id: "tambo-lote-4",
     campo: "Tambo",
     nombre: "Lote 4",
     superficieHa: 5,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
-    observaciones: "5 ha",
+    observaciones: "",
   },
   {
     id: "tambo-lote-5",
     campo: "Tambo",
     nombre: "Lote 5",
     superficieHa: 3,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
-    observaciones: "3 ha",
+    observaciones: "",
   },
   {
     id: "tambo-lote-6",
     campo: "Tambo",
     nombre: "Lote 6",
     superficieHa: 10,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
-    observaciones: "10 ha",
+    observaciones: "",
   },
   {
     id: "tambo-lote-7",
     campo: "Tambo",
     nombre: "Lote 7",
     superficieHa: 10,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
-    observaciones: "10 ha",
+    observaciones: "",
   },
   {
     id: "tambo-lote-8",
     campo: "Tambo",
     nombre: "Lote 8",
     superficieHa: 10,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
-    observaciones: "10 ha",
+    observaciones: "",
   },
   {
     id: "tambo-lote-9",
     campo: "Tambo",
     nombre: "Lote 9",
     superficieHa: 7,
-    estado: "Planificado",
+    estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
-    observaciones: "7 ha",
+    observaciones: "",
   },
 ];
 
@@ -528,8 +528,13 @@ const localRepository: AgricultureRepository = {
 
   saveLote(lote: Lote) {
     const all = this.listLotes();
-    const index = all.findIndex((x) => x.id === lote.id);
-    if (index >= 0) all[index] = lote;
+    const index = all.findIndex(
+      (x) =>
+        x.id === lote.id ||
+        (x.campo.toLowerCase() === lote.campo.toLowerCase() &&
+          x.nombre.toLowerCase() === lote.nombre.toLowerCase())
+    );
+    if (index >= 0) all[index] = { ...all[index], ...lote };
     else all.push(lote);
     writeArray(KEYS.lotes, all);
     notifyAgricultureSync();

@@ -415,10 +415,35 @@ export default function NewActivityModal({
       (i) => (i.producto && i.producto.trim().length > 0) || i.cantidadTotal || i.dosisReal || i.dosisPlanificada
     );
 
+    // Deducir cultivo antecesor automáticamente del historial del lote
+    let autoCultivoAntecesor = form.cultivoAntecesor || "";
+    if (!autoCultivoAntecesor) {
+      const pastActivities = agricultureData.listActivities();
+      const match = pastActivities.find(
+        (a) =>
+          a.id !== form.id &&
+          a.campo.toLowerCase() === form.campo.toLowerCase() &&
+          a.lote?.toLowerCase() === (form.lote || "").toLowerCase() &&
+          a.cultivo &&
+          a.cultivo.trim().length > 0 &&
+          a.cultivo.toLowerCase() !== "barbecho" &&
+          a.cultivo.toLowerCase() !== (finalCultivo || "").toLowerCase()
+      );
+      if (match && match.cultivo) {
+        autoCultivoAntecesor = match.cultivo;
+      } else {
+        const foundLote = agricultureData.listLotes(form.campo).find((l) => l.nombre === form.lote);
+        if (foundLote?.cultivoActual && foundLote.cultivoActual.toLowerCase() !== (finalCultivo || "").toLowerCase()) {
+          autoCultivoAntecesor = foundLote.cultivoActual;
+        }
+      }
+    }
+
     const activityToSave: Activity = {
       ...form,
       insumos: validInsumos,
       cultivo: finalCultivo,
+      cultivoAntecesor: autoCultivoAntecesor || undefined,
       id: form.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `act-${Date.now()}`),
       campo: isMultiLote ? (form.campo || "Multicampo") : form.campo,
       lote: isMultiLote ? (form.lote || (form.lotesAfectados || []).join(", ")) : (form.lote || "Lote Único"),
@@ -892,7 +917,7 @@ export default function NewActivityModal({
         {/* SECCIÓN 2: Labor, Estado y Método */}
         <div className="formSection">
           <h3>Labor, Estado y Método</h3>
-          <div className="formGrid fourForm">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
             <div>
               <label>Tipo de labor</label>
               <input
@@ -971,15 +996,6 @@ export default function NewActivityModal({
                 <option value="Terrestre">Terrestre</option>
                 <option value="Aérea">Aérea</option>
               </select>
-            </div>
-            <div>
-              <label>Cultivo Antecesor (opcional)</label>
-              <input
-                className="input"
-                value={form.cultivoAntecesor || ""}
-                onChange={(e) => set("cultivoAntecesor", e.target.value)}
-                placeholder="ej: Trigo, Avena, Maíz..."
-              />
             </div>
           </div>
         </div>
