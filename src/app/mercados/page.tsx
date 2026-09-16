@@ -7,7 +7,6 @@ import {
   CategoriaValor,
   ValorMovil,
   checkDailyAutoSync,
-  getDolarBnaVenta,
   getLastSyncTime,
   getValoresMoviles,
   saveValoresMoviles,
@@ -78,8 +77,6 @@ export default function MercadosPage() {
     });
   }, []);
 
-  const tcActivo = getDolarBnaVenta();
-
   async function handleSyncApis() {
     setSyncing(true);
     setFeedback(null);
@@ -147,19 +144,14 @@ export default function MercadosPage() {
     <AppShell active="Valores Móviles">
       <div className="pageHeader">
         <div>
-          <div className="badgeRow" style={{ marginBottom: "6px" }}>
-            <span className="pill badgeGreen">1-Valores Móviles HJB</span>
-            <span className="pill badgeSlate">Bimonetario (ARS / USD)</span>
-            {lastSync && (
+          {lastSync && (
+            <div className="badgeRow" style={{ marginBottom: "6px" }}>
               <span className="pill badgeBlue" style={{ fontSize: "11.5px" }}>
                 Sincronizado: {lastSync}
               </span>
-            )}
-          </div>
+            </div>
+          )}
           <h1>Valores Móviles & Precios de Referencia</h1>
-          <p className="muted">
-            Tabla central bimonetaria conectada a APIs oficiales (Dólar BNA, Inflación, Gas oil YPF y Pizarra Granos Rosario BCR).
-          </p>
         </div>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
@@ -182,40 +174,6 @@ export default function MercadosPage() {
           >
             💾 Guardar cambios
           </button>
-        </div>
-      </div>
-
-      {/* Banner de Tipo de Cambio Activo y Paridad */}
-      <div
-        style={{
-          background: "#f0fdf4",
-          border: "1px solid #bbf7d0",
-          borderRadius: "8px",
-          padding: "12px 18px",
-          marginBottom: "16px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "12px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "22px" }}>💵</span>
-          <div>
-            <div style={{ fontSize: "14px", fontWeight: 700, color: "#166534" }}>
-              Tipo de Cambio Activo: 1 USD = ${tcActivo.toLocaleString("es-AR")} ARS (BNA Venta)
-            </div>
-            <div style={{ fontSize: "12px", color: "#15803d" }}>
-              Podés editar en el casillero de <strong>Pesos ($)</strong> o en el de <strong>Dólares (USD)</strong>; el sistema actualiza automáticamente el valor opuesto.
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "11px", fontWeight: 600, color: "#166534", background: "#dcfce7", padding: "4px 8px", borderRadius: "6px" }}>
-            Referencia Central del Sistema
-          </span>
         </div>
       </div>
 
