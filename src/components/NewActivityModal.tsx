@@ -346,7 +346,23 @@ export default function NewActivityModal({
   );
 
   const allTiposActividad = Array.from(
-    new Set([...tiposActividad, "Barbecho", "Fumigación", ...(form.tipo ? [form.tipo] : [])])
+    new Set([
+      "Siembra",
+      "Barbecho",
+      "Fumigación",
+      "Fertilización",
+      "Biofertilización",
+      "Subsolado",
+      "Laboreo",
+      "Rastra de discos",
+      "Cosecha",
+      "Picado",
+      "Rollos",
+      "Pastoreo",
+      "Monitoreo",
+      ...tiposActividad,
+      ...(form.tipo ? [form.tipo] : []),
+    ])
   );
 
   return (
@@ -768,7 +784,7 @@ export default function NewActivityModal({
           <div className="formGrid fourForm">
             <div>
               <label>Tipo de labor</label>
-              <select
+              <input
                 className="input"
                 value={form.tipo}
                 onChange={(e) => {
@@ -778,21 +794,28 @@ export default function NewActivityModal({
                     ...prev,
                     tipo: newTipo,
                     maquinaria: newMaq,
-                    cultivo: newTipo === "Barbecho" ? "Barbecho" : (prev.cultivo === "Barbecho" ? "" : prev.cultivo),
+                    cultivo: newTipo.toLowerCase().includes("barbecho")
+                      ? "Barbecho"
+                      : (prev.cultivo === "Barbecho" ? "" : prev.cultivo),
                   }));
-                  if (newTipo === "Cosecha" || newTipo === "Picado" || newTipo === "Rollos") {
+                  const isCosechaPicado =
+                    newTipo.toLowerCase().includes("cosecha") ||
+                    newTipo.toLowerCase().includes("picado") ||
+                    newTipo.toLowerCase().includes("rollo");
+                  if (isCosechaPicado) {
                     setShowProduccion(true);
                   } else {
                     setShowProduccion(false);
                   }
                 }}
-              >
+                placeholder="Elegir o escribir labor (ej: Subsolado)..."
+                list="tipos-labor-preset"
+              />
+              <datalist id="tipos-labor-preset">
                 {allTiposActividad.map((tipo) => (
-                  <option key={tipo} value={tipo}>
-                    {tipo}
-                  </option>
+                  <option key={tipo} value={tipo} />
                 ))}
-              </select>
+              </datalist>
             </div>
             <div>
               <label>Estado</label>

@@ -5,22 +5,13 @@ import { Activity, agricultureData } from "@/lib/agricultureData";
 import { formatHistoricalDate, sortActivitiesRecentFirst } from "@/lib/dateUtils";
 
 function getTipoBadge(tipo: string) {
-  switch (tipo) {
-    case "Siembra":
-      return "pill badgeGreen";
-    case "Cosecha":
-    case "Picado":
-    case "Rollos":
-      return "pill badgePurple";
-    case "Fertilización":
-    case "Biofertilización":
-      return "pill badgeTeal";
-    case "Fumigación":
-    case "Barbecho":
-      return "pill badgeBlue";
-    default:
-      return "pill badgeSlate";
-  }
+  const t = (tipo || "").toLowerCase();
+  if (t.includes("siembra")) return "pill badgeGreen";
+  if (t.includes("cosecha") || t.includes("picado") || t.includes("rollo")) return "pill badgePurple";
+  if (t.includes("fertiliz")) return "pill badgeTeal";
+  if (t.includes("fumiga") || t.includes("pulveri") || t.includes("barbecho")) return "pill badgeBlue";
+  if (t.includes("subsol") || t.includes("laboreo") || t.includes("rastra")) return "pill badgeAmber";
+  return "pill badgeSlate";
 }
 
 interface TableFilters {
@@ -177,7 +168,23 @@ export default function ActivityTable({
   }, [activities, filters]);
 
   const CULTIVOS_OPTIONS = ["Maíz", "Trigo", "Soja", "Girasol", "Alfalfa", "Avena", "Forrajes", "Barbecho"];
-  const LABORES_OPTIONS = ["Siembra", "Fertilización", "Biofertilización", "Fumigación", "Barbecho", "Cosecha", "Picado", "Rollos", "Monitoreo"];
+  const LABORES_OPTIONS = Array.from(
+    new Set([
+      "Siembra",
+      "Fertilización",
+      "Biofertilización",
+      "Fumigación",
+      "Barbecho",
+      "Subsolado",
+      "Laboreo",
+      "Rastra de discos",
+      "Cosecha",
+      "Picado",
+      "Rollos",
+      "Monitoreo",
+      ...activities.map((a) => a.tipo).filter(Boolean),
+    ])
+  );
 
   return (
     <div>
