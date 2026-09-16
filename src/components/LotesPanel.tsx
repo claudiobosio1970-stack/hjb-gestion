@@ -255,17 +255,26 @@ export default function LotesPanel({
   lotes,
   activities,
   onChanged,
+  selectedLote: controlledSelectedLote,
+  onSelectLote,
 }: {
   campoNombre: string;
   lotes: Lote[];
   activities: Activity[];
   onChanged: () => void;
+  selectedLote?: Lote | null;
+  onSelectLote?: (lote: Lote | null) => void;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingLote, setEditingLote] = useState<Lote | null>(null);
 
   // Estado para entrar a un lote específico y cargar actividades directamente
-  const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
+  const [internalSelectedLote, setInternalSelectedLote] = useState<Lote | null>(null);
+  const selectedLote = controlledSelectedLote !== undefined ? controlledSelectedLote : internalSelectedLote;
+  const setSelectedLote = (lote: Lote | null) => {
+    if (onSelectLote) onSelectLote(lote);
+    setInternalSelectedLote(lote);
+  };
   const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
 
@@ -458,28 +467,6 @@ export default function LotesPanel({
               <h2 style={{ margin: 0 }}>
                 {campoNombre} — {activeLote.nombre}
               </h2>
-              <span className="pill badgeGreen" style={{ fontSize: "14px", fontWeight: 700 }}>
-                {activeLote.superficieHa ? `${activeLote.superficieHa} ha` : "Superficie a definir"}
-              </span>
-              <span
-                className={`pill ${
-                  activeLote.estado === "En producción"
-                    ? "badgeGreen"
-                    : activeLote.estado === "Pastoreo"
-                    ? "badgeTeal"
-                    : activeLote.estado === "Barbecho / Descanso"
-                    ? "badgeSlate"
-                    : "badgeAmber"
-                }`}
-                style={{ fontSize: "12px" }}
-              >
-                {activeLote.estado}
-              </span>
-              {activeLote.cultivoActual && (
-                <span className="pill badgePurple" style={{ fontSize: "12px" }}>
-                  🌾 Cultivo: {activeLote.cultivoActual}
-                </span>
-              )}
             </div>
           </div>
 
@@ -543,14 +530,6 @@ export default function LotesPanel({
             </div>
           </div>
 
-          <div>
-            <div style={{ fontSize: "11.5px", textTransform: "uppercase", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.5px" }}>
-              Aptitud de Suelo
-            </div>
-            <div style={{ fontSize: "14px", color: "var(--slate-700)", marginTop: "4px" }}>
-              {activeLote.aptitudSuelo || "Agrícola"}
-            </div>
-          </div>
 
           <div>
             <div style={{ fontSize: "11.5px", textTransform: "uppercase", fontWeight: 700, color: "var(--muted)", letterSpacing: "0.5px" }}>
@@ -570,15 +549,6 @@ export default function LotesPanel({
 
         {/* TABLA EJECUTIVA AGRONÓMICA: Cultivo | Biofertilizante/ha | Fertilizante/ha | Con qué se fumigó */}
         <div style={{ marginBottom: "26px" }}>
-          <div style={{ marginBottom: "10px" }}>
-            <h3 style={{ margin: 0, fontSize: "16px", color: "var(--slate-900)", display: "flex", alignItems: "center", gap: "8px" }}>
-              📊 Manejo Nutricional y Sanitario de {activeLote.nombre}
-            </h3>
-            <p className="muted" style={{ margin: "2px 0 0", fontSize: "12.5px" }}>
-              Resumen directo de lo que se le aplicó por hectárea en este lote (biofertilización, fertilización química y fumigaciones).
-            </p>
-          </div>
-
           <div className="tableWrap" style={{ background: "#ffffff", borderRadius: "10px", border: "1px solid var(--line)", overflow: "hidden" }}>
             <table className="dataTable" style={{ margin: 0 }}>
               <thead>
@@ -681,9 +651,6 @@ export default function LotesPanel({
           <h3 style={{ margin: 0, fontSize: "16px", color: "var(--slate-900)" }}>
             Historial de Labores de {activeLote.nombre}
           </h3>
-          <p className="muted" style={{ margin: "2px 0 0 0", fontSize: "13px" }}>
-            Todas las labores agrícolas realizadas o planificadas exclusivamente en este lote.
-          </p>
         </div>
 
         {activeLoteActivities.length === 0 ? (
@@ -725,6 +692,7 @@ export default function LotesPanel({
             }}
             onSaved={onChanged}
             showCampo={false}
+            hideCountNote={true}
           />
         )}
 

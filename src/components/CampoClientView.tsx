@@ -45,6 +45,9 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
   const [headerLoteToEdit, setHeaderLoteToEdit] = useState<Lote | null>(null);
   const [headerSelectorOpen, setHeaderSelectorOpen] = useState(false);
 
+  // Lote seleccionado en la pestaña de Lotes para vista enfocada
+  const [selectedLote, setSelectedLote] = useState<Lote | null>(null);
+
   const [activities, setActivities] = useState<Activity[]>([]);
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [soils, setSoils] = useState<SoilAnalysis[]>([]);
@@ -125,79 +128,103 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
     }
   }
 
+  const isViewingLoteDetail = tab === "Lotes" && !!selectedLote;
+
   return (
     <AppShell active="Agricultura">
       {/* Breadcrumb */}
       <div className="breadcrumb">
         <Link href="/agricultura" style={{ color: "var(--muted)" }}>Agricultura</Link>
         {" / "}
-        <strong style={{ color: "var(--slate-800)" }}>{campoNombre}</strong>
+        {isViewingLoteDetail ? (
+          <>
+            <button
+              type="button"
+              className="thResetBtn"
+              style={{ color: "var(--muted)", fontWeight: 500, cursor: "pointer", fontSize: "13px", padding: 0 }}
+              onClick={() => setSelectedLote(null)}
+            >
+              {campoNombre}
+            </button>
+            {" / "}
+            <strong style={{ color: "var(--slate-800)" }}>{selectedLote.nombre}</strong>
+          </>
+        ) : (
+          <strong style={{ color: "var(--slate-800)" }}>{campoNombre}</strong>
+        )}
       </div>
 
-      {/* Header */}
-      <div className="pageHeader">
-        <div>
-          <div className="badgeRow" style={{ marginBottom: "6px" }}>
-            <span className="pill badgeGreen">Establecimiento {campoNombre}</span>
-            <span className="pill badgeSlate">{campoMeta?.superficie || "Superficie centralizada"}</span>
-            <span className="pill badgeBlue">{lotesDisponibles.join(" · ")}</span>
+      {!isViewingLoteDetail && (
+        <>
+          {/* Header */}
+          <div className="pageHeader">
+            <div>
+              <div className="badgeRow" style={{ marginBottom: "6px" }}>
+                <span className="pill badgeGreen">Establecimiento {campoNombre}</span>
+                <span className="pill badgeSlate">{campoMeta?.superficie || "Superficie centralizada"}</span>
+                <span className="pill badgeBlue">{lotesDisponibles.join(" · ")}</span>
+              </div>
+              <h1>{campoNombre}</h1>
+              <p className="muted">
+                Historial agrícola completo: rotaciones, siembras, fertilizaciones, biofertilizaciones, fumigaciones y cosechas.
+              </p>
+            </div>
+            <div className="campoHeaderActions">
+              <button className="primaryButton" onClick={startNew}>
+                + Registrar labor
+              </button>
+              <button
+                type="button"
+                className="tableAction"
+                style={{
+                  padding: "8px 14px",
+                  fontWeight: 700,
+                  borderColor: "var(--brand-600)",
+                  color: "var(--brand-800)",
+                  background: "#ffffff",
+                  textAlign: "center",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  boxShadow: "var(--shadow-sm)",
+                }}
+                onClick={openHeaderLoteEdit}
+                title="Editar los datos de los lotes de este campo"
+              >
+                ✏️ Editar Lote
+              </button>
+            </div>
           </div>
-          <h1>{campoNombre}</h1>
-          <p className="muted">
-            Historial agrícola completo: rotaciones, siembras, fertilizaciones, biofertilizaciones, fumigaciones y cosechas.
-          </p>
-        </div>
-        <div className="campoHeaderActions">
-          <button className="primaryButton" onClick={startNew}>
-            + Registrar labor
-          </button>
-          <button
-            type="button"
-            className="tableAction"
-            style={{
-              padding: "8px 14px",
-              fontWeight: 700,
-              borderColor: "var(--brand-600)",
-              color: "var(--brand-800)",
-              background: "#ffffff",
-              textAlign: "center",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              boxShadow: "var(--shadow-sm)",
-            }}
-            onClick={openHeaderLoteEdit}
-            title="Editar los datos de los lotes de este campo"
-          >
-            ✏️ Editar Lote
-          </button>
-        </div>
-      </div>
 
-      {/* Métricas del Campo */}
-      <div className="metricsGrid four">
-        <MetricCard label="Superficie Total" value={campoMeta?.superficie || "—"} note={campoMeta?.detalle || ""} />
-        <MetricCard label="Lotes Operativos" value={String(lotesDisponibles.length)} note={lotesDisponibles.slice(0, 3).join(", ") + (lotesDisponibles.length > 3 ? "..." : "")} />
-        <MetricCard label="Labores Registradas" value={String(activities.length)} note={`${stats.realizadas} realizadas · ${stats.planificadas} planif.`} />
-        <MetricCard label="Cosechas / Rendimientos" value={String(stats.cosechasCount)} note="Registros de rinde documentados" />
-      </div>
+          {/* Métricas del Campo */}
+          <div className="metricsGrid four">
+            <MetricCard label="Superficie Total" value={campoMeta?.superficie || "—"} note={campoMeta?.detalle || ""} />
+            <MetricCard label="Lotes Operativos" value={String(lotesDisponibles.length)} note={lotesDisponibles.slice(0, 3).join(", ") + (lotesDisponibles.length > 3 ? "..." : "")} />
+            <MetricCard label="Labores Registradas" value={String(activities.length)} note={`${stats.realizadas} realizadas · ${stats.planificadas} planif.`} />
+            <MetricCard label="Cosechas / Rendimientos" value={String(stats.cosechasCount)} note="Registros de rinde documentados" />
+          </div>
 
-      {/* Selector de Pestañas */}
-      <div className="tabs">
-        {(["Actividades", "Lotes", "Rotaciones", "Insumos", "Biofertilización", "Suelos", "Documentos"] as Tab[]).map((name) => (
-          <button
-            key={name}
-            className={tab === name ? "tab active" : "tab"}
-            onClick={() => setTab(name)}
-          >
-            {name === "Biofertilización" && campoNombre === "Tambo" ? "🐄 Biofertilización" : name}
-            {name === "Actividades" && ` (${activities.length})`}
-            {name === "Lotes" && ` (${lotes.length})`}
-            {name === "Rotaciones" && ` (${rotacionesCampo.length})`}
-          </button>
-        ))}
-      </div>
+          {/* Selector de Pestañas */}
+          <div className="tabs">
+            {(["Actividades", "Lotes", "Rotaciones", "Insumos", "Biofertilización", "Suelos", "Documentos"] as Tab[]).map((name) => (
+              <button
+                key={name}
+                className={tab === name ? "tab active" : "tab"}
+                onClick={() => {
+                  setTab(name);
+                  if (name !== "Lotes") setSelectedLote(null);
+                }}
+              >
+                {name === "Biofertilización" && campoNombre === "Tambo" ? "🐄 Biofertilización" : name}
+                {name === "Actividades" && ` (${activities.length})`}
+                {name === "Lotes" && ` (${lotes.length})`}
+                {name === "Rotaciones" && ` (${rotacionesCampo.length})`}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* PESTAÑA: ACTIVIDADES */}
       {tab === "Actividades" && (
@@ -209,12 +236,14 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
 
       {/* PESTAÑA: LOTES */}
       {tab === "Lotes" && (
-        <section className="panel">
+        <section className="panel" style={isViewingLoteDetail ? { border: "none", background: "transparent", padding: 0, boxShadow: "none" } : undefined}>
           <LotesPanel
             campoNombre={campoNombre}
             lotes={lotes}
             activities={activities}
             onChanged={refresh}
+            selectedLote={selectedLote}
+            onSelectLote={setSelectedLote}
           />
         </section>
       )}

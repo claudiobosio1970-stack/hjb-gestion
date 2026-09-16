@@ -41,11 +41,13 @@ export default function ActivityTable({
   onEdit,
   onSaved,
   showCampo = true,
+  hideCountNote = false,
 }: {
   activities: Activity[];
   onEdit?: (activity: Activity) => void;
   onSaved?: () => void;
   showCampo?: boolean;
+  hideCountNote?: boolean;
 }) {
   const [filters, setFilters] = useState<TableFilters>(INITIAL_FILTERS);
 
@@ -189,16 +191,20 @@ export default function ActivityTable({
   return (
     <div>
       {/* Barra de estado de filtros en vivo */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
-        <span style={{ fontSize: "12.5px", color: "var(--slate-600)", fontWeight: 600 }}>
-          Mostrando <strong>{filteredActivities.length}</strong> de {activities.length} labores (orden cronológico reciente primero)
-        </span>
-        {hasActiveFilters && (
-          <button className="thResetBtn" onClick={reset} title="Restablecer todos los filtros">
-            Limpiar filtros activos ✕
-          </button>
-        )}
-      </div>
+      {(!hideCountNote || hasActiveFilters) && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
+          {!hideCountNote ? (
+            <span style={{ fontSize: "12.5px", color: "var(--slate-600)", fontWeight: 600 }}>
+              Mostrando <strong>{filteredActivities.length}</strong> de {activities.length} labores (orden cronológico reciente primero)
+            </span>
+          ) : <div />}
+          {hasActiveFilters && (
+            <button className="thResetBtn" onClick={reset} title="Restablecer todos los filtros">
+              Limpiar filtros activos ✕
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Aviso móvil de deslizamiento horizontal */}
       <div className="mobileTableHint">
@@ -457,7 +463,38 @@ export default function ActivityTable({
 
                     {/* Insumos & Dosis */}
                     <td>
-                      {activity.insumos.length ? (
+                      {activity.tipo.toLowerCase().includes("biofertiliz") ? (
+                        activity.insumos.length ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            {activity.insumos.map((input) => {
+                              const prodLower = (input.producto || "").toLowerCase();
+                              const obsLower = (input.observacion || "").toLowerCase();
+                              const isLiq =
+                                prodLower.includes("líquid") ||
+                                prodLower.includes("efluente") ||
+                                input.unidad.includes("kL") ||
+                                obsLower.includes("tanque");
+                              const tipoLabel = isLiq ? "Líquido" : "Sólido";
+                              const dosis = input.dosisReal ?? input.dosisPlanificada;
+                              const unidad = input.unidad || (isLiq ? "kL/ha" : "t/ha");
+                              return (
+                                <div
+                                  key={input.id}
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "var(--slate-900)",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {tipoLabel}: {dosis !== null && dosis !== undefined ? `${dosis.toLocaleString("es-AR")} ${unidad}` : "—"}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="muted" style={{ fontSize: "12px" }}>—</span>
+                        )
+                      ) : activity.insumos.length ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                           {activity.insumos.map((input) => {
                             const dosis = input.dosisReal ?? input.dosisPlanificada;
