@@ -1193,178 +1193,182 @@ export default function NewActivityModal({
             </div>
           )}
 
-          {isLaborSinInsumos(form.tipo) && form.insumos.length === 0 ? (
-            <div
-              style={{
-                padding: "16px 20px",
-                background: "var(--slate-50)",
-                borderRadius: "8px",
-                border: "1px dashed var(--slate-300)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "12px",
-              }}
-            >
-              <div>
-                <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
-                  ✓ Labor mecánica de suelo sin insumos ({form.tipo})
-                </strong>
-                <p style={{ margin: "3px 0 0", fontSize: "12px", color: "var(--slate-500)" }}>
-                  Para esta labor no se requiere cargar productos ni agroquímicos. Podés guardar directamente la labor.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="secondaryButton smallButton"
-                onClick={addInput}
-              >
-                + Agregar insumo si fuese necesario
-              </button>
-            </div>
-          ) : form.insumos.length === 0 ? (
-            <div style={{ padding: "16px", background: "var(--slate-50)", borderRadius: "8px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
-              Esta labor no registra insumos cargados.
-            </div>
-          ) : (
-            <div className="inputLines">
-              {form.insumos.map((input, idx) => {
-                const supActiva = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
-                const dosisActiva = isReal ? (input.dosisReal ?? input.dosisPlanificada) : input.dosisPlanificada;
-                const calculoSugerido = supActiva && dosisActiva ? (supActiva * dosisActiva).toFixed(1) : null;
-
-                return (
-                  <div key={input.id} className="inputLineCard">
-                    <div className="inputLineHeader">
-                      <strong>Insumo #{idx + 1}</strong>
-                      <button
-                        type="button"
-                        className="textDanger"
-                        onClick={() => removeInput(input.id)}
-                        title="Eliminar este insumo"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-
-                    <div className="formGrid fourForm">
-                      <div>
-                        <label>Producto / Semilla / Fertilizante</label>
-                        <input
-                          className="input"
-                          value={input.producto}
-                          onChange={(e) => updateInput(input.id, { producto: e.target.value })}
-                          placeholder="Nombre producto"
-                          list="productos-preset"
-                        />
-                      </div>
-                      <div>
-                        <label>Dosis por ha</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="input"
-                          value={
-                            (isReal ? input.dosisReal ?? input.dosisPlanificada : input.dosisPlanificada) ?? ""
-                          }
-                          onChange={(e) => {
-                            const val = e.target.value ? Number(e.target.value) : null;
-                            const totalSugerido = val && supActiva ? Number((val * supActiva).toFixed(2)) : input.cantidadTotal;
-                            if (isReal) {
-                              updateInput(input.id, {
-                                dosisReal: val,
-                                dosisPlanificada: input.dosisPlanificada ?? val,
-                                cantidadTotal: totalSugerido,
-                              });
-                            } else {
-                              updateInput(input.id, {
-                                dosisPlanificada: val,
-                                cantidadTotal: totalSugerido,
-                              });
-                            }
-                          }}
-                          placeholder="Dosis"
-                        />
-                      </div>
-                      <div>
-                        <label>Unidad de dosis</label>
-                        <select
-                          className="input"
-                          value={input.unidad}
-                          onChange={(e) => updateInput(input.id, { unidad: e.target.value })}
-                        >
-                          <option value="kg/ha">kg/ha</option>
-                          <option value="L/ha">L/ha</option>
-                          <option value="kL/ha">kL/ha (Efluente líq.)</option>
-                          <option value="t/ha">t/ha (Estiércol sól.)</option>
-                          <option value="g/ha">g/ha</option>
-                          <option value="cc/ha">cc/ha</option>
-                          <option value="bolsas/ha">bolsas/ha</option>
-                        </select>
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <label style={{ margin: 0 }}>Cantidad Total</label>
-                          {calculoSugerido && (
-                            <button
-                              type="button"
-                              className="thResetBtn"
-                              style={{ fontSize: "10px", padding: "1px 4px" }}
-                              onClick={() => updateInput(input.id, { cantidadTotal: Number(calculoSugerido) })}
-                              title="Calcular dosis × superficie total"
-                            >
-                              = {calculoSugerido}
-                            </button>
-                          )}
-                        </div>
-                        <input
-                          type="number"
-                          step="0.1"
-                          className="input"
-                          value={input.cantidadTotal ?? ""}
-                          onChange={(e) => updateInput(input.id, { cantidadTotal: e.target.value ? Number(e.target.value) : null })}
-                          placeholder="Total aplicado"
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: "8px" }}>
-                      <label style={{ fontSize: "11px", color: "var(--slate-600)" }}>
-                        Observación del insumo (opcional)
-                      </label>
-                      <input
-                        className="input"
-                        value={input.observacion || ""}
-                        onChange={(e) => updateInput(input.id, { observacion: e.target.value })}
-                        placeholder="ej: Dosis calculada s/análisis, en cabeceras..."
-                        style={{ fontSize: "12px" }}
-                      />
-                    </div>
+          {!isBiofertilizacion(form.tipo) && (
+            <>
+              {isLaborSinInsumos(form.tipo) && form.insumos.length === 0 ? (
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    background: "var(--slate-50)",
+                    borderRadius: "8px",
+                    border: "1px dashed var(--slate-300)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
+                      ✓ Labor mecánica de suelo sin insumos ({form.tipo})
+                    </strong>
+                    <p style={{ margin: "3px 0 0", fontSize: "12px", color: "var(--slate-500)" }}>
+                      Para esta labor no se requiere cargar productos ni agroquímicos. Podés guardar directamente la labor.
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <button
+                    type="button"
+                    className="secondaryButton smallButton"
+                    onClick={addInput}
+                  >
+                    + Agregar insumo si fuese necesario
+                  </button>
+                </div>
+              ) : form.insumos.length === 0 ? (
+                <div style={{ padding: "16px", background: "var(--slate-50)", borderRadius: "8px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
+                  Esta labor no registra insumos cargados.
+                </div>
+              ) : (
+                <div className="inputLines">
+                  {form.insumos.map((input, idx) => {
+                    const supActiva = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                    const dosisActiva = isReal ? (input.dosisReal ?? input.dosisPlanificada) : input.dosisPlanificada;
+                    const calculoSugerido = supActiva && dosisActiva ? (supActiva * dosisActiva).toFixed(1) : null;
 
-          <div style={{ marginTop: "14px" }}>
-            <button
-              type="button"
-              className="secondaryButton"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "8px 16px",
-                fontSize: "13px",
-                fontWeight: 600,
-                borderRadius: "8px",
-              }}
-              onClick={addInput}
-            >
-              + Agregar insumo
-            </button>
-          </div>
+                    return (
+                      <div key={input.id} className="inputLineCard">
+                        <div className="inputLineHeader">
+                          <strong>Insumo #{idx + 1}</strong>
+                          <button
+                            type="button"
+                            className="textDanger"
+                            onClick={() => removeInput(input.id)}
+                            title="Eliminar este insumo"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+
+                        <div className="formGrid fourForm">
+                          <div>
+                            <label>Producto / Semilla / Fertilizante</label>
+                            <input
+                              className="input"
+                              value={input.producto}
+                              onChange={(e) => updateInput(input.id, { producto: e.target.value })}
+                              placeholder="Nombre producto"
+                              list="productos-preset"
+                            />
+                          </div>
+                          <div>
+                            <label>Dosis por ha</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="input"
+                              value={
+                                (isReal ? input.dosisReal ?? input.dosisPlanificada : input.dosisPlanificada) ?? ""
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value ? Number(e.target.value) : null;
+                                const totalSugerido = val && supActiva ? Number((val * supActiva).toFixed(2)) : input.cantidadTotal;
+                                if (isReal) {
+                                  updateInput(input.id, {
+                                    dosisReal: val,
+                                    dosisPlanificada: input.dosisPlanificada ?? val,
+                                    cantidadTotal: totalSugerido,
+                                  });
+                                } else {
+                                  updateInput(input.id, {
+                                    dosisPlanificada: val,
+                                    cantidadTotal: totalSugerido,
+                                  });
+                                }
+                              }}
+                              placeholder="Dosis"
+                            />
+                          </div>
+                          <div>
+                            <label>Unidad de dosis</label>
+                            <select
+                              className="input"
+                              value={input.unidad}
+                              onChange={(e) => updateInput(input.id, { unidad: e.target.value })}
+                            >
+                              <option value="kg/ha">kg/ha</option>
+                              <option value="L/ha">L/ha</option>
+                              <option value="kL/ha">kL/ha (Efluente líq.)</option>
+                              <option value="t/ha">t/ha (Estiércol sól.)</option>
+                              <option value="g/ha">g/ha</option>
+                              <option value="cc/ha">cc/ha</option>
+                              <option value="bolsas/ha">bolsas/ha</option>
+                            </select>
+                          </div>
+                          <div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <label style={{ margin: 0 }}>Cantidad Total</label>
+                              {calculoSugerido && (
+                                <button
+                                  type="button"
+                                  className="thResetBtn"
+                                  style={{ fontSize: "10px", padding: "1px 4px" }}
+                                  onClick={() => updateInput(input.id, { cantidadTotal: Number(calculoSugerido) })}
+                                  title="Calcular dosis × superficie total"
+                                >
+                                  = {calculoSugerido}
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="input"
+                              value={input.cantidadTotal ?? ""}
+                              onChange={(e) => updateInput(input.id, { cantidadTotal: e.target.value ? Number(e.target.value) : null })}
+                              placeholder="Total aplicado"
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: "8px" }}>
+                          <label style={{ fontSize: "11px", color: "var(--slate-600)" }}>
+                            Observación del insumo (opcional)
+                          </label>
+                          <input
+                            className="input"
+                            value={input.observacion || ""}
+                            onChange={(e) => updateInput(input.id, { observacion: e.target.value })}
+                            placeholder="ej: Dosis calculada s/análisis, en cabeceras..."
+                            style={{ fontSize: "12px" }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{ marginTop: "14px" }}>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "8px 16px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    borderRadius: "8px",
+                  }}
+                  onClick={addInput}
+                >
+                  + Agregar insumo
+                </button>
+              </div>
+            </>
+          )}
 
           <datalist id="productos-preset">
             {productos.map((p) => (

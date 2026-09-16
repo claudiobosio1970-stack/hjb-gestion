@@ -308,6 +308,101 @@ export default function LotesPanel({
     });
   }, [activities, activeLote]);
 
+  // Resumen agronómico automático del lote: Biofertilización/ha, Fertilizantes/ha y Fumigaciones
+  const resumenAgronomico = useMemo(() => {
+    if (!activeLote) return null;
+    const supHa = activeLote.superficieHa || 1;
+
+    let bioLiqTanques = 0;
+    let bioLiqTotalKL = 0;
+    let bioSolCarros = 0;
+    let bioSolTotalTn = 0;
+
+    const fertilizantesMap = new Map<string, { dosisHa: number; totalKg: number; unidad: string }>();
+    const fumigaciones: Array<{ fecha: string; tipo: string; productos: string[] }> = [];
+
+    activeLoteActivities.forEach((act) => {
+      const isBio = act.tipo.toLowerCase().includes("biofertiliz");
+      const isFert = act.tipo.toLowerCase().includes("fertiliz") && !isBio;
+      const isFumig =
+        act.tipo.toLowerCase().includes("fumig") ||
+        act.tipo.toLowerCase().includes("pulveri") ||
+        act.tipo.toLowerCase().includes("barbecho");
+
+      if (isBio) {
+        act.insumos?.forEach((ins) => {
+          const p = (ins.producto || "").toLowerCase();
+          const obs = (ins.observacion || "").toLowerCase();
+          const total = ins.cantidadTotal || 0;
+          const dosis = ins.dosisReal || ins.dosisPlanificada || (total ? total / supHa : 0);
+
+          if (p.includes("líquid") || p.includes("efluente") || ins.unidad.includes("kL") || obs.includes("tanque")) {
+            bioLiqTotalKL += total || (dosis * supHa);
+            const matchTanques = obs.match(/(\d+(?:\.\d+)?)\s*tanque/i);
+            if (matchTanques) {
+              bioLiqTanques += Number(matchTanques[1]);
+            } else if (total) {
+              bioLiqTanques += Math.round((total / 12) * 10) / 10;
+            }
+          } else {
+            bioSolTotalTn += total || (dosis * supHa);
+            const matchCarros = obs.match(/(\d+(?:\.\d+)?)\s*carro/i);
+            if (matchCarros) {
+              bioSolCarros += Number(matchCarros[1]);
+            } else if (total) {
+              bioSolCarros += Math.round((total / 5) * 10) / 10;
+            }
+          }
+        });
+      } else if (isFert) {
+        act.insumos?.forEach((ins) => {
+          if (!ins.producto) return;
+          const prod = ins.producto.trim();
+          const dosis = ins.dosisReal || ins.dosisPlanificada || 0;
+          const total = ins.cantidadTotal || (dosis * supHa);
+          const current = fertilizantesMap.get(prod) || { dosisHa: 0, totalKg: 0, unidad: ins.unidad || "kg/ha" };
+          fertilizantesMap.set(prod, {
+            dosisHa: current.dosisHa + dosis,
+            totalKg: current.totalKg + total,
+            unidad: ins.unidad || "kg/ha",
+          });
+        });
+      } else if (isFumig) {
+        const prodList = act.insumos
+          ?.filter((i) => i.producto && i.producto.trim())
+          .map((i) => {
+            const dosis = i.dosisReal || i.dosisPlanificada;
+            return dosis ? `${i.producto} (${dosis} ${i.unidad})` : i.producto;
+          }) || [];
+
+        fumigaciones.push({
+          fecha: act.fechaReal || act.fechaPlanificada || "—",
+          tipo: act.tipo,
+          productos: prodList.length > 0 ? prodList : ["Aplicación sin productos especificados"],
+        });
+      }
+    });
+
+    const bioLiqDosisHa = activeLote.superficieHa ? (bioLiqTotalKL / activeLote.superficieHa).toFixed(2) : "0";
+    const bioSolDosisHa = activeLote.superficieHa ? (bioSolTotalTn / activeLote.superficieHa).toFixed(2) : "0";
+
+    return {
+      bioLiqTotalKL: Math.round(bioLiqTotalKL * 10) / 10,
+      bioLiqTanques: Math.round(bioLiqTanques * 10) / 10,
+      bioLiqDosisHa,
+      bioSolTotalTn: Math.round(bioSolTotalTn * 10) / 10,
+      bioSolCarros: Math.round(bioSolCarros * 10) / 10,
+      bioSolDosisHa,
+      fertilizantes: Array.from(fertilizantesMap.entries()).map(([nombre, d]) => ({
+        nombre,
+        dosisHa: Math.round(d.dosisHa * 10) / 10,
+        totalKg: Math.round(d.totalKg * 10) / 10,
+        unidad: d.unidad,
+      })),
+      fumigaciones,
+    };
+  }, [activeLote, activeLoteActivities]);
+
   // Métricas resumidas de los lotes de este campo
   const stats = useMemo(() => {
     const totalSuperficie = lotes.reduce((acc, l) => acc + (l.superficieHa || 0), 0);
@@ -323,6 +418,11 @@ export default function LotesPanel({
 
   // VISTA 1: DETALLE DE UN LOTE ESPECÍFICO (Para cargar labores seguidas en este lote)
   if (activeLote) {
+    const cleanObservaciones =
+      activeLote.observaciones && !/^\d+\s*ha$/i.test(activeLote.observaciones.trim())
+        ? activeLote.observaciones
+        : null;
+
     return (
       <div>
         {/* Barra de navegación superior y acciones del lote */}
@@ -418,7 +518,7 @@ export default function LotesPanel({
           className="tableCard"
           style={{
             padding: "16px 20px",
-            marginBottom: "24px",
+            marginBottom: "20px",
             background: "#ffffff",
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
@@ -461,34 +561,129 @@ export default function LotesPanel({
             </div>
           </div>
 
-          {activeLote.observaciones && (
+          {cleanObservaciones && (
             <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--line)", paddingTop: "10px", fontSize: "13px", color: "var(--slate-600)", fontStyle: "italic" }}>
-              <strong>Observaciones:</strong> {activeLote.observaciones}
+              <strong>Observaciones:</strong> {cleanObservaciones}
             </div>
           )}
         </div>
 
-        {/* Sección Tabla de Labores del Lote */}
-        <div style={{ marginBottom: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: "17px", color: "var(--slate-900)" }}>
-              Historial de Labores de {activeLote.nombre} ({activeLoteActivities.length})
+        {/* TABLA EJECUTIVA AGRONÓMICA: Cultivo | Biofertilizante/ha | Fertilizante/ha | Con qué se fumigó */}
+        <div style={{ marginBottom: "26px" }}>
+          <div style={{ marginBottom: "10px" }}>
+            <h3 style={{ margin: 0, fontSize: "16px", color: "var(--slate-900)", display: "flex", alignItems: "center", gap: "8px" }}>
+              📊 Manejo Nutricional y Sanitario de {activeLote.nombre}
             </h3>
-            <p className="muted" style={{ margin: "2px 0 0 0", fontSize: "13px" }}>
-              Todas las labores agrícolas realizadas o planificadas exclusivamente en este lote.
+            <p className="muted" style={{ margin: "2px 0 0", fontSize: "12.5px" }}>
+              Resumen directo de lo que se le aplicó por hectárea en este lote (biofertilización, fertilización química y fumigaciones).
             </p>
           </div>
-          <button
-            type="button"
-            className="primaryButton"
-            style={{ padding: "6px 14px", fontSize: "13px" }}
-            onClick={() => {
-              setEditingActivity(null);
-              setActivityModalOpen(true);
-            }}
-          >
-            + Nueva labor aquí
-          </button>
+
+          <div className="tableWrap" style={{ background: "#ffffff", borderRadius: "10px", border: "1px solid var(--line)", overflow: "hidden" }}>
+            <table className="dataTable" style={{ margin: 0 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: "20%" }}>Cultivo</th>
+                  <th style={{ width: "26%" }}>Biofertilización / ha</th>
+                  <th style={{ width: "26%" }}>Fertilización / ha</th>
+                  <th style={{ width: "28%" }}>Con qué se fumigó</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {/* Cultivo */}
+                  <td style={{ verticalAlign: "top" }}>
+                    <div style={{ fontWeight: 700, color: "var(--slate-900)", fontSize: "14px" }}>
+                      {activeLote.cultivoActual || "Campaña 2026/27"}
+                    </div>
+                    <span className="pill badgeGreen" style={{ fontSize: "11px", marginTop: "4px", display: "inline-block" }}>
+                      {activeLote.superficieHa ? `${activeLote.superficieHa} ha` : "Lote delimitado"}
+                    </span>
+                  </td>
+
+                  {/* Biofertilizante / ha */}
+                  <td style={{ verticalAlign: "top" }}>
+                    {resumenAgronomico && (resumenAgronomico.bioLiqTotalKL > 0 || resumenAgronomico.bioSolTotalTn > 0) ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        {resumenAgronomico.bioLiqTotalKL > 0 && (
+                          <div style={{ background: "#f0f9ff", padding: "6px 10px", borderRadius: "6px", border: "1px solid #bae6fd" }}>
+                            <div style={{ fontWeight: 700, color: "#0369a1", fontSize: "13px" }}>
+                              💧 {resumenAgronomico.bioLiqDosisHa} kL/ha (Líquido)
+                            </div>
+                            <div style={{ fontSize: "11.5px", color: "#0284c7", marginTop: "2px" }}>
+                              Total: {resumenAgronomico.bioLiqTotalKL} kL · {resumenAgronomico.bioLiqTanques > 0 ? `${resumenAgronomico.bioLiqTanques} tanques` : "Efluente tratado"}
+                            </div>
+                          </div>
+                        )}
+                        {resumenAgronomico.bioSolTotalTn > 0 && (
+                          <div style={{ background: "#f0fdf4", padding: "6px 10px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                            <div style={{ fontWeight: 700, color: "#15803d", fontSize: "13px" }}>
+                              🚜 {resumenAgronomico.bioSolDosisHa} tn/ha (Sólido)
+                            </div>
+                            <div style={{ fontSize: "11.5px", color: "#16a34a", marginTop: "2px" }}>
+                              Total: {resumenAgronomico.bioSolTotalTn} tn · {resumenAgronomico.bioSolCarros > 0 ? `${resumenAgronomico.bioSolCarros} carros` : "Estiércol sólido"}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ color: "var(--muted)", fontSize: "13px" }}>— Sin biofertilización registrada</span>
+                    )}
+                  </td>
+
+                  {/* Fertilizante / ha */}
+                  <td style={{ verticalAlign: "top" }}>
+                    {resumenAgronomico && resumenAgronomico.fertilizantes.length > 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        {resumenAgronomico.fertilizantes.map((fert, idx) => (
+                          <div key={idx} style={{ background: "#f8fafc", padding: "6px 10px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                            <div style={{ fontWeight: 700, color: "var(--slate-800)", fontSize: "13px" }}>
+                              🌱 {fert.dosisHa} {fert.unidad}
+                            </div>
+                            <div style={{ fontSize: "11.5px", color: "var(--slate-600)", marginTop: "2px" }}>
+                              {fert.nombre} (Total: {fert.totalKg} kg)
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ color: "var(--muted)", fontSize: "13px" }}>— Sin fertilización mineral</span>
+                    )}
+                  </td>
+
+                  {/* Con qué se fumigó */}
+                  <td style={{ verticalAlign: "top" }}>
+                    {resumenAgronomico && resumenAgronomico.fumigaciones.length > 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        {resumenAgronomico.fumigaciones.map((fum, idx) => (
+                          <div key={idx} style={{ background: "#f8fafc", padding: "6px 10px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px" }}>
+                            <div style={{ fontWeight: 700, color: "var(--slate-800)" }}>
+                              🛡️ {fum.tipo} <span style={{ fontWeight: 400, color: "var(--muted)", fontSize: "11px" }}>({fum.fecha})</span>
+                            </div>
+                            <div style={{ color: "var(--slate-700)", marginTop: "2px" }}>
+                              {fum.productos.join(" + ")}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ color: "var(--muted)", fontSize: "13px" }}>— Sin fumigaciones registradas</span>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Sección Historial Completo de Labores del Lote */}
+        <div style={{ marginBottom: "14px" }}>
+          <h3 style={{ margin: 0, fontSize: "16px", color: "var(--slate-900)" }}>
+            Historial de Labores de {activeLote.nombre}
+          </h3>
+          <p className="muted" style={{ margin: "2px 0 0 0", fontSize: "13px" }}>
+            Todas las labores agrícolas realizadas o planificadas exclusivamente en este lote.
+          </p>
         </div>
 
         {activeLoteActivities.length === 0 ? (
