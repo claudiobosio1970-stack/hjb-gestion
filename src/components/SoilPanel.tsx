@@ -47,6 +47,10 @@ export default function SoilPanel({
   const [campana, setCampana] = useState<string>("2026/27");
   const [showManureModal, setShowManureModal] = useState<boolean>(false);
 
+  // Estados para simulación interactiva en vivo
+  const [simCarros, setSimCarros] = useState<number | null>(null);
+  const [simTanques, setSimTanques] = useState<number | null>(null);
+
   // Modal para agregar análisis manual
   const [openAddModal, setOpenAddModal] = useState<boolean>(false);
   const [fecha, setFecha] = useState("");
@@ -84,26 +88,37 @@ export default function SoilPanel({
     // Fallback con nombres canónicos si aún no hay lotes guardados en store para este campo
     if (campoNombre.toLowerCase() === "tambo") {
       return [
-        { id: "tambo-l1", campo: "Tambo", nombre: "Lote 1", superficieHa: 5, cultivoActual: "Maíz Silo", campana: "2026/27", estado: "En producción" },
-        { id: "tambo-l2", campo: "Tambo", nombre: "Lote 2", superficieHa: 5, cultivoActual: "Maíz Silo", campana: "2026/27", estado: "En producción" },
-        { id: "tambo-l3", campo: "Tambo", nombre: "Lote 3", superficieHa: 6, cultivoActual: "Maíz Silo", campana: "2026/27", estado: "En producción" },
-        { id: "tambo-l4", campo: "Tambo", nombre: "Lote 4", superficieHa: 5, cultivoActual: "Maíz", campana: "2026/27", estado: "En producción" },
-        { id: "tambo-l5", campo: "Tambo", nombre: "Lote 5", superficieHa: 9, cultivoActual: "Alfalfa", campana: "2026/27", estado: "En producción" },
-        { id: "tambo-l6", campo: "Tambo", nombre: "Lote 6", superficieHa: 8, cultivoActual: "Pastura Consociada", campana: "2026/27", estado: "En producción" },
-        { id: "tambo-l7", campo: "Tambo", nombre: "Lote 7", superficieHa: 10, cultivoActual: "Maíz", campana: "2026/27", estado: "En producción" },
-        { id: "tambo-l8", campo: "Tambo", nombre: "Lote 8", superficieHa: 12, cultivoActual: "Alfalfa", campana: "2026/27", estado: "En producción" },
-        { id: "tambo-l9", campo: "Tambo", nombre: "Lote 9", superficieHa: 13, cultivoActual: "Alfalfa", campana: "2026/27", estado: "En producción" },
+        { id: "tambo-l1", campo: "Tambo", nombre: "Lote 1", superficieHa: 7, cultivoActual: "Doble Maíz Silo", campana: "2026/27", estado: "En producción" },
+        { id: "tambo-l2", campo: "Tambo", nombre: "Lote 2", superficieHa: 10, cultivoActual: "Avena / Maíz", campana: "2026/27", estado: "En producción" },
+        { id: "tambo-l3", campo: "Tambo", nombre: "Lote 3", superficieHa: 11, cultivoActual: "Avena / Maíz", campana: "2026/27", estado: "En producción" },
+        { id: "tambo-l4", campo: "Tambo", nombre: "Lote 4", superficieHa: 5, cultivoActual: "Doble Maíz Silo", campana: "2026/27", estado: "En producción" },
+        { id: "tambo-l5", campo: "Tambo", nombre: "Lote 5", superficieHa: 3, cultivoActual: "Alfalfa 4°", campana: "2026/27", estado: "En producción" },
+        { id: "tambo-l6", campo: "Tambo", nombre: "Lote 6", superficieHa: 10, cultivoActual: "Alfalfa 4°", campana: "2026/27", estado: "En producción" },
+        { id: "tambo-l7", campo: "Tambo", nombre: "Lote 7", superficieHa: 10, cultivoActual: "Maíz 1ra", campana: "2026/27", estado: "En producción" },
+        { id: "tambo-l8", campo: "Tambo", nombre: "Lote 8", superficieHa: 10, cultivoActual: "Alfalfa 4°", campana: "2026/27", estado: "En producción" },
+        { id: "tambo-l9", campo: "Tambo", nombre: "Lote 9", superficieHa: 7, cultivoActual: "Alfalfa 3°", campana: "2026/27", estado: "En producción" },
       ];
     }
     if (campoNombre.toLowerCase() === "racca") {
       return [
-        { id: "racca-l1", campo: "Racca", nombre: "Lote 1", superficieHa: 55, cultivoActual: "Soja 1ra", campana: "2026/27", estado: "Planificado" },
-        { id: "racca-l2", campo: "Racca", nombre: "Lote 2", superficieHa: 45, cultivoActual: "Maíz Silo", campana: "2026/27", estado: "Planificado" },
+        { id: "racca-l1", campo: "Racca", nombre: "Lote 1", superficieHa: 50, cultivoActual: "Soja 1ra", campana: "2026/27", estado: "Planificado" },
+        { id: "racca-l2", campo: "Racca", nombre: "Lote 2", superficieHa: 50, cultivoActual: "Maíz ST 9939", campana: "2026/27", estado: "Planificado" },
       ];
     }
     if (campoNombre.toLowerCase() === "kitty") {
       return [
-        { id: "kitty-l1", campo: "Kitty", nombre: "Lote Único", superficieHa: 24, cultivoActual: "Maíz Silo", campana: "2026/27", estado: "En producción" },
+        { id: "kitty-l1", campo: "Kitty", nombre: "Lote Único", superficieHa: 29, cultivoActual: "Maíz ST 9741", campana: "2026/27", estado: "En producción" },
+      ];
+    }
+    if (campoNombre.toLowerCase() === "aguilera") {
+      return [
+        { id: "aguilera-l1", campo: "Aguilera", nombre: "Lote Único", superficieHa: 20, cultivoActual: "Maíz ST 9736", campana: "2026/27", estado: "En producción" },
+      ];
+    }
+    if (campoNombre.toLowerCase() === "keuneke") {
+      return [
+        { id: "keuneke-l1", campo: "Keuneke", nombre: "Lote 1", superficieHa: 48, cultivoActual: "Avena / Soja", campana: "2026/27", estado: "En producción" },
+        { id: "keuneke-l2", campo: "Keuneke", nombre: "Lote 2", superficieHa: 9, cultivoActual: "Alfalfa 2°", campana: "2026/27", estado: "En producción" },
       ];
     }
     return [
@@ -117,15 +132,30 @@ export default function SoilPanel({
     return lotesDelCampo.find((l) => l.nombre.toLowerCase() === selectedLoteNombre.toLowerCase()) || lotesDelCampo[0];
   }, [selectedLoteNombre, lotesDelCampo]);
 
-  // Resúmenes calculados para todos los lotes del campo
+  // Al cambiar de lote, resetear simulación y actualizar la meta según cultivo del lote
+  useEffect(() => {
+    setSimCarros(null);
+    setSimTanques(null);
+    if (activeLote?.cultivoActual) {
+      setTargetCrop(activeLote.cultivoActual);
+    }
+  }, [selectedLoteNombre, activeLote?.cultivoActual]);
+
+  // Resúmenes calculados para todos los lotes del campo (cada lote con su cultivo de rotación)
   const summariesDelCampo: LoteNutrientSummary[] = useMemo(() => {
     return lotesDelCampo.map((lote) =>
-      computeLoteNutrientSummary(campoNombre, lote.nombre, lote.superficieHa || 5, targetCrop, campana)
+      computeLoteNutrientSummary(
+        campoNombre,
+        lote.nombre,
+        lote.superficieHa || 5,
+        lote.cultivoActual || targetCrop,
+        campana
+      )
     );
   }, [lotesDelCampo, campoNombre, targetCrop, campana, soils, moistures, manure]);
 
-  // Resumen específico del lote seleccionado
-  const activeSummary: LoteNutrientSummary | null = useMemo(() => {
+  // Resumen base real (sin simulación) del lote seleccionado
+  const baselineSummary: LoteNutrientSummary | null = useMemo(() => {
     if (!activeLote) return null;
     return computeLoteNutrientSummary(
       campoNombre,
@@ -135,6 +165,24 @@ export default function SoilPanel({
       campana
     );
   }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure]);
+
+  const isSimulating = simCarros !== null || simTanques !== null;
+  const currentSimCarros = simCarros !== null ? simCarros : (baselineSummary?.carrosSolido ?? 0);
+  const currentSimTanques = simTanques !== null ? simTanques : (baselineSummary?.tanquesLiquido ?? 0);
+
+  // Resumen reactivo del lote seleccionado (aplica simulación en vivo)
+  const activeSummary: LoteNutrientSummary | null = useMemo(() => {
+    if (!activeLote) return null;
+    return computeLoteNutrientSummary(
+      campoNombre,
+      activeLote.nombre,
+      activeLote.superficieHa || 5,
+      targetCrop,
+      campana,
+      isSimulating ? currentSimCarros : undefined,
+      isSimulating ? currentSimTanques : undefined
+    );
+  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure, isSimulating, currentSimCarros, currentSimTanques]);
 
   // Totales acumulados en todo el campo
   const totalesCampo = useMemo(() => {
@@ -344,14 +392,18 @@ export default function SoilPanel({
             <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>Meta Nutricional:</label>
             <select
               className="select"
-              style={{ fontSize: "12px", padding: "4px 8px" }}
+              style={{ fontSize: "12px", padding: "4px 8px", fontWeight: 600 }}
               value={targetCrop}
               onChange={(e) => setTargetCrop(e.target.value)}
             >
-              <option value="Maíz Silo">Maíz Silo (120 qq / 45 t MV) · Meta 200 kg N / 35 kg P</option>
-              <option value="Maíz Grano">Maíz Grano (110 qq) · Meta 190 kg N / 30 kg P</option>
-              <option value="Sorgo Silo">Sorgo Silo / Forrajero · Meta 160 kg N / 25 kg P</option>
-              <option value="Pastura Consociada">Pastura Consociada · Meta 60 kg N / 40 kg P</option>
+              <option value="Doble Maíz Silo">Doble Maíz Silo · Meta 300 N / 60 P / 340 K</option>
+              <option value="Avena / Maíz">Avena / Maíz · Meta 230 N / 40 P / 200 K</option>
+              <option value="Maíz Silo">Maíz Silo (120 qq / 45 t MV) · Meta 220 N / 40 P / 220 K</option>
+              <option value="Maíz 1ra">Maíz 1ra Grano (120 qq) · Meta 200 N / 35 P / 120 K</option>
+              <option value="Alfalfa 4°">Alfalfa en Producción (Alta K) · Meta 60 N / 45 P / 300 K</option>
+              <option value="Soja 1ra">Soja de 1ra · Meta 45 N / 30 P / 75 K</option>
+              <option value="Sorgo Silo">Sorgo Silo / Forrajero · Meta 170 N / 30 P / 160 K</option>
+              <option value="Pastura Consociada">Pastura Consociada · Meta 60 N / 40 P / 200 K</option>
             </select>
           </div>
         </div>
@@ -376,8 +428,8 @@ export default function SoilPanel({
               gap: "16px",
             }}
           >
-            <div style={{ maxWidth: "780px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+            <div style={{ maxWidth: "760px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px", flexWrap: "wrap" }}>
                 <span
                   style={{
                     padding: "3px 9px",
@@ -391,15 +443,46 @@ export default function SoilPanel({
                 >
                   {activeSummary.estadoBalance === "Cubierto con holgura" ? "✓ Cubierto con Holgura" : "⚡ Se Recomienda Aplicar"}
                 </span>
+
+                {activeSummary.nutrienteLimitante && (
+                  <span
+                    style={{
+                      padding: "3px 9px",
+                      borderRadius: "20px",
+                      fontSize: "11px",
+                      fontWeight: 800,
+                      background: activeSummary.nutrienteLimitante === "Potasio" ? "#e0e7ff" : activeSummary.nutrienteLimitante === "Fósforo" ? "#e0f2fe" : "#fef3c7",
+                      color: activeSummary.nutrienteLimitante === "Potasio" ? "#3730a3" : activeSummary.nutrienteLimitante === "Fósforo" ? "#0369a1" : "#92400e",
+                    }}
+                  >
+                    Limitante Agronómico: {activeSummary.nutrienteLimitante}
+                  </span>
+                )}
+
+                {isSimulating && (
+                  <span
+                    style={{
+                      padding: "3px 9px",
+                      borderRadius: "20px",
+                      fontSize: "11px",
+                      fontWeight: 800,
+                      background: "#f3e8ff",
+                      color: "#6b21a8",
+                    }}
+                  >
+                    🔬 Modo Simulación Activo
+                  </span>
+                )}
+
                 <strong style={{ fontSize: "15px", color: "var(--slate-900)" }}>
-                  Diagnóstico Nutricional · {activeLote.nombre} ({activeSummary.superficieHa} ha) · Campaña {campana} · Cultivo: {targetCrop}
+                  {activeLote.nombre} ({activeSummary.superficieHa} ha) · Campaña {campana} · Cultivo: {targetCrop}
                 </strong>
               </div>
               <p style={{ margin: 0, fontSize: "13px", color: "var(--slate-800)", lineHeight: "1.45" }}>
                 {activeSummary.mensajeDiagnostico}
               </p>
               <small style={{ display: "block", color: "var(--muted)", fontSize: "11px", marginTop: "5px" }}>
-                🔒 Balance y carros restantes calculados exclusivamente para la <strong>Campaña {campana}</strong> (evita acumulación histórica).
+                🔒 Balance y carros restantes calculados exclusivamente para la <strong>Campaña {campana}</strong>. Equivalencia promedio: <strong>1 carro sólido (5 tn) ≈ 3.5 tanques líquidos (12.000 L)</strong>.
               </small>
             </div>
 
@@ -410,28 +493,339 @@ export default function SoilPanel({
                 padding: "12px 18px",
                 borderRadius: "10px",
                 border: "1px solid rgba(0,0,0,0.08)",
-                minWidth: "190px",
+                minWidth: "200px",
               }}
             >
               <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", display: "block" }}>
-                CARROS RESTANTES A TIRAR
+                OPCIÓN RECOMENDADA
               </span>
               <span
                 style={{
-                  fontSize: "26px",
+                  fontSize: "24px",
                   fontWeight: 900,
-                  color: activeSummary.carrosRestantesRecomendados === 0 ? "#16a34a" : "#d97706",
+                  color: activeSummary.soloCarrosRestantes === 0 ? "#16a34a" : "#d97706",
                   lineHeight: "1.2",
                   display: "block",
                 }}
               >
-                {activeSummary.carrosRestantesRecomendados === 0 ? "0 carros" : `${activeSummary.carrosRestantesRecomendados} carros`}
+                {activeSummary.soloCarrosRestantes === 0 ? "0 carros" : `${activeSummary.soloCarrosRestantes} carros`}
               </span>
-              <small style={{ fontSize: "11px", color: "var(--muted)", display: "block" }}>
-                {activeSummary.carrosRestantesRecomendados === 0
+              <small style={{ fontSize: "11.5px", color: "var(--muted)", display: "block", marginTop: "2px" }}>
+                {activeSummary.soloCarrosRestantes === 0
                   ? "Meta nutricional superada"
-                  : `o bien ${activeSummary.tanquesRestantesRecomendados} tanques efluente`}
+                  : `o bien ${activeSummary.soloTanquesRestantes} tanques`}
               </small>
+            </div>
+          </div>
+
+          {/* 3 OPCIONES INTERCAMBIABLES DE APLICACIÓN */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px" }}>
+            {/* Opción A: 100% Sólido */}
+            <div
+              style={{
+                background: "#ffffff",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: "12px",
+                padding: "16px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: "12px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#854d0e", background: "#fef9c3", padding: "2px 7px", borderRadius: "6px" }}>
+                    Opción A · 100% Sólido
+                  </span>
+                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>Carros 5 tn</span>
+                </div>
+                <strong style={{ fontSize: "22px", display: "block", color: activeSummary.soloCarrosRestantes === 0 ? "#16a34a" : "#0f172a" }}>
+                  {activeSummary.soloCarrosRestantes === 0 ? "0 carros restantes" : `${activeSummary.soloCarrosRestantes} carros a tirar`}
+                </strong>
+                <p style={{ margin: "6px 0 0 0", fontSize: "12px", color: "var(--slate-600)", lineHeight: "1.4" }}>
+                  Aporta <strong>{activeSummary.soloCarrosRestantes * 60} kg N</strong>, <strong>{activeSummary.soloCarrosRestantes * 50} kg P</strong>, <strong>{Math.round(activeSummary.soloCarrosRestantes * 123.5)} kg K</strong> y <strong>{(activeSummary.soloCarrosRestantes * 1.32).toFixed(1)} tn MO</strong>. Óptimo para aumentar materia orgánica y fósforo de fondo.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => {
+                  setSimCarros((baselineSummary?.carrosSolido || 0) + activeSummary.soloCarrosRestantes);
+                  setSimTanques(baselineSummary?.tanquesLiquido || 0);
+                }}
+                style={{ fontSize: "12px", padding: "6px 10px", width: "100%", justifyContent: "center" }}
+              >
+                🔬 Simular aplicar todo sólido
+              </button>
+            </div>
+
+            {/* Opción B: 100% Líquido */}
+            <div
+              style={{
+                background: "#ffffff",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: "12px",
+                padding: "16px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: "12px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#0369a1", background: "#e0f2fe", padding: "2px 7px", borderRadius: "6px" }}>
+                    Opción B · 100% Líquido
+                  </span>
+                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>Tanques 12.000 L</span>
+                </div>
+                <strong style={{ fontSize: "22px", display: "block", color: activeSummary.soloTanquesRestantes === 0 ? "#16a34a" : "#0f172a" }}>
+                  {activeSummary.soloTanquesRestantes === 0 ? "0 tanques restantes" : `${activeSummary.soloTanquesRestantes} tanques a tirar`}
+                </strong>
+                <p style={{ margin: "6px 0 0 0", fontSize: "12px", color: "var(--slate-600)", lineHeight: "1.4" }}>
+                  Aporta <strong>{Math.round(activeSummary.soloTanquesRestantes * 21.6)} kg N</strong>, <strong>{Math.round(activeSummary.soloTanquesRestantes * 7.2)} kg P</strong> y <strong>{Math.round(activeSummary.soloTanquesRestantes * 26.4)} kg K</strong> solubles. Disponibilidad rápida sin pisar coronas; ideal para alfalfa o cobertura post-siembra.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => {
+                  setSimCarros(baselineSummary?.carrosSolido || 0);
+                  setSimTanques((baselineSummary?.tanquesLiquido || 0) + activeSummary.soloTanquesRestantes);
+                }}
+                style={{ fontSize: "12px", padding: "6px 10px", width: "100%", justifyContent: "center" }}
+              >
+                🔬 Simular aplicar todo líquido
+              </button>
+            </div>
+
+            {/* Opción C: Mixta Equilibrada */}
+            <div
+              style={{
+                background: "#ffffff",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: "12px",
+                padding: "16px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: "12px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#15803d", background: "#dcfce7", padding: "2px 7px", borderRadius: "6px" }}>
+                    Opción C · Mezcla Sugerida
+                  </span>
+                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>Combinación óptima</span>
+                </div>
+                <strong style={{ fontSize: "20px", display: "block", color: "#0f172a" }}>
+                  {activeSummary.opcionMixtaSugerida.carros === 0 && activeSummary.opcionMixtaSugerida.tanques === 0
+                    ? "0 carros + 0 tanques"
+                    : `${activeSummary.opcionMixtaSugerida.carros} carros + ${activeSummary.opcionMixtaSugerida.tanques} tanques`}
+                </strong>
+                <p style={{ margin: "6px 0 0 0", fontSize: "12px", color: "var(--slate-600)", lineHeight: "1.4" }}>
+                  Aporte balanceado: incorpora biomasa con sólidos y fertilización líquida de rápida asimilación, evitando sobrecargas puntuales en el suelo.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={() => {
+                  setSimCarros((baselineSummary?.carrosSolido || 0) + activeSummary.opcionMixtaSugerida.carros);
+                  setSimTanques((baselineSummary?.tanquesLiquido || 0) + activeSummary.opcionMixtaSugerida.tanques);
+                }}
+                style={{ fontSize: "12px", padding: "6px 10px", width: "100%", justifyContent: "center" }}
+              >
+                🔬 Simular mezcla sugerida
+              </button>
+            </div>
+          </div>
+
+          {/* SIMULADOR EN VIVO DE INTERCAMBIO DINÁMICO */}
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1.5px solid #cbd5e1",
+              borderRadius: "12px",
+              padding: "16px 20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+              <div>
+                <strong style={{ fontSize: "14px", color: "var(--slate-900)", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>🎛️</span>
+                  <span>Simulador de Recálculo Dinámico e Intercambiabilidad</span>
+                </strong>
+                <small style={{ color: "var(--slate-600)", display: "block", marginTop: "2px", fontSize: "12px" }}>
+                  Ajustá los carros o tanques aplicados para ver en tiempo real cómo cambia la necesidad del otro recurso y el % de cobertura N-P-K:
+                </small>
+              </div>
+
+              {isSimulating && (
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => {
+                    setSimCarros(null);
+                    setSimTanques(null);
+                  }}
+                  style={{ fontSize: "12px", padding: "4px 10px", color: "#b91c1c", borderColor: "#fca5a5", background: "#fef2f2" }}
+                >
+                  ↺ Restablecer a reales ({baselineSummary?.carrosSolido || 0} c / {baselineSummary?.tanquesLiquido || 0} t)
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
+              {/* Stepper Carros Sólidos */}
+              <div style={{ background: "#ffffff", padding: "12px 14px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)" }}>
+                    🚜 Carros Sólidos Aplicados / Simulados:
+                  </label>
+                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                    Real: {baselineSummary?.carrosSolido || 0} carros
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setSimCarros(Math.max(0, currentSimCarros - 1))}
+                    style={{ width: "32px", height: "32px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f1f5f9", fontWeight: 800, fontSize: "16px", cursor: "pointer" }}
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    className="input"
+                    style={{ textAlign: "center", fontWeight: 800, fontSize: "16px", padding: "4px 8px" }}
+                    value={currentSimCarros}
+                    onChange={(e) => setSimCarros(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSimCarros(currentSimCarros + 1)}
+                    style={{ width: "32px", height: "32px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f1f5f9", fontWeight: 800, fontSize: "16px", cursor: "pointer" }}
+                  >
+                    +
+                  </button>
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--slate-600)" }}>carros</span>
+                </div>
+              </div>
+
+              {/* Stepper Tanques Líquidos */}
+              <div style={{ background: "#ffffff", padding: "12px 14px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-800)" }}>
+                    💧 Tanques Líquidos Aplicados / Simulados:
+                  </label>
+                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                    Real: {baselineSummary?.tanquesLiquido || 0} tanques
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setSimTanques(Math.max(0, currentSimTanques - 1))}
+                    style={{ width: "32px", height: "32px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f1f5f9", fontWeight: 800, fontSize: "16px", cursor: "pointer" }}
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    className="input"
+                    style={{ textAlign: "center", fontWeight: 800, fontSize: "16px", padding: "4px 8px" }}
+                    value={currentSimTanques}
+                    onChange={(e) => setSimTanques(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSimTanques(currentSimTanques + 1)}
+                    style={{ width: "32px", height: "32px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f1f5f9", fontWeight: 800, fontSize: "16px", cursor: "pointer" }}
+                  >
+                    +
+                  </button>
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--slate-600)" }}>tanques</span>
+                </div>
+              </div>
+            </div>
+
+            {/* BARRAS DE COBERTURA NUTRICIONAL N - P - K */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "4px" }}>
+              <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--slate-800)" }}>
+                Porcentaje de Cobertura de Metas del Cultivo ({targetCrop}):
+              </span>
+
+              {/* Barra N */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+                  <strong style={{ color: "#15803d" }}>Nitrógeno (N): {activeSummary.coberturaPct.nitrogeno}%</strong>
+                  <span style={{ color: "var(--slate-600)" }}>
+                    Disponible: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.nDisponibleKgHa + activeSummary.aportesPorHa.nitrogenoKgHa : activeSummary.aportesPorHa.nitrogenoKgHa} kg/ha (Meta: {activeSummary.metaKgHa.nitrogeno} kg/ha)
+                  </span>
+                </div>
+                <div style={{ background: "#e2e8f0", borderRadius: "6px", height: "10px", overflow: "hidden" }}>
+                  <div
+                    style={{
+                      background: activeSummary.coberturaPct.nitrogeno >= 100 ? "#22c55e" : activeSummary.coberturaPct.nitrogeno >= 70 ? "#f59e0b" : "#3b82f6",
+                      width: `${Math.min(100, activeSummary.coberturaPct.nitrogeno)}%`,
+                      height: "100%",
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Barra P */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+                  <strong style={{ color: "#0369a1" }}>Fósforo (P): {activeSummary.coberturaPct.fosforo}%</strong>
+                  <span style={{ color: "var(--slate-600)" }}>
+                    Aporte: +{activeSummary.aportesPorHa.fosforoKgHa} kg P/ha · P Bray: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.fosforoBrayPpm : 22} ppm (Meta: {activeSummary.metaKgHa.fosforo} kg/ha)
+                  </span>
+                </div>
+                <div style={{ background: "#e2e8f0", borderRadius: "6px", height: "10px", overflow: "hidden" }}>
+                  <div
+                    style={{
+                      background: activeSummary.coberturaPct.fosforo >= 100 ? "#22c55e" : activeSummary.coberturaPct.fosforo >= 70 ? "#f59e0b" : "#0284c7",
+                      width: `${Math.min(100, activeSummary.coberturaPct.fosforo)}%`,
+                      height: "100%",
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Barra K */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
+                  <strong style={{ color: "#4338ca" }}>Potasio (K): {activeSummary.coberturaPct.potasio}%</strong>
+                  <span style={{ color: "var(--slate-600)" }}>
+                    Aporte: +{activeSummary.aportesPorHa.potasioKgHa} kg K/ha (Meta: {activeSummary.metaKgHa.potasio} kg/ha)
+                    {targetCrop.toLowerCase().includes("silo") || targetCrop.toLowerCase().includes("alfalfa") ? " · ⚠️ Alta extracción por biomasa" : ""}
+                  </span>
+                </div>
+                <div style={{ background: "#e2e8f0", borderRadius: "6px", height: "10px", overflow: "hidden" }}>
+                  <div
+                    style={{
+                      background: activeSummary.coberturaPct.potasio >= 100 ? "#22c55e" : activeSummary.coberturaPct.potasio >= 70 ? "#f59e0b" : "#6366f1",
+                      width: `${Math.min(100, activeSummary.coberturaPct.potasio)}%`,
+                      height: "100%",
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -691,20 +1085,20 @@ export default function SoilPanel({
               </div>
             </div>
 
-            <table style={{ width: "100%", fontSize: "12.5px", borderCollapse: "collapse", minWidth: "900px" }}>
+            <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse", minWidth: "1050px" }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid var(--border)", textAlign: "left", color: "var(--slate-700)", background: "var(--slate-50)" }}>
-                  <th style={{ padding: "8px 10px" }}>Lote</th>
+                  <th style={{ padding: "8px 10px" }}>Lote & Rotación</th>
                   <th style={{ padding: "8px 10px" }}>Sup (ha)</th>
-                  <th style={{ padding: "8px 10px" }}>Agua Útil (mm)</th>
-                  <th style={{ padding: "8px 10px" }}>P Bray (ppm)</th>
-                  <th style={{ padding: "8px 10px" }}>N Suelo (kg/ha)</th>
-                  <th style={{ padding: "8px 10px" }}>MO Suelo (%)</th>
-                  <th style={{ padding: "8px 10px" }}>Carros Tirados</th>
-                  <th style={{ padding: "8px 10px" }}>Aporte N (kg/ha)</th>
-                  <th style={{ padding: "8px 10px" }}>Aporte P (kg/ha)</th>
-                  <th style={{ padding: "8px 10px" }}>Carros Restantes Sugeridos</th>
-                  <th style={{ padding: "8px 10px" }}>Estado Balance</th>
+                  <th style={{ padding: "8px 10px" }}>Agua Útil</th>
+                  <th style={{ padding: "8px 10px" }}>P Bray / N Suelo</th>
+                  <th style={{ padding: "8px 10px" }}>Aplicado Campaña</th>
+                  <th style={{ padding: "8px 10px" }}>Opción 100% Sólido</th>
+                  <th style={{ padding: "8px 10px" }}>Opción 100% Líquido</th>
+                  <th style={{ padding: "8px 10px" }}>Mezcla Sugerida</th>
+                  <th style={{ padding: "8px 10px" }}>Cobertura N-P-K</th>
+                  <th style={{ padding: "8px 10px" }}>Limitante</th>
+                  <th style={{ padding: "8px 10px" }}>Estado</th>
                   <th style={{ padding: "8px 10px", textAlign: "center" }}>Acción</th>
                 </tr>
               </thead>
@@ -715,44 +1109,75 @@ export default function SoilPanel({
                   return (
                     <tr key={s.lote} style={{ borderBottom: "1px solid var(--border)" }}>
                       <td style={{ padding: "10px", fontWeight: 700, color: "var(--slate-900)" }}>
-                        {s.lote}
+                        <div>{s.lote}</div>
+                        <small style={{ color: "var(--muted)", fontWeight: 500, fontSize: "11px" }}>{s.cultivo}</small>
                       </td>
                       <td style={{ padding: "10px" }}>{s.superficieHa} ha</td>
                       <td style={{ padding: "10px", fontWeight: 700, color: "#0284c7" }}>
                         {s.perfilHumedad ? `${s.perfilHumedad.totalAguaUtilMm} mm` : "—"}
                       </td>
                       <td style={{ padding: "10px" }}>
-                        {s.sueloPrevio ? `${s.sueloPrevio.fosforoBrayPpm} ppm` : "—"}
+                        <div>{s.sueloPrevio ? `${s.sueloPrevio.fosforoBrayPpm} ppm P` : "—"}</div>
+                        <small style={{ color: "var(--muted)", fontSize: "11px" }}>{s.sueloPrevio ? `${s.sueloPrevio.nDisponibleKgHa} kg N` : "—"}</small>
                       </td>
                       <td style={{ padding: "10px" }}>
-                        {s.sueloPrevio ? `${s.sueloPrevio.nDisponibleKgHa} kg` : "—"}
-                      </td>
-                      <td style={{ padding: "10px" }}>
-                        {s.sueloPrevio ? `${s.sueloPrevio.materiaOrganicaPct}%` : "—"}
-                      </td>
-                      <td style={{ padding: "10px", fontWeight: 700 }}>
-                        {s.carrosSolido > 0 ? (
-                          <span style={{ color: "#166534", background: "#dcfce7", padding: "2px 6px", borderRadius: "4px" }}>
-                            🚜 {s.carrosSolido} ({s.toneladasSolido} t)
-                          </span>
+                        {s.carrosSolido > 0 || s.tanquesLiquido > 0 ? (
+                          <div>
+                            {s.carrosSolido > 0 && (
+                              <span style={{ color: "#166534", background: "#dcfce7", padding: "2px 5px", borderRadius: "4px", fontSize: "11px", fontWeight: 700, marginRight: "4px" }}>
+                                🚜 {s.carrosSolido} c
+                              </span>
+                            )}
+                            {s.tanquesLiquido > 0 && (
+                              <span style={{ color: "#0369a1", background: "#e0f2fe", padding: "2px 5px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
+                                💧 {s.tanquesLiquido} t
+                              </span>
+                            )}
+                          </div>
                         ) : (
-                          <span style={{ color: "var(--muted)" }}>0</span>
+                          <span style={{ color: "var(--muted)", fontSize: "11px" }}>0 aplicados</span>
                         )}
                       </td>
-                      <td style={{ padding: "10px", fontWeight: 700, color: s.aportesPorHa.nitrogenoKgHa > 0 ? "#16a34a" : "var(--slate-600)" }}>
-                        {s.aportesPorHa.nitrogenoKgHa > 0 ? `+${s.aportesPorHa.nitrogenoKgHa}` : "0"}
-                      </td>
-                      <td style={{ padding: "10px", fontWeight: 700, color: s.aportesPorHa.fosforoKgHa > 0 ? "#0284c7" : "var(--slate-600)" }}>
-                        {s.aportesPorHa.fosforoKgHa > 0 ? `+${s.aportesPorHa.fosforoKgHa}` : "0"}
+                      <td style={{ padding: "10px" }}>
+                        <strong style={{ color: s.soloCarrosRestantes === 0 ? "#16a34a" : "#854d0e", fontSize: "12.5px" }}>
+                          {s.soloCarrosRestantes === 0 ? "✓ 0 carros" : `${s.soloCarrosRestantes} carros`}
+                        </strong>
                       </td>
                       <td style={{ padding: "10px" }}>
-                        <strong style={{ color: isDone ? "#16a34a" : "#d97706", fontSize: "13px" }}>
-                          {isDone ? "0 carros" : `${s.carrosRestantesRecomendados} carros`}
+                        <strong style={{ color: s.soloTanquesRestantes === 0 ? "#16a34a" : "#0369a1", fontSize: "12.5px" }}>
+                          {s.soloTanquesRestantes === 0 ? "✓ 0 tanques" : `${s.soloTanquesRestantes} tanques`}
                         </strong>
-                        {!isDone && (
-                          <small style={{ display: "block", color: "var(--muted)", fontSize: "10.5px" }}>
-                            o {s.tanquesRestantesRecomendados} tanques
-                          </small>
+                      </td>
+                      <td style={{ padding: "10px", fontSize: "11.5px" }}>
+                        {s.soloCarrosRestantes === 0 && s.soloTanquesRestantes === 0 ? (
+                          <span style={{ color: "#16a34a", fontWeight: 700 }}>Cubierto</span>
+                        ) : (
+                          <span style={{ color: "var(--slate-800)", fontWeight: 600 }}>
+                            {s.opcionMixtaSugerida.carros} c + {s.opcionMixtaSugerida.tanques} t
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px", fontSize: "11px" }}>
+                        <div><strong style={{ color: s.coberturaPct.nitrogeno >= 100 ? "#16a34a" : "#d97706" }}>N:</strong> {s.coberturaPct.nitrogeno}%</div>
+                        <div><strong style={{ color: s.coberturaPct.fosforo >= 100 ? "#16a34a" : "#0284c7" }}>P:</strong> {s.coberturaPct.fosforo}%</div>
+                        <div><strong style={{ color: s.coberturaPct.potasio >= 100 ? "#16a34a" : "#6366f1" }}>K:</strong> {s.coberturaPct.potasio}%</div>
+                      </td>
+                      <td style={{ padding: "10px" }}>
+                        {s.nutrienteLimitante !== "Equilibrado" ? (
+                          <span
+                            style={{
+                              padding: "2px 6px",
+                              borderRadius: "10px",
+                              fontSize: "10.5px",
+                              fontWeight: 800,
+                              background: s.nutrienteLimitante === "Potasio" ? "#e0e7ff" : s.nutrienteLimitante === "Fósforo" ? "#e0f2fe" : "#fef3c7",
+                              color: s.nutrienteLimitante === "Potasio" ? "#3730a3" : s.nutrienteLimitante === "Fósforo" ? "#0369a1" : "#92400e",
+                            }}
+                          >
+                            {s.nutrienteLimitante}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--muted)", fontSize: "11px" }}>Equilibrado</span>
                         )}
                       </td>
                       <td style={{ padding: "10px" }}>
@@ -776,7 +1201,7 @@ export default function SoilPanel({
                           onClick={() => setSelectedLoteNombre(s.lote)}
                           style={{ fontSize: "11.5px", padding: "3px 8px" }}
                         >
-                          Ver detalle
+                          Simular
                         </button>
                       </td>
                     </tr>

@@ -818,8 +818,34 @@ export default function GoogleMapView() {
     const isPerimetro = lote.tipo === "perimetro_campo";
     const labores = getLaboresForLote(lote);
 
+    let nutrientBadge = "";
+    if (!isPerimetro) {
+      try {
+        const sum = computeLoteNutrientSummary(
+          lote.campoNombre,
+          lote.nombre,
+          lote.superficieHa || 10,
+          lote.cultivo || "Maíz Silo",
+          "2026/27"
+        );
+        const isDone = sum.estadoBalance === "Cubierto con holgura";
+        nutrientBadge = `
+          <div style="background: ${isDone ? '#f0fdf4' : '#fffbeb'}; border: 1px solid ${isDone ? '#86efac' : '#fde68a'}; border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; font-size: 11px;">
+            <div style="font-weight: 700; color: ${isDone ? '#166534' : '#b45309'}; margin-bottom: 2px;">
+              ${isDone ? "✓ Nutrición N-P-K Cubierta" : `⚡ Restan: ${sum.soloCarrosRestantes} carros Ó ${sum.soloTanquesRestantes} tanques`}
+            </div>
+            <div style="color: #475569; font-size: 10.5px;">
+              Aplicados: ${sum.carrosSolido} c / ${sum.tanquesLiquido} t · N: ${sum.coberturaPct.nitrogeno}% · P: ${sum.coberturaPct.fosforo}% · K: ${sum.coberturaPct.potasio}%
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        // ignore
+      }
+    }
+
     const contentString = `
-      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px 4px; min-width: 250px; color: #0f172a;">
+      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px 4px; min-width: 260px; color: #0f172a;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
           <span style="font-size: 11px; font-weight: 700; background: ${isPerimetro ? '#fef3c7' : '#dcfce7'}; color: ${isPerimetro ? '#92400e' : '#166534'}; padding: 2px 7px; border-radius: 4px;">
             ${isPerimetro ? "🚩 Perímetro de Campo" : "🌾 Lote Interno"}
@@ -838,6 +864,8 @@ export default function GoogleMapView() {
           ${lote.cultivo ? `<strong>Cultivo:</strong> ${lote.cultivo}<br/>` : ""}
           <strong>Labores registradas:</strong> ${labores.length} labor(es)
         </p>
+
+        ${nutrientBadge}
 
         <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; flex-direction: column; gap: 6px;">
           <button
@@ -1558,8 +1586,13 @@ export default function GoogleMapView() {
                             textTransform: "uppercase",
                           }}
                         >
-                          {isCovered ? "✓ Cubierto" : `⚡ Sugerido: ${summary.carrosRestantesRecomendados} carros`}
+                          {isCovered ? "✓ Cubierto" : `⚡ Sugerido: ${summary.soloCarrosRestantes} carros`}
                         </span>
+                        {summary.nutrienteLimitante !== "Equilibrado" && (
+                          <span style={{ fontSize: "10px", fontWeight: 700, background: "#e0e7ff", color: "#3730a3", padding: "2px 6px", borderRadius: "10px" }}>
+                            Limitante: {summary.nutrienteLimitante}
+                          </span>
+                        )}
                       </div>
 
                       <Link
@@ -1579,23 +1612,30 @@ export default function GoogleMapView() {
                       </div>
 
                       <div style={{ background: "#ffffff", padding: "8px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.06)" }}>
-                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>P BRAY / N SUELO</span>
-                        <strong style={{ color: "var(--slate-800)" }}>
-                          {summary.sueloPrevio ? `${summary.sueloPrevio.fosforoBrayPpm} ppm · ${summary.sueloPrevio.nDisponibleKgHa} kg` : "—"}
+                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>APLICADO EN CAMPAÑA</span>
+                        <strong style={{ color: summary.carrosSolido > 0 || summary.tanquesLiquido > 0 ? "#16a34a" : "var(--slate-700)" }}>
+                          {summary.carrosSolido} c / {summary.tanquesLiquido} t
                         </strong>
                       </div>
 
                       <div style={{ background: "#ffffff", padding: "8px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.06)" }}>
-                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>CARROS TIRADOS</span>
-                        <strong style={{ color: summary.carrosSolido > 0 ? "#16a34a" : "var(--slate-700)" }}>
-                          {summary.carrosSolido > 0 ? `${summary.carrosSolido} carros (${summary.toneladasSolido} tn)` : "0 carros"}
+                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>OPCIÓN 100% SÓLIDO</span>
+                        <strong style={{ color: isCovered ? "#16a34a" : "#854d0e", fontSize: "12px" }}>
+                          {isCovered ? "✓ 0 carros" : `${summary.soloCarrosRestantes} carros`}
                         </strong>
                       </div>
 
                       <div style={{ background: "#ffffff", padding: "8px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.06)" }}>
-                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>CARROS RESTANTES</span>
-                        <strong style={{ color: isCovered ? "#16a34a" : "#d97706", fontSize: "12px" }}>
-                          {isCovered ? "0 carros restantes" : `${summary.carrosRestantesRecomendados} carros (5 tn)`}
+                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>OPCIÓN 100% LÍQUIDO</span>
+                        <strong style={{ color: isCovered ? "#16a34a" : "#0369a1", fontSize: "12px" }}>
+                          {isCovered ? "✓ 0 tanques" : `${summary.soloTanquesRestantes} tanques`}
+                        </strong>
+                      </div>
+
+                      <div style={{ background: "#ffffff", padding: "8px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>COBERTURA N - P - K</span>
+                        <strong style={{ color: "#0f172a", fontSize: "11px" }}>
+                          N {summary.coberturaPct.nitrogeno}% · P {summary.coberturaPct.fosforo}% · K {summary.coberturaPct.potasio}%
                         </strong>
                       </div>
                     </div>

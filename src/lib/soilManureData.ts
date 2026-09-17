@@ -552,7 +552,7 @@ if (typeof window !== "undefined") {
 }
 
 // =========================================================================
-// CALCULADOR Y RECOMENDADOR NUTRICIONAL AVANZADO (N-P-K Y CARROS RESTANTES)
+// CALCULADOR Y RECOMENDADOR NUTRICIONAL AVANZADO (N-P-K Y CARROS/TANQUES INTERCAMBIABLES)
 // =========================================================================
 
 export interface LoteNutrientSummary {
@@ -564,7 +564,7 @@ export interface LoteNutrientSummary {
   // Análisis previo de suelo
   sueloPrevio?: SoilChemicalAnalysis;
   perfilHumedad?: SoilMoistureProfile;
-  // Enmiendas ya aplicadas
+  // Enmiendas aplicadas (reales o simuladas)
   toneladasSolido: number;
   carrosSolido: number;
   metrosCubicosLiquido: number;
@@ -585,17 +585,55 @@ export interface LoteNutrientSummary {
     azufreKgHa: number;
     materiaOrganicaTnHa: number;
   };
-  // Metas agronómicas recomendadas (según cultivo o lab)
+  // Metas agronómicas recomendadas N-P-K (kg/ha)
   metaKgHa: {
     nitrogeno: number;
     fosforo: number;
     potasio: number;
   };
-  // Estado y recomendación de carros restantes
+  // Cobertura porcentual N-P-K (0 a 100+%)
+  coberturaPct: {
+    nitrogeno: number;
+    fosforo: number;
+    potasio: number;
+  };
+  // OPCIONES INTERCAMBIABLES DINÁMICAS
+  soloCarrosRestantes: number;   // Si se decide aplicar 100% SÓLIDO
+  soloTanquesRestantes: number;  // Si se decide aplicar 100% LÍQUIDO
+  opcionMixtaSugerida: {
+    carros: number;
+    tanques: number;
+  };
+  nutrienteLimitante: "Nitrógeno" | "Fósforo" | "Potasio" | "Equilibrado";
+  // Compatibilidad hacia atrás
   carrosRestantesRecomendados: number;
   tanquesRestantesRecomendados: number;
   estadoBalance: "Cubierto con holgura" | "Recomendado aplicar" | "Déficit pendiente";
   mensajeDiagnostico: string;
+}
+
+export function getCropDemand(cultivo: string): { metaN: number; metaP: number; metaK: number; nombreNormalizado: string } {
+  const c = (cultivo || "").toLowerCase();
+  if (c.includes("doble") || (c.includes("silo") && (c.includes("/") || c.includes("m silo")))) {
+    return { metaN: 300, metaP: 60, metaK: 340, nombreNormalizado: "Doble Maíz Silo" };
+  }
+  if (c.includes("avena") && c.includes("maiz")) {
+    return { metaN: 230, metaP: 40, metaK: 200, nombreNormalizado: "Avena / Maíz" };
+  }
+  if (c.includes("silo")) {
+    return { metaN: 220, metaP: 40, metaK: 220, nombreNormalizado: "Maíz Silo" };
+  }
+  if (c.includes("alfalfa")) {
+    return { metaN: 60, metaP: 45, metaK: 300, nombreNormalizado: "Alfalfa en Producción" };
+  }
+  if (c.includes("soja")) {
+    return { metaN: 45, metaP: 30, metaK: 75, nombreNormalizado: "Soja de 1ra" };
+  }
+  if (c.includes("sorgo")) {
+    return { metaN: 170, metaP: 30, metaK: 160, nombreNormalizado: "Sorgo Silo / Forrajero" };
+  }
+  // Maíz de 1ra / Grano comercial (120 qq/ha)
+  return { metaN: 200, metaP: 35, metaK: 120, nombreNormalizado: "Maíz 1ra (120 qq)" };
 }
 
 export function computeLoteNutrientSummary(
@@ -603,7 +641,9 @@ export function computeLoteNutrientSummary(
   loteNombre: string,
   superficieHa: number,
   cultivo: string = "Maíz Silo",
-  campana: string = "2026/27"
+  campana: string = "2026/27",
+  simulatedCarros?: number,
+  simulatedTanques?: number
 ): LoteNutrientSummary {
   const cClean = campo.toLowerCase();
   const lClean = loteNombre.toLowerCase().replace(/lote\s*/g, "").trim();
@@ -625,56 +665,62 @@ export function computeLoteNutrientSummary(
     return mClean === lClean || m.lote.toLowerCase().includes(lClean);
   });
 
-  // 2. Extraer labores reales de biofertilización ya aplicadas a este lote EN ESTA CAMPAÑA
-  const activities = agricultureData.listActivities();
-  const lotesActs = activities.filter((act) => {
-    if (act.campo.toLowerCase() !== cClean) return false;
-    if (act.tipo !== "Biofertilización") return false;
-    if (act.estado === "Cancelada") return false;
-    // FILTRO ESTRICTO POR CAMPAÑA: evita que los carros se acumulen indefinidamente entre campañas
-    if (campana && act.campana && act.campana.trim() !== campana.trim()) return false;
-
-    const actLoteClean = (act.lote || "").toLowerCase().replace(/lote\s*/g, "").trim();
-    if (actLoteClean === lClean) return true;
-    if (act.esGrupal && act.lotesAfectados?.some((la) => la.toLowerCase().includes(lClean))) return true;
-    return false;
-  });
-
+  // 2. Extraer labores de biofertilización (o usar simulación en vivo)
   let totalTnSolido = 0;
   let totalM3Liquido = 0;
 
-  lotesActs.forEach((act) => {
-    act.insumos.forEach((ins) => {
-      const pNom = (ins.producto || "").toLowerCase();
+  if (simulatedCarros !== undefined || simulatedTanques !== undefined) {
+    const c = Math.max(0, simulatedCarros ?? 0);
+    const t = Math.max(0, simulatedTanques ?? 0);
+    totalTnSolido = c * (manure.toneladasPorCarro || 5);
+    totalM3Liquido = t * 12;
+  } else {
+    const activities = agricultureData.listActivities();
+    const lotesActs = activities.filter((act) => {
+      if (act.campo.toLowerCase() !== cClean) return false;
+      if (act.tipo !== "Biofertilización") return false;
+      if (act.estado === "Cancelada") return false;
+      // FILTRO ESTRICTO POR CAMPAÑA
+      if (campana && act.campana && act.campana.trim() !== campana.trim()) return false;
 
-      if (pNom.includes("sólido") || pNom.includes("solido") || ins.id === "bio-estiercol-sol") {
-        let tn = ins.cantidadTotal || 0;
-        if (!tn && ins.dosisReal && act.superficieReal) {
-          tn = ins.dosisReal * act.superficieReal;
-        }
-        totalTnSolido += tn;
-      } else if (pNom.includes("líquido") || pNom.includes("liquido") || ins.id === "bio-efluente-liq") {
-        let m3 = ins.cantidadTotal || 0;
-        if (!m3 && ins.dosisReal && act.superficieReal) {
-          m3 = ins.dosisReal * act.superficieReal;
-        }
-        totalM3Liquido += m3;
-      }
+      const actLoteClean = (act.lote || "").toLowerCase().replace(/lote\s*/g, "").trim();
+      if (actLoteClean === lClean) return true;
+      if (act.esGrupal && act.lotesAfectados?.some((la) => la.toLowerCase().includes(lClean))) return true;
+      return false;
     });
-  });
+
+    lotesActs.forEach((act) => {
+      act.insumos.forEach((ins) => {
+        const pNom = (ins.producto || "").toLowerCase();
+        if (pNom.includes("sólido") || pNom.includes("solido") || ins.id === "bio-estiercol-sol") {
+          let tn = ins.cantidadTotal || 0;
+          if (!tn && ins.dosisReal && act.superficieReal) {
+            tn = ins.dosisReal * act.superficieReal;
+          }
+          totalTnSolido += tn;
+        } else if (pNom.includes("líquido") || pNom.includes("liquido") || ins.id === "bio-efluente-liq") {
+          let m3 = ins.cantidadTotal || 0;
+          if (!m3 && ins.dosisReal && act.superficieReal) {
+            m3 = ins.dosisReal * act.superficieReal;
+          }
+          totalM3Liquido += m3;
+        }
+      });
+    });
+  }
 
   const carrosSolido = Math.round(totalTnSolido / (manure.toneladasPorCarro || 5));
   const tanquesLiquido = Math.round(totalM3Liquido / 12); // Tanque de 12.000 L = 12 m³
 
-  // 3. Cálculo de nutrientes aportados por el estiércol sólido (análisis Clover)
-  // N: 1.2% (12 kg/tn), P: 1.0% (10 kg/tn), K: 2.47% (24.7 kg/tn), S: 0.22% (2.2 kg/tn), MO: 26.4% (264 kg/tn)
+  // 3. Aportes de nutrientes del estiércol sólido (Clover E326)
+  // 1 tn aporta: 12 kg N, 10 kg P (22.9 kg P2O5), 24.7 kg K (29.8 kg K2O), 2.2 kg S, 264 kg MO
   const nSolido = totalTnSolido * (manure.nitrogenoTotalPct * 10);
   const pSolido = totalTnSolido * (manure.fosforoTotalPct * 10);
   const kSolido = totalTnSolido * (manure.potasioTotalPct * 10);
   const sSolido = totalTnSolido * (manure.azufreTotalPct * 10);
   const moSolido = totalTnSolido * (manure.materiaOrganicaPct * 10);
 
-  // Aportes de efluente líquido (referencia técnica tambo: 1.8 kg N/m³, 0.6 kg P/m³, 2.2 kg K/m³)
+  // Aportes de efluente líquido (1 m³: 1.8 kg N, 0.6 kg P, 2.2 kg K)
   const nLiquido = totalM3Liquido * 1.8;
   const pLiquido = totalM3Liquido * 0.6;
   const kLiquido = totalM3Liquido * 2.2;
@@ -694,60 +740,103 @@ export function computeLoteNutrientSummary(
   const sPorHa = Number((totalS / sup).toFixed(1));
   const moTnPorHa = Number((totalMO / 1000 / sup).toFixed(2));
 
-  // 4. Metas nutricionales agronómicas para la campaña (Meta Maíz 120 qq o Silo de alta producción)
-  // Demanda estándar N: 200 kg/ha, P: 35 kg/ha (~80 kg P2O5), K: 120 kg/ha
-  const metaN = 200;
-  const metaP = 35;
-  const metaK = 120;
+  // 4. Metas agronómicas N-P-K por tipo de cultivo
+  const demand = getCropDemand(cultivo);
+  const metaN = demand.metaN;
+  const metaP = demand.metaP;
+  const metaK = demand.metaK;
 
-  // Disponibilidad de suelo inicial medida en el laboratorio (a 0-20 cm)
-  const nSuelo = sueloPrevio ? sueloPrevio.nDisponibleKgHa : 35; // kg/ha
-  const pBraySuelo = sueloPrevio ? sueloPrevio.fosforoBrayPpm : 22; // ppm
+  // Suelo previo inicial (Molisol)
+  const nSueloKgHa = sueloPrevio ? sueloPrevio.nDisponibleKgHa : 35;
+  const pBraySuelo = sueloPrevio ? sueloPrevio.fosforoBrayPpm : 22;
+  const kSueloPpm = sueloPrevio ? sueloPrevio.potasioPpm : 600;
 
-  // Balance de Nitrógeno: Meta - (N Suelo + N Aportado enmiendas)
-  const deficitN = Math.max(0, metaN - (nSuelo + nPorHa));
-  // Balance de Fósforo: Si P Bray > 28 ppm o P aportado > 40 kg/ha, está ampliamente cubierto
-  const deficitP = pBraySuelo >= 28 ? 0 : Math.max(0, metaP - pPorHa);
+  // Déficits por hectárea
+  const nTotalDispKgHa = nSueloKgHa + nPorHa;
+  const defNKgHa = Math.max(0, metaN - nTotalDispKgHa);
+  const defPKgHa = pBraySuelo >= 28 && pPorHa > 0 ? 0 : Math.max(0, metaP - pPorHa);
+  const defKKgHa = Math.max(0, metaK - kPorHa);
 
-  // Cada carro de 5 tn aporta: 60 kg N y 50 kg P totales
-  // Por hectárea en este lote, 1 carro aporta (60 / sup) kg N/ha
-  const nPorCarroHa = 60 / sup;
-  let carrosRestantes = 0;
-  let tanquesRestantes = 0;
+  // Déficits totales en el lote
+  const defNTotal = defNKgHa * sup;
+  const defPTotal = defPKgHa * sup;
+  const defKTotal = defKKgHa * sup;
+
+  // Constantes de aporte unitario:
+  // 1 Carro sólido (5 tn): 60 kg N, 50 kg P, 123.5 kg K
+  // 1 Tanque líquido (12 m³): 21.6 kg N, 7.2 kg P, 26.4 kg K
+  const N_POR_CARRO = 60;
+  const P_POR_CARRO = 50;
+  const K_POR_CARRO = 123.5;
+
+  const N_POR_TANQUE = 21.6;
+  const P_POR_TANQUE = 7.2;
+  const K_POR_TANQUE = 26.4;
+
+  // OPCIÓN 100% SÓLIDO (Carros de 5 tn)
+  const cReqN = defNTotal > 0 ? Math.ceil(defNTotal / N_POR_CARRO) : 0;
+  const cReqP = defPTotal > 0 ? Math.ceil(defPTotal / P_POR_CARRO) : 0;
+  const cReqK = (demand.nombreNormalizado.includes("Silo") || demand.nombreNormalizado.includes("Alfalfa")) && defKTotal > 0
+    ? Math.ceil(defKTotal / K_POR_CARRO)
+    : 0;
+
+  const soloCarros = Math.max(cReqN, cReqP, cReqK);
+
+  // OPCIÓN 100% LÍQUIDO (Tanques de 12.000 L)
+  const tReqN = defNTotal > 0 ? Math.ceil(defNTotal / N_POR_TANQUE) : 0;
+  const tReqP = defPTotal > 0 ? Math.ceil(defPTotal / P_POR_TANQUE) : 0;
+  const tReqK = defKTotal > 0 ? Math.ceil(defKTotal / K_POR_TANQUE) : 0;
+
+  const soloTanques = Math.max(tReqN, tReqK);
+
+  // OPCIÓN MIXTA SUGERIDA
+  let mixtaCarros = 0;
+  let mixtaTanques = 0;
+  if (soloCarros > 0) {
+    if (demand.nombreNormalizado.includes("Alfalfa")) {
+      mixtaCarros = 0;
+      mixtaTanques = soloTanques;
+    } else {
+      mixtaCarros = Math.ceil(soloCarros * 0.55);
+      const remN = Math.max(0, defNTotal - (mixtaCarros * N_POR_CARRO));
+      const remK = Math.max(0, defKTotal - (mixtaCarros * K_POR_CARRO));
+      mixtaTanques = Math.ceil(Math.max(remN / N_POR_TANQUE, remK / K_POR_TANQUE));
+    }
+  }
+
+  // Nutriente limitante
+  let nutrienteLimitante: "Nitrógeno" | "Fósforo" | "Potasio" | "Equilibrado" = "Equilibrado";
+  if (soloCarros > 0) {
+    if (cReqK >= cReqN && cReqK >= cReqP && cReqK > 0) nutrienteLimitante = "Potasio";
+    else if (cReqP >= cReqN && cReqP > 0) nutrienteLimitante = "Fósforo";
+    else if (cReqN > 0) nutrienteLimitante = "Nitrógeno";
+  }
+
+  // Cobertura porcentual N-P-K
+  const covN = Math.min(200, Math.round((nTotalDispKgHa / metaN) * 100));
+  const covP = pBraySuelo >= 28 ? 100 : Math.min(200, Math.round((pPorHa / Math.max(1, metaP)) * 100));
+  const covK = Math.min(200, Math.round((kPorHa / Math.max(1, metaK)) * 100));
+
+  // Diagnóstico
   let estadoBalance: "Cubierto con holgura" | "Recomendado aplicar" | "Déficit pendiente" = "Cubierto con holgura";
   let mensajeDiagnostico = "";
 
-  if (nPorHa >= metaN || totalTnSolido >= sup * 35) {
-    // Si ya tiene más de 35 tn/ha de estiércol o cubrió la meta de N
-    carrosRestantes = 0;
-    tanquesRestantes = 0;
+  if (soloCarros === 0 && soloTanques === 0) {
     estadoBalance = "Cubierto con holgura";
-    mensajeDiagnostico = `¡Nutrición superada con excelente reserva orgánica! Se aplicaron ${carrosSolido} carros (${Math.round(totalTnSolido / sup)} t/ha) y ${tanquesLiquido} tanques. Aporte: ${nPorHa} kg N/ha y ${pPorHa} kg P/ha. No se requieren más carros para esta campaña.`;
-  } else if (deficitN > 0 || deficitP > 0) {
-    // Faltan nutrientes para la meta
-    carrosRestantes = Math.ceil(deficitN / nPorCarroHa);
-    // Alternativa con tanques líquidos (cada tanque de 12 m³ aporta aprox 21.6 kg N)
-    tanquesRestantes = Math.ceil(deficitN / (21.6 / sup));
-
-    if (totalTnSolido === 0) {
-      estadoBalance = "Déficit pendiente";
-      mensajeDiagnostico = `Lote sin aplicaciones de estiércol sólido todavía. Suelo inicial: ${nSuelo} kg N/ha y ${pBraySuelo} ppm P Bray. Se recomienda aplicar aprox. ${carrosRestantes} carros de 5 tn (o ${tanquesRestantes} tanques de efluente) para alcanzar el rendimiento potencial de 120 qq/ha.`;
-    } else {
-      estadoBalance = "Recomendado aplicar";
-      mensajeDiagnostico = `Se aplicaron ${carrosSolido} carros, pero aún restan aprox. ${deficitN} kg N/ha para la meta. Se sugiere complementar con ${carrosRestantes} carros más o ${tanquesRestantes} tanques.`;
-    }
+    mensajeDiagnostico = `¡Nutrición N-P-K cubierta con creces para toda la campaña! Se aplicaron ${carrosSolido} carros (${Math.round(totalTnSolido / sup)} t/ha) y ${tanquesLiquido} tanques. Cobertura: N ${covN}%, P ${covP}%, K ${covK}%. Aporte total: ${nPorHa} kg N, ${pPorHa} kg P y ${kPorHa} kg K/ha.`;
+  } else if (totalTnSolido === 0 && totalM3Liquido === 0) {
+    estadoBalance = "Déficit pendiente";
+    mensajeDiagnostico = `Lote sin enmiendas en esta campaña. Requerimiento para ${demand.nombreNormalizado}: ${metaN} kg N, ${metaP} kg P, ${metaK} kg K/ha. Podés cubrir el óptimo tirando: ${soloCarros} carros sólidos Ó bien ${soloTanques} tanques líquidos (o una mezcla de ${mixtaCarros} carros + ${mixtaTanques} tanques).`;
   } else {
-    carrosRestantes = 0;
-    tanquesRestantes = 0;
-    estadoBalance = "Cubierto con holgura";
-    mensajeDiagnostico = `Balance equilibrado. La combinación de fertilidad natural y enmiendas cubre los requerimientos del cultivo planificado.`;
+    estadoBalance = "Recomendado aplicar";
+    mensajeDiagnostico = `Se aplicaron ${carrosSolido} carros y ${tanquesLiquido} tanques. Cobertura: N ${covN}%, P ${covP}%, K ${covK}%. Resta para el óptimo: ${soloCarros} carros sólidos más Ó bien ${soloTanques} tanques líquidos más.`;
   }
 
   return {
     campo,
     lote: loteNombre,
     superficieHa,
-    cultivo,
+    cultivo: demand.nombreNormalizado,
     campana,
     sueloPrevio,
     perfilHumedad,
@@ -774,9 +863,22 @@ export function computeLoteNutrientSummary(
       fosforo: metaP,
       potasio: metaK,
     },
-    carrosRestantesRecomendados: carrosRestantes,
-    tanquesRestantesRecomendados: tanquesRestantes,
+    coberturaPct: {
+      nitrogeno: covN,
+      fosforo: covP,
+      potasio: covK,
+    },
+    soloCarrosRestantes: soloCarros,
+    soloTanquesRestantes: soloTanques,
+    opcionMixtaSugerida: {
+      carros: mixtaCarros,
+      tanques: mixtaTanques,
+    },
+    nutrienteLimitante,
+    carrosRestantesRecomendados: soloCarros,
+    tanquesRestantesRecomendados: soloTanques,
     estadoBalance,
     mensajeDiagnostico,
   };
 }
+

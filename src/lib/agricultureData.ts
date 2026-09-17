@@ -130,6 +130,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Keuneke",
     nombre: "Lote 1",
     superficieHa: 48,
+    cultivoActual: "Avena / Soja",
     estado: "En producción",
     aptitudSuelo: "Agrícola Clase I",
     observaciones: "",
@@ -139,6 +140,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Keuneke",
     nombre: "Lote 2",
     superficieHa: 9,
+    cultivoActual: "Alfalfa 2°",
     estado: "En producción",
     aptitudSuelo: "Agrícola Clase I",
     observaciones: "",
@@ -149,18 +151,20 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Racca",
     nombre: "Lote 1",
     superficieHa: 50,
+    cultivoActual: "Soja 1ra",
     estado: "En producción",
     aptitudSuelo: "Agrícola de alta productividad",
-    observaciones: "Lote 1 de Racca (50 ha)",
+    observaciones: "Lote 1 de Racca (50 ha, incluye sector 3a)",
   },
   {
     id: "racca-lote-2",
     campo: "Racca",
     nombre: "Lote 2",
     superficieHa: 50,
+    cultivoActual: "Maíz ST 9939",
     estado: "En producción",
     aptitudSuelo: "Agrícola de alta productividad",
-    observaciones: "Lote 2 de Racca (50 ha)",
+    observaciones: "Lote 2 de Racca (50 ha, incluye sector 3b)",
   },
   // Kitty (29 ha - 1 lote)
   {
@@ -168,6 +172,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Kitty",
     nombre: "Lote Único",
     superficieHa: 29,
+    cultivoActual: "Maíz ST 9741",
     estado: "En producción",
     aptitudSuelo: "Agrícola de alta productividad",
     observaciones: "",
@@ -178,6 +183,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Aguilera",
     nombre: "Lote Único",
     superficieHa: 20,
+    cultivoActual: "Maíz ST 9736",
     estado: "En producción",
     aptitudSuelo: "Agrícola Clase I-II",
     observaciones: "",
@@ -188,6 +194,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 1",
     superficieHa: 7,
+    cultivoActual: "Doble Maíz Silo",
     estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
     observaciones: "",
@@ -197,6 +204,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 2",
     superficieHa: 10,
+    cultivoActual: "Avena / Maíz",
     estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
     observaciones: "",
@@ -206,6 +214,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 3",
     superficieHa: 11,
+    cultivoActual: "Avena / Maíz",
     estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
     observaciones: "",
@@ -215,6 +224,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 4",
     superficieHa: 5,
+    cultivoActual: "Doble Maíz Silo",
     estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
     observaciones: "",
@@ -224,6 +234,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 5",
     superficieHa: 3,
+    cultivoActual: "Alfalfa 4°",
     estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
     observaciones: "",
@@ -233,6 +244,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 6",
     superficieHa: 10,
+    cultivoActual: "Alfalfa 4°",
     estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
     observaciones: "",
@@ -242,6 +254,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 7",
     superficieHa: 10,
+    cultivoActual: "Maíz 1ra",
     estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
     observaciones: "",
@@ -251,6 +264,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 8",
     superficieHa: 10,
+    cultivoActual: "Alfalfa 4°",
     estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
     observaciones: "",
@@ -260,6 +274,7 @@ export const INITIAL_LOTES: Lote[] = [
     campo: "Tambo",
     nombre: "Lote 9",
     superficieHa: 7,
+    cultivoActual: "Alfalfa 3°",
     estado: "En producción",
     aptitudSuelo: "Agrícola-Forrajero",
     observaciones: "",
@@ -499,13 +514,28 @@ const localRepository: AgricultureRepository = {
   },
 
   listLotes(campo?: string) {
-    if (typeof window === "undefined") {
-      return campo
-        ? INITIAL_LOTES.filter((x) => x.campo.toLowerCase() === campo.toLowerCase())
-        : INITIAL_LOTES;
+    let lotes = INITIAL_LOTES;
+    if (typeof window !== "undefined") {
+      const stored = readArray<Lote>(KEYS.lotes);
+      if (stored.length > 0) {
+        lotes = stored.map((sl) => {
+          const init = INITIAL_LOTES.find(
+            (il) =>
+              il.campo.toLowerCase() === sl.campo.toLowerCase() &&
+              (il.id === sl.id || il.nombre.toLowerCase() === sl.nombre.toLowerCase())
+          );
+          if (init) {
+            return {
+              ...init,
+              ...sl,
+              cultivoActual: sl.cultivoActual || init.cultivoActual,
+              superficieHa: sl.superficieHa || init.superficieHa,
+            };
+          }
+          return sl;
+        });
+      }
     }
-    const stored = readArray<Lote>(KEYS.lotes);
-    const lotes = stored.length > 0 ? stored : INITIAL_LOTES;
     if (!campo) return lotes;
     return lotes.filter((x) => x.campo.toLowerCase() === campo.toLowerCase());
   },
