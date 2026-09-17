@@ -241,8 +241,69 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
   },
 ];
 
+import { db } from "@/lib/firebase";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
+
 const GEO_STORAGE_KEY = "hjb_campos_geo_coords_v2";
 const LOTES_GEO_STORAGE_KEY = "hjb_lotes_geo_polygons_v04";
+
+export const HJB_GEO_SYNC_EVENT = "hjb_geo_sync";
+
+export function notifyGeoSync() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(HJB_GEO_SYNC_EVENT));
+  }
+}
+
+let isGeoFirestoreSyncInitialized = false;
+
+export function initGeoFirestoreSync() {
+  if (typeof window === "undefined" || isGeoFirestoreSyncInitialized || !db) return;
+  isGeoFirestoreSyncInitialized = true;
+
+  try {
+    const geoDocRef = doc(db, "config", "geo_data");
+    onSnapshot(
+      geoDocRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data.campos_coords && typeof data.campos_coords === "object") {
+            localStorage.setItem(GEO_STORAGE_KEY, JSON.stringify(data.campos_coords));
+          }
+          if (Array.isArray(data.lotes_geo) && data.lotes_geo.length > 0) {
+            localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(data.lotes_geo));
+          }
+          notifyGeoSync();
+        } else {
+          // Si no hay datos en la nube pero este dispositivo ya tiene datos guardados, migrarlos a Firestore
+          const localCoordsRaw = localStorage.getItem(GEO_STORAGE_KEY);
+          const localLotesRaw = localStorage.getItem(LOTES_GEO_STORAGE_KEY);
+          const campos_coords = localCoordsRaw ? JSON.parse(localCoordsRaw) : {};
+          const lotes_geo = localLotesRaw ? JSON.parse(localLotesRaw) : DEFAULT_LOTES_GEO;
+
+          setDoc(geoDocRef, {
+            campos_coords,
+            lotes_geo,
+            updatedAt: new Date().toISOString(),
+          }).catch(console.error);
+        }
+      },
+      (error) => {
+        console.warn("Firestore sync geo error:", error);
+      }
+    );
+  } catch (err) {
+    console.warn("Error iniciando sincronización geo en Firestore:", err);
+  }
+}
+
+// Iniciar automáticamente sincronización geo en cliente
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    initGeoFirestoreSync();
+  }, 100);
+}
 
 export function getCamposGeo(): CampoGeo[] {
   if (typeof window === "undefined") return DEFAULT_CAMPOS_GEO;
@@ -269,6 +330,11 @@ export function saveCampoCoordinates(campoId: string, lat: number, lng: number) 
     const overrides = raw ? JSON.parse(raw) : {};
     overrides[campoId] = { lat, lng };
     localStorage.setItem(GEO_STORAGE_KEY, JSON.stringify(overrides));
+    notifyGeoSync();
+
+    if (db) {
+      setDoc(doc(db, "config", "geo_data"), { campos_coords: overrides, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+    }
   } catch (err) {
     console.error("Error guardando coordenadas:", err);
   }
@@ -278,6 +344,10 @@ export function resetAllCampoCoordinates() {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(GEO_STORAGE_KEY);
+    notifyGeoSync();
+    if (db) {
+      setDoc(doc(db, "config", "geo_data"), { campos_coords: {}, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+    }
   } catch (err) {
     console.error("Error reseteando coordenadas:", err);
   }
@@ -300,6 +370,10 @@ export function saveAllLotesGeo(lotes: LoteGeo[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(lotes));
+    notifyGeoSync();
+    if (db) {
+      setDoc(doc(db, "config", "geo_data"), { lotes_geo: lotes, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+    }
   } catch (err) {
     console.error("Error guardando lotes delimitados:", err);
   }
@@ -337,6 +411,10 @@ export function resetAllLotesGeo(): LoteGeo[] {
   if (typeof window === "undefined") return DEFAULT_LOTES_GEO;
   try {
     localStorage.removeItem(LOTES_GEO_STORAGE_KEY);
+    notifyGeoSync();
+    if (db) {
+      setDoc(doc(db, "config", "geo_data"), { lotes_geo: DEFAULT_LOTES_GEO, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+    }
   } catch (err) {
     console.error("Error reseteando polígonos de lotes:", err);
   }

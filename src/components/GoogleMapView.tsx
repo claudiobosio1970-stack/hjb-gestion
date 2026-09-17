@@ -13,8 +13,9 @@ import {
   updateLoteCoordinates,
   deleteLoteGeo,
   resetAllLotesGeo,
+  HJB_GEO_SYNC_EVENT,
 } from "@/lib/geoData";
-import { agricultureData, Activity } from "@/lib/agricultureData";
+import { agricultureData, Activity, HJB_AGRICULTURE_SYNC_EVENT } from "@/lib/agricultureData";
 import NewActivityModal from "@/components/NewActivityModal";
 
 declare global {
@@ -152,7 +153,47 @@ export default function GoogleMapView() {
       setLoadError("Google Maps reportó que la clave requiere verificar que la 'Maps JavaScript API' esté habilitada en Google Cloud Console.");
     };
 
+    const reloadLiveMapData = () => {
+      const updatedCampos = getCamposGeo();
+      const updatedLotesGeo = getLotesGeo();
+      const acts = agricultureData.listActivities();
+      const agriLotes = agricultureData.listLotes();
+
+      const synced = updatedLotesGeo.map((lg) => {
+        if (lg.tipo === "perimetro_campo") {
+          const campoAgri = updatedCampos.find((camp) => camp.id === lg.campoId);
+          return {
+            ...lg,
+            superficieHa: campoAgri ? campoAgri.superficieHa : lg.superficieHa,
+          };
+        }
+        const matched = agriLotes.find((al) => {
+          if (al.campo.toLowerCase() !== lg.campoNombre.toLowerCase()) return false;
+          const alClean = al.nombre.toLowerCase().replace(/lote\s*/g, "").trim();
+          const lgClean = lg.nombre.toLowerCase().replace(/lote\s*/g, "").trim();
+          return alClean === lgClean;
+        });
+        if (matched) {
+          return {
+            ...lg,
+            superficieHa: matched.superficieHa ?? lg.superficieHa,
+            cultivo: matched.cultivoActual || lg.cultivo,
+          };
+        }
+        return lg;
+      });
+
+      setCampos(updatedCampos);
+      setLotes(synced);
+      setActivities(acts);
+    };
+
+    window.addEventListener(HJB_GEO_SYNC_EVENT, reloadLiveMapData);
+    window.addEventListener(HJB_AGRICULTURE_SYNC_EVENT, reloadLiveMapData);
+
     return () => {
+      window.removeEventListener(HJB_GEO_SYNC_EVENT, reloadLiveMapData);
+      window.removeEventListener(HJB_AGRICULTURE_SYNC_EVENT, reloadLiveMapData);
       delete window.hjbDeleteLote;
       delete window.hjbOpenLabores;
     };
@@ -246,6 +287,13 @@ export default function GoogleMapView() {
       renderLotes(mapInstanceRef.current, lotes, showLotesLayer, isEditingVertices, currentZoom, selectedCampo);
     }
   }, [currentZoom, selectedCampo, lotes, showLotesLayer, isEditingVertices, mapLoaded]);
+
+  // Actualizar marcadores de campos cuando cambian sus coordenadas o modo calibración
+  useEffect(() => {
+    if (mapInstanceRef.current && mapLoaded) {
+      renderMarkers(mapInstanceRef.current, campos, isCalibrating);
+    }
+  }, [campos, isCalibrating, mapLoaded]);
 
   // Renderizar carteles destacados de los 5 Campos
   function renderMarkers(map: any, camposList: CampoGeo[], calibrating: boolean) {

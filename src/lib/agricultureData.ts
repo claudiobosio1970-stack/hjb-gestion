@@ -421,8 +421,10 @@ export function initAgricultureFirestoreSync() {
           writeArray(KEYS.lotes, remoteLotes);
           notifyAgricultureSync();
         } else {
-          // Si no hay lotes en la nube, inicializar con los lotes predeterminados
-          INITIAL_LOTES.forEach((lote) => {
+          // Si no hay lotes en la nube, inicializar con los lotes locales o predeterminados
+          const local = readArray<Lote>(KEYS.lotes);
+          const toUpload = local.length > 0 ? local : INITIAL_LOTES;
+          toUpload.forEach((lote) => {
             setDoc(doc(db, "lotes", lote.id), sanitizeForFirestore(lote)).catch(console.error);
           });
         }
