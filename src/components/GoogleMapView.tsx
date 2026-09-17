@@ -15,6 +15,7 @@ import {
   HJB_GEO_SYNC_EVENT,
 } from "@/lib/geoData";
 import { agricultureData, Activity, HJB_AGRICULTURE_SYNC_EVENT } from "@/lib/agricultureData";
+import { computeLoteNutrientSummary } from "@/lib/soilManureData";
 import NewActivityModal from "@/components/NewActivityModal";
 
 declare global {
@@ -1516,6 +1517,90 @@ export default function GoogleMapView() {
                   </Link>
                 </div>
               </div>
+
+              {/* Resumen de Suelos y Recomendación de Enmiendas */}
+              {(() => {
+                const summary = computeLoteNutrientSummary(
+                  laboresModalLote.campoNombre,
+                  laboresModalLote.nombre,
+                  laboresModalLote.superficieHa || 5,
+                  laboresModalLote.cultivo || "Maíz Silo"
+                );
+                const isCovered = summary.estadoBalance === "Cubierto con holgura";
+
+                return (
+                  <div
+                    style={{
+                      background: isCovered ? "#f0fdf4" : "#fffbeb",
+                      border: isCovered ? "1.5px solid #86efac" : "1.5px solid #fde68a",
+                      borderRadius: "10px",
+                      padding: "12px 16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "14px" }}>🧪</span>
+                        <strong style={{ fontSize: "13px", color: "var(--slate-900)" }}>
+                          Nutrición de Suelo & Enmiendas Orgánicas
+                        </strong>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 800,
+                            padding: "2px 7px",
+                            borderRadius: "10px",
+                            background: isCovered ? "#16a34a" : "#d97706",
+                            color: "#fff",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {isCovered ? "✓ Cubierto" : `⚡ Sugerido: ${summary.carrosRestantesRecomendados} carros`}
+                        </span>
+                      </div>
+
+                      <Link
+                        href={`/agricultura/${laboresModalLote.campoId}`}
+                        style={{ fontSize: "11.5px", color: "var(--brand-700)", fontWeight: 700, textDecoration: "none" }}
+                      >
+                        Ver análisis de suelos completo →
+                      </Link>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "8px", fontSize: "11.5px" }}>
+                      <div style={{ background: "#ffffff", padding: "8px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>AGUA ÚTIL TOTAL</span>
+                        <strong style={{ color: "#0284c7" }}>
+                          {summary.perfilHumedad ? `${summary.perfilHumedad.totalAguaUtilMm} mm` : "—"}
+                        </strong>
+                      </div>
+
+                      <div style={{ background: "#ffffff", padding: "8px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>P BRAY / N SUELO</span>
+                        <strong style={{ color: "var(--slate-800)" }}>
+                          {summary.sueloPrevio ? `${summary.sueloPrevio.fosforoBrayPpm} ppm · ${summary.sueloPrevio.nDisponibleKgHa} kg` : "—"}
+                        </strong>
+                      </div>
+
+                      <div style={{ background: "#ffffff", padding: "8px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>CARROS TIRADOS</span>
+                        <strong style={{ color: summary.carrosSolido > 0 ? "#16a34a" : "var(--slate-700)" }}>
+                          {summary.carrosSolido > 0 ? `${summary.carrosSolido} carros (${summary.toneladasSolido} tn)` : "0 carros"}
+                        </strong>
+                      </div>
+
+                      <div style={{ background: "#ffffff", padding: "8px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                        <span style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>CARROS RESTANTES</span>
+                        <strong style={{ color: isCovered ? "#16a34a" : "#d97706", fontSize: "12px" }}>
+                          {isCovered ? "0 carros restantes" : `${summary.carrosRestantesRecomendados} carros (5 tn)`}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Listado de labores asociadas */}
               <div>

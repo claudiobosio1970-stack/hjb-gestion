@@ -345,7 +345,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
       {/* PESTAÑA: SUELOS */}
       {tab === "Suelos" && (
         <section className="panel">
-          <SoilPanel analyses={soils} onChanged={refresh} />
+          <SoilPanel campoNombre={campoNombre} analyses={soils} onChanged={refresh} />
         </section>
       )}
 
