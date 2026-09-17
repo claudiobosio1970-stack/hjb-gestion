@@ -240,6 +240,35 @@ export const DEFAULT_SOIL_ANALYSES: SoilChemicalAnalysis[] = [
     observaciones: "Muestreo previo a aplicación masiva de estiércol y efluente.",
   },
   {
+    id: "soil-racca-lote-1",
+    campo: "Racca",
+    lote: "Lote 1",
+    fecha: "2026-08-22",
+    laboratorio: "Laboratorio Molisol",
+    profundidad: "0-20 cm",
+    fosforoBrayPpm: 20.1,
+    nNo3Ppm: 11.1,
+    nDisponibleKgHa: 57.84,
+    ph: 6.18,
+    conductividadElectricaUsCm: 75,
+    materiaOrganicaPct: 2.64,
+    azufrePpm: 8.0,
+    zincPpm: 0.61,
+    calcioPpm: 1823,
+    magnesioPpm: 277,
+    potasioPpm: 653,
+    sodioPpm: 41,
+    cicMeq: 17.2,
+    satBasesPct: 77.2,
+    boroPpm: 0.8,
+    hierroPpm: 66,
+    manganesoPpm: 48,
+    cobrePpm: 1.2,
+    nTotalPct: 0.13,
+    recomendacionLab: "Para Maíz de 120 qq/ha: MAP c/ S y Zn: 80 kg/ha | Urea: 200 kg/ha",
+    observaciones: "Informe Molisol 'Racca 3'. Corresponde a los sectores 3a y 3b trabajados operativamente en Lote 1.",
+  },
+  {
     id: "soil-racca-lote-2",
     campo: "Racca",
     lote: "Lote 2",
@@ -359,6 +388,22 @@ export const DEFAULT_MOISTURE_PROFILES: SoilMoistureProfile[] = [
       { profundidadCm: "100-150", humedadActualPct: 27.0, pmpPct: 18.0, aguaUtilPct: 72.4, aguaUtilMm: 61.8 },
       { profundidadCm: "150-200", humedadActualPct: 27.2, pmpPct: 16.0, aguaUtilPct: 93.3, aguaUtilMm: 72.8 },
     ],
+  },
+  {
+    id: "moisture-racca-lote-1",
+    campo: "Racca",
+    lote: "Lote 1",
+    fecha: "2026-08-22",
+    laboratorio: "Laboratorio Molisol",
+    totalAguaUtilMm: 305.5,
+    estratos: [
+      { profundidadCm: "0-20", humedadActualPct: 27.6, pmpPct: 17.6, aguaUtilPct: 66.8, aguaUtilMm: 24.8 },
+      { profundidadCm: "20-60", humedadActualPct: 32.6, pmpPct: 19.5, aguaUtilPct: 89.6, aguaUtilMm: 68.1 },
+      { profundidadCm: "60-100", humedadActualPct: 30.0, pmpPct: 19.0, aguaUtilPct: 77.2, aguaUtilMm: 57.2 },
+      { profundidadCm: "100-150", humedadActualPct: 29.0, pmpPct: 17.5, aguaUtilPct: 87.6, aguaUtilMm: 74.8 },
+      { profundidadCm: "150-200", humedadActualPct: 28.4, pmpPct: 16.0, aguaUtilPct: 103.3, aguaUtilMm: 80.6 },
+    ],
+    observaciones: "Informe Molisol 'Racca 3' (Sector 3a/3b operado en Lote 1). Gran reserva hídrica: 305.5 mm.",
   },
   {
     id: "moisture-racca-lote-2",
@@ -515,6 +560,7 @@ export interface LoteNutrientSummary {
   lote: string;
   superficieHa: number;
   cultivo: string;
+  campana: string;
   // Análisis previo de suelo
   sueloPrevio?: SoilChemicalAnalysis;
   perfilHumedad?: SoilMoistureProfile;
@@ -556,7 +602,8 @@ export function computeLoteNutrientSummary(
   campo: string,
   loteNombre: string,
   superficieHa: number,
-  cultivo: string = "Maíz Silo"
+  cultivo: string = "Maíz Silo",
+  campana: string = "2026/27"
 ): LoteNutrientSummary {
   const cClean = campo.toLowerCase();
   const lClean = loteNombre.toLowerCase().replace(/lote\s*/g, "").trim();
@@ -578,12 +625,14 @@ export function computeLoteNutrientSummary(
     return mClean === lClean || m.lote.toLowerCase().includes(lClean);
   });
 
-  // 2. Extraer labores reales de biofertilización ya aplicadas a este lote
+  // 2. Extraer labores reales de biofertilización ya aplicadas a este lote EN ESTA CAMPAÑA
   const activities = agricultureData.listActivities();
   const lotesActs = activities.filter((act) => {
     if (act.campo.toLowerCase() !== cClean) return false;
     if (act.tipo !== "Biofertilización") return false;
     if (act.estado === "Cancelada") return false;
+    // FILTRO ESTRICTO POR CAMPAÑA: evita que los carros se acumulen indefinidamente entre campañas
+    if (campana && act.campana && act.campana.trim() !== campana.trim()) return false;
 
     const actLoteClean = (act.lote || "").toLowerCase().replace(/lote\s*/g, "").trim();
     if (actLoteClean === lClean) return true;
@@ -699,6 +748,7 @@ export function computeLoteNutrientSummary(
     lote: loteNombre,
     superficieHa,
     cultivo,
+    campana,
     sueloPrevio,
     perfilHumedad,
     toneladasSolido: totalTnSolido,

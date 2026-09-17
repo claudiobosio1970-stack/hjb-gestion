@@ -1524,7 +1524,8 @@ export default function GoogleMapView() {
                   laboresModalLote.campoNombre,
                   laboresModalLote.nombre,
                   laboresModalLote.superficieHa || 5,
-                  laboresModalLote.cultivo || "Maíz Silo"
+                  laboresModalLote.cultivo || "Maíz Silo",
+                  "2026/27"
                 );
                 const isCovered = summary.estadoBalance === "Cubierto con holgura";
 
@@ -1544,7 +1545,7 @@ export default function GoogleMapView() {
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span style={{ fontSize: "14px" }}>🧪</span>
                         <strong style={{ fontSize: "13px", color: "var(--slate-900)" }}>
-                          Nutrición de Suelo & Enmiendas Orgánicas
+                          Nutrición de Suelo & Enmiendas (Campaña 2026/27)
                         </strong>
                         <span
                           style={{

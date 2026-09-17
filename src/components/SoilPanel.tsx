@@ -44,6 +44,7 @@ export default function SoilPanel({
   const [manure, setManure] = useState<ManureAnalysis>(DEFAULT_MANURE_ANALYSIS);
   const [selectedLoteNombre, setSelectedLoteNombre] = useState<string>("TODOS");
   const [targetCrop, setTargetCrop] = useState<string>("Maíz Silo");
+  const [campana, setCampana] = useState<string>("2026/27");
   const [showManureModal, setShowManureModal] = useState<boolean>(false);
 
   // Modal para agregar análisis manual
@@ -119,9 +120,9 @@ export default function SoilPanel({
   // Resúmenes calculados para todos los lotes del campo
   const summariesDelCampo: LoteNutrientSummary[] = useMemo(() => {
     return lotesDelCampo.map((lote) =>
-      computeLoteNutrientSummary(campoNombre, lote.nombre, lote.superficieHa || 5, targetCrop)
+      computeLoteNutrientSummary(campoNombre, lote.nombre, lote.superficieHa || 5, targetCrop, campana)
     );
-  }, [lotesDelCampo, campoNombre, targetCrop, soils, moistures, manure]);
+  }, [lotesDelCampo, campoNombre, targetCrop, campana, soils, moistures, manure]);
 
   // Resumen específico del lote seleccionado
   const activeSummary: LoteNutrientSummary | null = useMemo(() => {
@@ -130,9 +131,10 @@ export default function SoilPanel({
       campoNombre,
       activeLote.nombre,
       activeLote.superficieHa || 5,
-      targetCrop
+      targetCrop,
+      campana
     );
-  }, [activeLote, campoNombre, targetCrop, soils, moistures, manure]);
+  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure]);
 
   // Totales acumulados en todo el campo
   const totalesCampo = useMemo(() => {
@@ -297,7 +299,13 @@ export default function SoilPanel({
                   color: isSelected ? "var(--brand-700)" : "var(--slate-700)",
                 }}
               >
-                <span>{lote.nombre}</span>
+                <span>
+                  {campoNombre.toLowerCase() === "racca" && lote.nombre.toLowerCase().includes("1")
+                    ? "Lote 1 (Sector 3a)"
+                    : campoNombre.toLowerCase() === "racca" && lote.nombre.toLowerCase().includes("2")
+                    ? "Lote 2 (Sector 3b)"
+                    : lote.nombre}
+                </span>
                 {hasCarts && (
                   <span
                     style={{
@@ -317,19 +325,35 @@ export default function SoilPanel({
           })}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>Meta Nutricional:</label>
-          <select
-            className="select"
-            style={{ fontSize: "12px", padding: "4px 8px" }}
-            value={targetCrop}
-            onChange={(e) => setTargetCrop(e.target.value)}
-          >
-            <option value="Maíz Silo">Maíz Silo (120 qq / 45 t MV) · Meta 200 kg N / 35 kg P</option>
-            <option value="Maíz Grano">Maíz Grano (110 qq) · Meta 190 kg N / 30 kg P</option>
-            <option value="Sorgo Silo">Sorgo Silo / Forrajero · Meta 160 kg N / 25 kg P</option>
-            <option value="Pastura Consociada">Pastura Consociada · Meta 60 kg N / 40 kg P</option>
-          </select>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>Campaña:</label>
+            <select
+              className="select"
+              style={{ fontSize: "12px", padding: "4px 8px", fontWeight: 600 }}
+              value={campana}
+              onChange={(e) => setCampana(e.target.value)}
+            >
+              <option value="2026/27">2026/27 (En curso)</option>
+              <option value="2025/26">2025/26</option>
+              <option value="2024/25">2024/25</option>
+            </select>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>Meta Nutricional:</label>
+            <select
+              className="select"
+              style={{ fontSize: "12px", padding: "4px 8px" }}
+              value={targetCrop}
+              onChange={(e) => setTargetCrop(e.target.value)}
+            >
+              <option value="Maíz Silo">Maíz Silo (120 qq / 45 t MV) · Meta 200 kg N / 35 kg P</option>
+              <option value="Maíz Grano">Maíz Grano (110 qq) · Meta 190 kg N / 30 kg P</option>
+              <option value="Sorgo Silo">Sorgo Silo / Forrajero · Meta 160 kg N / 25 kg P</option>
+              <option value="Pastura Consociada">Pastura Consociada · Meta 60 kg N / 40 kg P</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -368,12 +392,15 @@ export default function SoilPanel({
                   {activeSummary.estadoBalance === "Cubierto con holgura" ? "✓ Cubierto con Holgura" : "⚡ Se Recomienda Aplicar"}
                 </span>
                 <strong style={{ fontSize: "15px", color: "var(--slate-900)" }}>
-                  Diagnóstico Nutricional · {activeLote.nombre} ({activeSummary.superficieHa} ha) · Cultivo: {targetCrop}
+                  Diagnóstico Nutricional · {activeLote.nombre} ({activeSummary.superficieHa} ha) · Campaña {campana} · Cultivo: {targetCrop}
                 </strong>
               </div>
               <p style={{ margin: 0, fontSize: "13px", color: "var(--slate-800)", lineHeight: "1.45" }}>
                 {activeSummary.mensajeDiagnostico}
               </p>
+              <small style={{ display: "block", color: "var(--muted)", fontSize: "11px", marginTop: "5px" }}>
+                🔒 Balance y carros restantes calculados exclusivamente para la <strong>Campaña {campana}</strong> (evita acumulación histórica).
+              </small>
             </div>
 
             <div
@@ -649,11 +676,19 @@ export default function SoilPanel({
 
           {/* TABLA COMPARATIVA MULTI-LOTE */}
           <div className="card" style={{ padding: "16px", overflowX: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <h3 style={{ margin: 0, fontSize: "16px", color: "var(--slate-900)" }}>
-                Comparativa de Suelos, Labores y Recomendación Nutricional ({summariesDelCampo.length} lotes)
-              </h3>
-              <span className="pill badgeGreen">Meta calculada para: {targetCrop}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "16px", color: "var(--slate-900)" }}>
+                  Comparativa de Suelos, Labores y Recomendación Nutricional ({summariesDelCampo.length} lotes)
+                </h3>
+                <small style={{ color: "var(--muted)", fontSize: "11.5px" }}>
+                  Mostrando aportes de enmiendas y carros calculados exclusivamente para la <strong>Campaña {campana}</strong>
+                </small>
+              </div>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <span className="pill badgeSlate">Campaña {campana}</span>
+                <span className="pill badgeGreen">Meta: {targetCrop}</span>
+              </div>
             </div>
 
             <table style={{ width: "100%", fontSize: "12.5px", borderCollapse: "collapse", minWidth: "900px" }}>
