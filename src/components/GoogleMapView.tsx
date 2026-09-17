@@ -106,7 +106,7 @@ export default function GoogleMapView() {
   // Cargar datos geográficos y labores al montar
   useEffect(() => {
     const c = getCamposGeo();
-    const l = getLotesGeo();
+    const l = getLotesGeo().filter((lg) => lg.id !== "racca-lote-3a" && lg.id !== "racca-lote-3b");
     const acts = agricultureData.listActivities();
     const agriLotes = agricultureData.listLotes();
 
@@ -168,7 +168,7 @@ export default function GoogleMapView() {
       }
 
       const updatedCampos = getCamposGeo();
-      const updatedLotesGeo = getLotesGeo();
+      const updatedLotesGeo = getLotesGeo().filter((lg) => lg.id !== "racca-lote-3a" && lg.id !== "racca-lote-3b");
       const acts = agricultureData.listActivities();
       const agriLotes = agricultureData.listLotes();
 
@@ -414,7 +414,9 @@ export default function GoogleMapView() {
     const isWorkingMode = isTracing || editingVertices;
     const shouldShowInternalLotes = isCloseZoom || isFocusing || isWorkingMode;
 
-    lotesList.forEach((lote) => {
+    const sanitizedLotes = lotesList.filter((l) => l.id !== "racca-lote-3a" && l.id !== "racca-lote-3b");
+
+    sanitizedLotes.forEach((lote) => {
       const isPerimetro = lote.tipo === "perimetro_campo";
       const campoObj = campos.find((c) => c.id === lote.campoId);
 

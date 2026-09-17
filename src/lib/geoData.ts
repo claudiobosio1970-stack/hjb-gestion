@@ -52,10 +52,10 @@ export const DEFAULT_CAMPOS_GEO: CampoGeo[] = [
     lat: -32.2427,
     lng: -61.6073,
     color: "#d97706",
-    cultivoPrincipal: "Campaña 2026/27 (4 lotes delimitados)",
-    cantLotes: 4,
+    cultivoPrincipal: "Campaña 2026/27 (2 lotes delimitados)",
+    cantLotes: 2,
     estado: "Planificado",
-    descripcion: "Establecimiento de 100 ha subdividido en 4 lotes sobre Ruta Provincial 40S.",
+    descripcion: "Establecimiento de 100 ha subdividido en 2 lotes sobre Ruta Provincial 40S.",
   },
   {
     id: "kitty",
@@ -479,7 +479,8 @@ export function initGeoFirestoreSync() {
             localStorage.setItem(GEO_STORAGE_KEY, JSON.stringify(data.campos_coords));
           }
           if (Array.isArray(data.lotes_geo)) {
-            localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(data.lotes_geo));
+            const sanitized = data.lotes_geo.filter((l: any) => l.id !== "racca-lote-3a" && l.id !== "racca-lote-3b");
+            localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(sanitized));
           }
           notifyGeoSync();
         } else {
@@ -567,7 +568,14 @@ export function getLotesGeo(): LoteGeo[] {
     const raw = localStorage.getItem(LOTES_GEO_STORAGE_KEY);
     if (!raw) return DEFAULT_LOTES_GEO;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_LOTES_GEO;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const sanitized = parsed.filter((l: any) => l.id !== "racca-lote-3a" && l.id !== "racca-lote-3b");
+      if (sanitized.length !== parsed.length) {
+        localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(sanitized));
+      }
+      return sanitized;
+    }
+    return DEFAULT_LOTES_GEO;
   } catch {
     return DEFAULT_LOTES_GEO;
   }
@@ -576,10 +584,11 @@ export function getLotesGeo(): LoteGeo[] {
 export function saveAllLotesGeo(lotes: LoteGeo[]) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(lotes));
+    const sanitized = lotes.filter((l) => l.id !== "racca-lote-3a" && l.id !== "racca-lote-3b");
+    localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(sanitized));
     notifyGeoSync();
     if (db) {
-      setDoc(doc(db, "config", "geo_data"), { lotes_geo: lotes, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+      setDoc(doc(db, "config", "geo_data"), { lotes_geo: sanitized, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
     }
   } catch (err) {
     console.error("Error guardando lotes delimitados:", err);
