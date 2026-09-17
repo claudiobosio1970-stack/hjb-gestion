@@ -51,6 +51,7 @@ export default function GoogleMapView() {
   const tracingPointsRef = useRef<Array<{ lat: number; lng: number }>>([]);
   const tracingPolylineRef = useRef<any>(null);
   const tracingMarkersRef = useRef<any[]>([]);
+  const handleTracingClickRef = useRef<((e: any) => void) | null>(null);
 
   const [campos, setCampos] = useState<CampoGeo[]>([]);
   const [lotes, setLotes] = useState<LoteGeo[]>([]);
@@ -66,6 +67,13 @@ export default function GoogleMapView() {
   const [tracingCount, setTracingCount] = useState(0);
   const [isEditingVertices, setIsEditingVertices] = useState(false);
   const [showLotesLayer, setShowLotesLayer] = useState(true);
+
+  const isEditingVerticesRef = useRef(false);
+  isEditingVerticesRef.current = isEditingVertices;
+  const isTracingRef = useRef(false);
+  isTracingRef.current = isTracing;
+  const prevEditingVerticesRef = useRef(false);
+  const debounceTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   // Modal para ver Labores de un Lote específico
   const [laboresModalLote, setLaboresModalLote] = useState<LoteGeo | null>(null);
@@ -154,6 +162,11 @@ export default function GoogleMapView() {
     };
 
     const reloadLiveMapData = () => {
+      // Si el usuario está editando vértices o trazando, NO recargar el estado para no resetear los polígonos bajo el cursor
+      if (isEditingVerticesRef.current || isTracingRef.current) {
+        return;
+      }
+
       const updatedCampos = getCamposGeo();
       const updatedLotesGeo = getLotesGeo();
       const acts = agricultureData.listActivities();
@@ -284,9 +297,21 @@ export default function GoogleMapView() {
   // Actualizar renderizado cuando cambia el zoom o el campo seleccionado
   useEffect(() => {
     if (mapInstanceRef.current && mapLoaded) {
+      const justToggledEdit = prevEditingVerticesRef.current !== isEditingVertices;
+      prevEditingVerticesRef.current = isEditingVertices;
+
+      // Si estamos en modo de ajuste de vértices y no acaba de conmutarse, evitar recrear polígonos
+      if (isEditingVertices && !justToggledEdit) {
+        return;
+      }
+      // Si el usuario está trazando un lote activamente, no interrumpir los polígonos
+      if (isTracing) {
+        return;
+      }
+
       renderLotes(mapInstanceRef.current, lotes, showLotesLayer, isEditingVertices, currentZoom, selectedCampo);
     }
-  }, [currentZoom, selectedCampo, lotes, showLotesLayer, isEditingVertices, mapLoaded]);
+  }, [currentZoom, selectedCampo, lotes, showLotesLayer, isEditingVertices, mapLoaded, isTracing]);
 
   // Actualizar marcadores de campos cuando cambian sus coordenadas o modo calibración
   useEffect(() => {
@@ -429,15 +454,21 @@ export default function GoogleMapView() {
             const pt = path.getAt(i);
             newCoords.push({ lat: Number(pt.lat().toFixed(6)), lng: Number(pt.lng().toFixed(6)) });
           }
-          const updated = updateLoteCoordinates(lote.id, newCoords);
-          setLotes(updated);
 
+          // Inmediatamente mover el cartel de etiqueta al nuevo centroide sin recrear polígonos
           const newCentroid = computePolygonCentroid(newCoords);
           const badge = labelMarkersRef.current.get(lote.id);
           if (badge) badge.setPosition(newCentroid);
 
-          setStatusNotice(`✓ Vértices de "${lote.nombre}" actualizados`);
-          setTimeout(() => setStatusNotice(null), 3000);
+          // Debounce para guardar coordenadas sin reiniciar polígonos ni interrumpir el cursor
+          if (debounceTimersRef.current[lote.id]) {
+            clearTimeout(debounceTimersRef.current[lote.id]);
+          }
+          debounceTimersRef.current[lote.id] = setTimeout(() => {
+            updateLoteCoordinates(lote.id, newCoords);
+            setStatusNotice(`✓ Vértices de "${lote.nombre}" actualizados`);
+            setTimeout(() => setStatusNotice(null), 3000);
+          }, 400);
         };
 
         path.addListener("set_at", handlePathChange);
@@ -483,6 +514,13 @@ export default function GoogleMapView() {
       });
 
       const onLoteClick = (e?: any) => {
+        if (isTracingRef.current && handleTracingClickRef.current) {
+          handleTracingClickRef.current(e);
+          return;
+        }
+        if (isEditingVerticesRef.current || isTracingRef.current) {
+          return;
+        }
         setSelectedLote(lote);
         const cOfLote = campos.find((c) => c.id === lote.campoId);
         if (cOfLote) setSelectedCampo(cOfLote);
@@ -565,14 +603,17 @@ export default function GoogleMapView() {
 
     map.setOptions({ draggableCursor: "crosshair" });
 
-    mapClickListenerRef.current = map.addListener("click", (e: any) => {
+    const handleTracingClick = (e: any) => {
+      if (!e || !e.latLng) return;
       const lat = Number(e.latLng.lat().toFixed(6));
       const lng = Number(e.latLng.lng().toFixed(6));
       const pt = { lat, lng };
 
       tracingPointsRef.current.push(pt);
       const newPath = [...tracingPointsRef.current];
-      tracingPolylineRef.current.setPath(newPath);
+      if (tracingPolylineRef.current) {
+        tracingPolylineRef.current.setPath(newPath);
+      }
 
       const dotMarker = new window.google.maps.Marker({
         position: pt,
@@ -589,7 +630,10 @@ export default function GoogleMapView() {
       });
       tracingMarkersRef.current.push(dotMarker);
       setTracingCount(newPath.length);
-    });
+    };
+
+    handleTracingClickRef.current = handleTracingClick;
+    mapClickListenerRef.current = map.addListener("click", handleTracingClick);
 
     setStatusNotice(`✏️ Modo Trazo Activo: Hacé clic en el satélite en cada esquina del ${tipoDeseado === "perimetro_campo" ? "perímetro del campo" : "lote"}.`);
   }
@@ -622,6 +666,7 @@ export default function GoogleMapView() {
   }
 
   function cancelNativeTracing() {
+    handleTracingClickRef.current = null;
     if (mapClickListenerRef.current && window.google?.maps) {
       window.google.maps.event.removeListener(mapClickListenerRef.current);
       mapClickListenerRef.current = null;
@@ -631,6 +676,7 @@ export default function GoogleMapView() {
       mapInstanceRef.current.setOptions({ draggableCursor: null });
     }
     setIsTracing(false);
+    isTracingRef.current = false;
     setTracingCount(0);
   }
 
@@ -645,17 +691,29 @@ export default function GoogleMapView() {
 
   function toggleEditingVertices() {
     const nextState = !isEditingVertices;
-    setIsEditingVertices(nextState);
+
+    // Cancelar cualquier timer pendiente de guardado
+    Object.values(debounceTimersRef.current).forEach((t) => clearTimeout(t));
+    debounceTimersRef.current = {};
+
     if (isTracing) cancelNativeTracing();
 
-    if (mapInstanceRef.current) {
-      renderLotes(mapInstanceRef.current, lotes, showLotesLayer, nextState, currentZoom, selectedCampo);
-    }
-    if (nextState) {
-      setStatusNotice("📐 Modo Ajuste Activo: Podés arrastrar cualquiera de las esquinas o puntos medios de los trazos para calzarlos exactos.");
-    } else {
+    setIsEditingVertices(nextState);
+    isEditingVerticesRef.current = nextState;
+
+    if (!nextState) {
+      const freshLotes = getLotesGeo();
+      setLotes(freshLotes);
+      if (mapInstanceRef.current) {
+        renderLotes(mapInstanceRef.current, freshLotes, showLotesLayer, false, currentZoom, selectedCampo);
+      }
       setStatusNotice("✓ Ajuste de esquinas finalizado y guardado");
       setTimeout(() => setStatusNotice(null), 3500);
+    } else {
+      if (mapInstanceRef.current) {
+        renderLotes(mapInstanceRef.current, lotes, showLotesLayer, true, currentZoom, selectedCampo);
+      }
+      setStatusNotice("📐 Modo Ajuste Activo: Podés arrastrar cualquiera de las esquinas o puntos medios de los trazos para calzarlos exactos.");
     }
   }
 

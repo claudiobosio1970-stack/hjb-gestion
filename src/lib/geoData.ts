@@ -102,7 +102,7 @@ export interface LoteGeo {
 
 // Lotes y perímetros iniciales pre-configurados para los 5 campos (17 lotes reales + 5 perímetros)
 export const DEFAULT_LOTES_GEO: LoteGeo[] = [
-  // --- RACCA: Perímetro exterior y sus 4 lotes internos (100 ha) ---
+  // --- RACCA: Perímetro exterior y sus 2 lotes internos (100 ha) ---
   {
     id: "racca-perimetro",
     campoId: "racca",
@@ -120,55 +120,21 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     observaciones: "Perímetro general del establecimiento Racca (100 ha)",
   },
   {
-    id: "racca-lote-3a",
-    campoId: "racca",
-    campoNombre: "Racca",
-    nombre: "3a",
-    tipo: "lote_interno",
-    superficieHa: 25,
-    coordenadas: [
-      { lat: -32.2382, lng: -61.6126 },
-      { lat: -32.2382, lng: -61.6073 },
-      { lat: -32.2427, lng: -61.6073 },
-      { lat: -32.2427, lng: -61.6126 },
-    ],
-    color: "#22c55e",
-    cultivo: "Soja 1ra",
-    observaciones: "Subdivisión norte-oeste de Racca",
-  },
-  {
-    id: "racca-lote-3b",
-    campoId: "racca",
-    campoNombre: "Racca",
-    nombre: "3b",
-    tipo: "lote_interno",
-    superficieHa: 25,
-    coordenadas: [
-      { lat: -32.2382, lng: -61.6073 },
-      { lat: -32.2382, lng: -61.6020 },
-      { lat: -32.2427, lng: -61.6020 },
-      { lat: -32.2427, lng: -61.6073 },
-    ],
-    color: "#22c55e",
-    cultivo: "Maíz",
-    observaciones: "Subdivisión norte-este de Racca",
-  },
-  {
     id: "racca-lote-1",
     campoId: "racca",
     campoNombre: "Racca",
     nombre: "1",
     tipo: "lote_interno",
-    superficieHa: 25,
+    superficieHa: 50,
     coordenadas: [
-      { lat: -32.2427, lng: -61.6126 },
-      { lat: -32.2427, lng: -61.6073 },
+      { lat: -32.2382, lng: -61.6126 },
+      { lat: -32.2382, lng: -61.6073 },
       { lat: -32.2472, lng: -61.6073 },
       { lat: -32.2472, lng: -61.6126 },
     ],
     color: "#22c55e",
     cultivo: "Soja 1ra",
-    observaciones: "Subdivisión sur-oeste de Racca",
+    observaciones: "Lote 1 de Racca (50 ha)",
   },
   {
     id: "racca-lote-2",
@@ -176,16 +142,16 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     campoNombre: "Racca",
     nombre: "2",
     tipo: "lote_interno",
-    superficieHa: 25,
+    superficieHa: 50,
     coordenadas: [
-      { lat: -32.2427, lng: -61.6073 },
-      { lat: -32.2427, lng: -61.6020 },
+      { lat: -32.2382, lng: -61.6073 },
+      { lat: -32.2382, lng: -61.6020 },
       { lat: -32.2472, lng: -61.6020 },
       { lat: -32.2472, lng: -61.6073 },
     ],
     color: "#22c55e",
-    cultivo: "Alfalfa",
-    observaciones: "Subdivisión sur-este de Racca",
+    cultivo: "Maíz",
+    observaciones: "Lote 2 de Racca (50 ha)",
   },
 
   // --- KEUNEKE: Perímetro exterior y sus 2 lotes internos (57 ha) ---
@@ -496,20 +462,6 @@ export function notifyGeoSync() {
   }
 }
 
-export function mergeLotesWithDefaults(lotes: LoteGeo[]): LoteGeo[] {
-  if (!Array.isArray(lotes) || lotes.length === 0) return DEFAULT_LOTES_GEO;
-  const map = new Map<string, LoteGeo>();
-  // Primero cargamos los predeterminados completos (para que ningún lote falte)
-  for (const def of DEFAULT_LOTES_GEO) {
-    map.set(def.id, def);
-  }
-  // Luego sobreescribimos con las versiones modificadas o agregadas por el usuario
-  for (const l of lotes) {
-    map.set(l.id, l);
-  }
-  return Array.from(map.values());
-}
-
 let isGeoFirestoreSyncInitialized = false;
 
 export function initGeoFirestoreSync() {
@@ -526,26 +478,16 @@ export function initGeoFirestoreSync() {
           if (data.campos_coords && typeof data.campos_coords === "object") {
             localStorage.setItem(GEO_STORAGE_KEY, JSON.stringify(data.campos_coords));
           }
-          if (Array.isArray(data.lotes_geo) && data.lotes_geo.length > 0) {
-            const merged = mergeLotesWithDefaults(data.lotes_geo);
-            localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(merged));
-            // Si la nube tenía menos delimitaciones que el estándar completo, actualizar la nube
-            if (merged.length > data.lotes_geo.length) {
-              setDoc(geoDocRef, { lotes_geo: merged, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
-            }
-          } else {
-            // Si estaba vacío en la nube, subir los 22 lotes completos
-            setDoc(geoDocRef, { lotes_geo: DEFAULT_LOTES_GEO, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
-            localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(DEFAULT_LOTES_GEO));
+          if (Array.isArray(data.lotes_geo)) {
+            localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(data.lotes_geo));
           }
           notifyGeoSync();
         } else {
-          // Si no hay documento en la nube, crearlo con los 22 lotes completos
+          // Si no hay documento en la nube, inicializarlo una sola vez con los valores predeterminados
           const localCoordsRaw = localStorage.getItem(GEO_STORAGE_KEY);
           const localLotesRaw = localStorage.getItem(LOTES_GEO_STORAGE_KEY);
           const campos_coords = localCoordsRaw ? JSON.parse(localCoordsRaw) : {};
-          const parsedLocal = localLotesRaw ? JSON.parse(localLotesRaw) : [];
-          const lotes_geo = mergeLotesWithDefaults(parsedLocal);
+          const lotes_geo = localLotesRaw ? JSON.parse(localLotesRaw) : DEFAULT_LOTES_GEO;
 
           setDoc(geoDocRef, {
             campos_coords,
@@ -625,7 +567,7 @@ export function getLotesGeo(): LoteGeo[] {
     const raw = localStorage.getItem(LOTES_GEO_STORAGE_KEY);
     if (!raw) return DEFAULT_LOTES_GEO;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? mergeLotesWithDefaults(parsed) : DEFAULT_LOTES_GEO;
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_LOTES_GEO;
   } catch {
     return DEFAULT_LOTES_GEO;
   }
