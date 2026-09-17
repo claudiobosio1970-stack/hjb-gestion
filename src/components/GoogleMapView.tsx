@@ -12,7 +12,6 @@ import {
   saveLoteGeo,
   updateLoteCoordinates,
   deleteLoteGeo,
-  resetAllLotesGeo,
   HJB_GEO_SYNC_EVENT,
 } from "@/lib/geoData";
 import { agricultureData, Activity, HJB_AGRICULTURE_SYNC_EVENT } from "@/lib/agricultureData";
@@ -916,34 +915,6 @@ export default function GoogleMapView() {
     setShowKeyModal(false);
   }
 
-  function handleResetLotes() {
-    if (window.confirm("¿Deseás restaurar los perímetros y lotes de los 5 campos (Tambo, Racca, Keuneke, Aguilera y Kitty)?")) {
-      const defs = resetAllLotesGeo();
-      setLotes(defs);
-      setSelectedLote(null);
-      if (mapInstanceRef.current) {
-        renderLotes(mapInstanceRef.current, defs, showLotesLayer, isEditingVertices, currentZoom, selectedCampo);
-      }
-      setStatusNotice("✓ Perímetros y lotes restaurados a valores de referencia.");
-      setTimeout(() => setStatusNotice(null), 4000);
-    }
-  }
-
-  function handleClearAllTrazos() {
-    if (window.confirm("¿Estás seguro de que querés borrar TODOS los trazos del mapa? Esta acción no se puede deshacer.")) {
-      const empty: LoteGeo[] = [];
-      localStorage.setItem("hjb_lotes_geo_polygons_v04", JSON.stringify(empty));
-      setLotes(empty);
-      setSelectedLote(null);
-      if (infoWindowRef.current) infoWindowRef.current.close();
-      if (mapInstanceRef.current) {
-        renderLotes(mapInstanceRef.current, empty, showLotesLayer, isEditingVertices, currentZoom, selectedCampo);
-      }
-      setStatusNotice("✓ Se han borrado todos los trazos del mapa.");
-      setTimeout(() => setStatusNotice(null), 4000);
-    }
-  }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {/* Barra de Control Superior */}
@@ -1326,28 +1297,6 @@ export default function GoogleMapView() {
               );
             })}
 
-            {/* Acciones de reseteo o limpieza */}
-            <div style={{ marginTop: "10px", display: "flex", justifyContent: "space-between", gap: "6px" }}>
-              <button
-                type="button"
-                onClick={handleResetLotes}
-                className="thResetBtn"
-                style={{ fontSize: "11px", color: "var(--brand-700)" }}
-                title="Restaurar ejemplos de Racca y Keuneke"
-              >
-                Restaurar Racca y Keuneke
-              </button>
-
-              <button
-                type="button"
-                onClick={handleClearAllTrazos}
-                className="thResetBtn"
-                style={{ fontSize: "11px", color: "#b91c1c" }}
-                title="Borrar todos los polígonos dibujados"
-              >
-                Borrar todos los trazos
-              </button>
-            </div>
           </div>
         </div>
 
