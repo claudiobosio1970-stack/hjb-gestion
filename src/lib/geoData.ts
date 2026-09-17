@@ -100,9 +100,9 @@ export interface LoteGeo {
   observaciones?: string;
 }
 
-// Lotes y perímetros iniciales pre-configurados (Racca y Keuneke como referencia)
+// Lotes y perímetros iniciales pre-configurados para los 5 campos (17 lotes reales + 5 perímetros)
 export const DEFAULT_LOTES_GEO: LoteGeo[] = [
-  // --- RACCA: Perímetro exterior y sus 4 lotes internos ---
+  // --- RACCA: Perímetro exterior y sus 4 lotes internos (100 ha) ---
   {
     id: "racca-perimetro",
     campoId: "racca",
@@ -188,7 +188,7 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     observaciones: "Subdivisión sur-este de Racca",
   },
 
-  // --- KEUNEKE: Perímetro exterior y sus 2 lotes internos ---
+  // --- KEUNEKE: Perímetro exterior y sus 2 lotes internos (57 ha) ---
   {
     id: "keuneke-perimetro",
     campoId: "keuneke",
@@ -239,6 +239,247 @@ export const DEFAULT_LOTES_GEO: LoteGeo[] = [
     cultivo: "Soja 1ra",
     observaciones: "Lote 2 de Keuneke (9 ha)",
   },
+
+  // --- TAMBO: Perímetro exterior y sus 9 lotes internos (73 ha) ---
+  {
+    id: "tambo-perimetro",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "Tambo",
+    tipo: "perimetro_campo",
+    superficieHa: 73,
+    coordenadas: [
+      { lat: -32.1730, lng: -61.7745 },
+      { lat: -32.1730, lng: -61.7650 },
+      { lat: -32.1816, lng: -61.7650 },
+      { lat: -32.1816, lng: -61.7745 },
+    ],
+    color: "#2563eb",
+    observaciones: "Perímetro general del establecimiento Tambo (73 ha)",
+  },
+  {
+    id: "tambo-lote-1",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "1",
+    tipo: "lote_interno",
+    superficieHa: 7,
+    coordenadas: [
+      { lat: -32.1730, lng: -61.7745 },
+      { lat: -32.1730, lng: -61.7713 },
+      { lat: -32.1758, lng: -61.7713 },
+      { lat: -32.1758, lng: -61.7745 },
+    ],
+    color: "#22c55e",
+    cultivo: "Alfalfa",
+    observaciones: "Lote 1 de Tambo (7 ha - Alfalfa)",
+  },
+  {
+    id: "tambo-lote-2",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "2",
+    tipo: "lote_interno",
+    superficieHa: 10,
+    coordenadas: [
+      { lat: -32.1730, lng: -61.7713 },
+      { lat: -32.1730, lng: -61.7681 },
+      { lat: -32.1758, lng: -61.7681 },
+      { lat: -32.1758, lng: -61.7713 },
+    ],
+    color: "#22c55e",
+    cultivo: "Maíz Silo",
+    observaciones: "Lote 2 de Tambo (10 ha - Silo Maíz)",
+  },
+  {
+    id: "tambo-lote-3",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "3",
+    tipo: "lote_interno",
+    superficieHa: 11,
+    coordenadas: [
+      { lat: -32.1730, lng: -61.7681 },
+      { lat: -32.1730, lng: -61.7650 },
+      { lat: -32.1758, lng: -61.7650 },
+      { lat: -32.1758, lng: -61.7681 },
+    ],
+    color: "#22c55e",
+    cultivo: "Pastura Consociada",
+    observaciones: "Lote 3 de Tambo (11 ha - Pastura Consociada)",
+  },
+  {
+    id: "tambo-lote-4",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "4",
+    tipo: "lote_interno",
+    superficieHa: 5,
+    coordenadas: [
+      { lat: -32.1758, lng: -61.7745 },
+      { lat: -32.1758, lng: -61.7713 },
+      { lat: -32.1787, lng: -61.7713 },
+      { lat: -32.1787, lng: -61.7745 },
+    ],
+    color: "#22c55e",
+    cultivo: "Verdeo Invierno",
+    observaciones: "Lote 4 de Tambo (5 ha - Verdeo Avena)",
+  },
+  {
+    id: "tambo-lote-5",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "5",
+    tipo: "lote_interno",
+    superficieHa: 3,
+    coordenadas: [
+      { lat: -32.1758, lng: -61.7713 },
+      { lat: -32.1758, lng: -61.7681 },
+      { lat: -32.1787, lng: -61.7681 },
+      { lat: -32.1787, lng: -61.7713 },
+    ],
+    color: "#22c55e",
+    cultivo: "Alfalfa 2do Año",
+    observaciones: "Lote 5 de Tambo (3 ha - Alfalfa)",
+  },
+  {
+    id: "tambo-lote-6",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "6",
+    tipo: "lote_interno",
+    superficieHa: 10,
+    coordenadas: [
+      { lat: -32.1758, lng: -61.7681 },
+      { lat: -32.1758, lng: -61.7650 },
+      { lat: -32.1787, lng: -61.7650 },
+      { lat: -32.1787, lng: -61.7681 },
+    ],
+    color: "#22c55e",
+    cultivo: "Bajo Mejorado",
+    observaciones: "Lote 6 de Tambo (10 ha - Agropiro/Melilotus)",
+  },
+  {
+    id: "tambo-lote-7",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "7",
+    tipo: "lote_interno",
+    superficieHa: 10,
+    coordenadas: [
+      { lat: -32.1787, lng: -61.7745 },
+      { lat: -32.1787, lng: -61.7713 },
+      { lat: -32.1816, lng: -61.7713 },
+      { lat: -32.1816, lng: -61.7745 },
+    ],
+    color: "#22c55e",
+    cultivo: "Sorgo Forrajero BMR",
+    observaciones: "Lote 7 de Tambo (10 ha - Sorgo BMR)",
+  },
+  {
+    id: "tambo-lote-8",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "8",
+    tipo: "lote_interno",
+    superficieHa: 10,
+    coordenadas: [
+      { lat: -32.1787, lng: -61.7713 },
+      { lat: -32.1787, lng: -61.7681 },
+      { lat: -32.1816, lng: -61.7681 },
+      { lat: -32.1816, lng: -61.7713 },
+    ],
+    color: "#22c55e",
+    cultivo: "Alfalfa Implante",
+    observaciones: "Lote 8 de Tambo (10 ha - Alfalfa Implante)",
+  },
+  {
+    id: "tambo-lote-9",
+    campoId: "tambo",
+    campoNombre: "Tambo",
+    nombre: "9",
+    tipo: "lote_interno",
+    superficieHa: 7,
+    coordenadas: [
+      { lat: -32.1787, lng: -61.7681 },
+      { lat: -32.1787, lng: -61.7650 },
+      { lat: -32.1816, lng: -61.7650 },
+      { lat: -32.1816, lng: -61.7681 },
+    ],
+    color: "#22c55e",
+    cultivo: "Ryegrass Anual",
+    observaciones: "Lote 9 de Tambo (7 ha - Lote Escuela)",
+  },
+
+  // --- AGUILERA: Perímetro exterior y Lote Único (20 ha) ---
+  {
+    id: "aguilera-perimetro",
+    campoId: "aguilera",
+    campoNombre: "Aguilera",
+    nombre: "Aguilera",
+    tipo: "perimetro_campo",
+    superficieHa: 20,
+    coordenadas: [
+      { lat: -32.2145, lng: -61.6055 },
+      { lat: -32.2145, lng: -61.6007 },
+      { lat: -32.2187, lng: -61.6007 },
+      { lat: -32.2187, lng: -61.6055 },
+    ],
+    color: "#15803d",
+    observaciones: "Perímetro general del establecimiento Aguilera (20 ha)",
+  },
+  {
+    id: "aguilera-lote-unico",
+    campoId: "aguilera",
+    campoNombre: "Aguilera",
+    nombre: "Lote Único",
+    tipo: "lote_interno",
+    superficieHa: 20,
+    coordenadas: [
+      { lat: -32.2145, lng: -61.6055 },
+      { lat: -32.2145, lng: -61.6007 },
+      { lat: -32.2187, lng: -61.6007 },
+      { lat: -32.2187, lng: -61.6055 },
+    ],
+    color: "#22c55e",
+    cultivo: "Soja 1ra / Trigo",
+    observaciones: "Lote Único de Aguilera (20 ha)",
+  },
+
+  // --- KITTY: Perímetro exterior y Lote Único (29 ha) ---
+  {
+    id: "kitty-perimetro",
+    campoId: "kitty",
+    campoNombre: "Kitty",
+    nombre: "Kitty",
+    tipo: "perimetro_campo",
+    superficieHa: 29,
+    coordenadas: [
+      { lat: -32.2516, lng: -61.6324 },
+      { lat: -32.2516, lng: -61.6268 },
+      { lat: -32.2566, lng: -61.6268 },
+      { lat: -32.2566, lng: -61.6324 },
+    ],
+    color: "#7c3aed",
+    observaciones: "Perímetro general del establecimiento Kitty (29 ha)",
+  },
+  {
+    id: "kitty-lote-unico",
+    campoId: "kitty",
+    campoNombre: "Kitty",
+    nombre: "Lote Único",
+    tipo: "lote_interno",
+    superficieHa: 29,
+    coordenadas: [
+      { lat: -32.2516, lng: -61.6324 },
+      { lat: -32.2516, lng: -61.6268 },
+      { lat: -32.2566, lng: -61.6268 },
+      { lat: -32.2566, lng: -61.6324 },
+    ],
+    color: "#22c55e",
+    cultivo: "Maíz Silo Reserva",
+    observaciones: "Lote Único de Kitty (29 ha)",
+  },
 ];
 
 import { db } from "@/lib/firebase";
@@ -253,6 +494,20 @@ export function notifyGeoSync() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(HJB_GEO_SYNC_EVENT));
   }
+}
+
+export function mergeLotesWithDefaults(lotes: LoteGeo[]): LoteGeo[] {
+  if (!Array.isArray(lotes) || lotes.length === 0) return DEFAULT_LOTES_GEO;
+  const map = new Map<string, LoteGeo>();
+  // Primero cargamos los predeterminados completos (para que ningún lote falte)
+  for (const def of DEFAULT_LOTES_GEO) {
+    map.set(def.id, def);
+  }
+  // Luego sobreescribimos con las versiones modificadas o agregadas por el usuario
+  for (const l of lotes) {
+    map.set(l.id, l);
+  }
+  return Array.from(map.values());
 }
 
 let isGeoFirestoreSyncInitialized = false;
@@ -272,15 +527,25 @@ export function initGeoFirestoreSync() {
             localStorage.setItem(GEO_STORAGE_KEY, JSON.stringify(data.campos_coords));
           }
           if (Array.isArray(data.lotes_geo) && data.lotes_geo.length > 0) {
-            localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(data.lotes_geo));
+            const merged = mergeLotesWithDefaults(data.lotes_geo);
+            localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(merged));
+            // Si la nube tenía menos delimitaciones que el estándar completo, actualizar la nube
+            if (merged.length > data.lotes_geo.length) {
+              setDoc(geoDocRef, { lotes_geo: merged, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+            }
+          } else {
+            // Si estaba vacío en la nube, subir los 22 lotes completos
+            setDoc(geoDocRef, { lotes_geo: DEFAULT_LOTES_GEO, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
+            localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(DEFAULT_LOTES_GEO));
           }
           notifyGeoSync();
         } else {
-          // Si no hay datos en la nube pero este dispositivo ya tiene datos guardados, migrarlos a Firestore
+          // Si no hay documento en la nube, crearlo con los 22 lotes completos
           const localCoordsRaw = localStorage.getItem(GEO_STORAGE_KEY);
           const localLotesRaw = localStorage.getItem(LOTES_GEO_STORAGE_KEY);
           const campos_coords = localCoordsRaw ? JSON.parse(localCoordsRaw) : {};
-          const lotes_geo = localLotesRaw ? JSON.parse(localLotesRaw) : DEFAULT_LOTES_GEO;
+          const parsedLocal = localLotesRaw ? JSON.parse(localLotesRaw) : [];
+          const lotes_geo = mergeLotesWithDefaults(parsedLocal);
 
           setDoc(geoDocRef, {
             campos_coords,
@@ -360,7 +625,7 @@ export function getLotesGeo(): LoteGeo[] {
     const raw = localStorage.getItem(LOTES_GEO_STORAGE_KEY);
     if (!raw) return DEFAULT_LOTES_GEO;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_LOTES_GEO;
+    return Array.isArray(parsed) && parsed.length > 0 ? mergeLotesWithDefaults(parsed) : DEFAULT_LOTES_GEO;
   } catch {
     return DEFAULT_LOTES_GEO;
   }

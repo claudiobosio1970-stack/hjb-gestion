@@ -857,7 +857,7 @@ export default function GoogleMapView() {
   }
 
   function handleResetLotes() {
-    if (window.confirm("¿Deseás restaurar los perímetros y lotes iniciales de referencia (Racca y Keuneke)?")) {
+    if (window.confirm("¿Deseás restaurar los perímetros y lotes de los 5 campos (Tambo, Racca, Keuneke, Aguilera y Kitty)?")) {
       const defs = resetAllLotesGeo();
       setLotes(defs);
       setSelectedLote(null);
