@@ -103,13 +103,14 @@ export default function ActivityTable({
         }
       }
 
-      // 2. Filtro Campo y Lote
+      // 2. Filtro Campo y Lote / Cliente
       if (filters.campoLote.trim()) {
         const q = filters.campoLote.trim().toLowerCase();
         const campoMatch = act.campo.toLowerCase().includes(q);
         const loteMatch = (act.lote || "").toLowerCase().includes(q);
+        const clienteMatch = (act.cliente || "").toLowerCase().includes(q);
         const grupalMatch = act.esGrupal && act.lotesAfectados?.some((l) => l.toLowerCase().includes(q));
-        if (!campoMatch && !loteMatch && !grupalMatch) return false;
+        if (!campoMatch && !loteMatch && !grupalMatch && !clienteMatch) return false;
       }
 
       // 3. Filtro Cultivo
@@ -411,33 +412,68 @@ export default function ActivityTable({
 
                     {/* Campo y Lote */}
                     <td>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: "6px", flexWrap: "wrap" }}>
-                        {showCampo && (
-                          <strong style={{ fontSize: "14.5px", color: "var(--slate-950)", letterSpacing: "-0.01em" }}>
-                            {activity.campo}
-                          </strong>
-                        )}
-                        {showCampo && <span style={{ color: "var(--slate-400)", fontWeight: 700 }}>·</span>}
-                        <span style={{ fontSize: "14px", fontWeight: showCampo ? 600 : 700, color: "var(--slate-800)" }}>
-                          {activity.lote || "Lote Único"}
-                        </span>
-                      </div>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "3px", flexWrap: "wrap" }}>
-                        {activity.superficieReal || activity.superficiePlanificada ? (
-                          <small style={{ color: "var(--muted)", fontSize: "12px", fontWeight: 500 }}>
-                            {activity.superficieReal ?? activity.superficiePlanificada} ha
-                          </small>
-                        ) : null}
-                        {activity.esGrupal && (
-                          <span className="groupBadge" title={activity.lotesAfectados?.join(", ")}>
-                            👥 Grupal ({activity.lotesAfectados?.length || 0} lotes)
-                          </span>
-                        )}
-                      </div>
-                      {activity.esGrupal && activity.lotesAfectados && activity.lotesAfectados.length > 0 && (
-                        <div style={{ fontSize: "11px", color: "var(--brand-700)", marginTop: "2px", lineHeight: 1.25 }}>
-                          {activity.lotesAfectados.join(" · ")}
+                      {activity.campo === "A Terceros" || activity.campo?.toLowerCase().includes("tercero") ? (
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                            <span
+                              style={{
+                                background: "#fef3c7",
+                                color: "#92400e",
+                                border: "1px solid #fde68a",
+                                borderRadius: "9999px",
+                                padding: "2px 8px",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "3px",
+                              }}
+                            >
+                              🤝 A Terceros
+                            </span>
+                            <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
+                              👤 {activity.cliente || activity.lote || "Cliente Tercero"}
+                            </strong>
+                          </div>
+                          {(activity.superficieReal || activity.superficiePlanificada) && (
+                            <div style={{ marginTop: "3px" }}>
+                              <small style={{ color: "var(--muted)", fontSize: "12px", fontWeight: 500 }}>
+                                {activity.superficieReal ?? activity.superficiePlanificada} ha
+                              </small>
+                            </div>
+                          )}
                         </div>
+                      ) : (
+                        <>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: "6px", flexWrap: "wrap" }}>
+                            {showCampo && (
+                              <strong style={{ fontSize: "14.5px", color: "var(--slate-950)", letterSpacing: "-0.01em" }}>
+                                {activity.campo}
+                              </strong>
+                            )}
+                            {showCampo && <span style={{ color: "var(--slate-400)", fontWeight: 700 }}>·</span>}
+                            <span style={{ fontSize: "14px", fontWeight: showCampo ? 600 : 700, color: "var(--slate-800)" }}>
+                              {activity.lote || "Lote Único"}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "3px", flexWrap: "wrap" }}>
+                            {activity.superficieReal || activity.superficiePlanificada ? (
+                              <small style={{ color: "var(--muted)", fontSize: "12px", fontWeight: 500 }}>
+                                {activity.superficieReal ?? activity.superficiePlanificada} ha
+                              </small>
+                            ) : null}
+                            {activity.esGrupal && (
+                              <span className="groupBadge" title={activity.lotesAfectados?.join(", ")}>
+                                👥 Grupal ({activity.lotesAfectados?.length || 0} lotes)
+                              </span>
+                            )}
+                          </div>
+                          {activity.esGrupal && activity.lotesAfectados && activity.lotesAfectados.length > 0 && (
+                            <div style={{ fontSize: "11px", color: "var(--brand-700)", marginTop: "2px", lineHeight: 1.25 }}>
+                              {activity.lotesAfectados.join(" · ")}
+                            </div>
+                          )}
+                        </>
                       )}
                     </td>
 

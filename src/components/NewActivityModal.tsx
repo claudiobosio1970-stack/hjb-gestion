@@ -16,7 +16,7 @@ import { LOTES_POR_CAMPO } from "@/lib/historicalData";
 import { productos, tiposActividad } from "@/lib/mockData";
 import { INITIAL_EQUIPMENT } from "@/lib/machineryData";
 
-const CAMPOS_HJB = ["Aguilera", "Tambo", "Racca", "Kitty", "Keuneke"];
+const CAMPOS_HJB = ["Aguilera", "Tambo", "Racca", "Kitty", "Keuneke", "A Terceros"];
 const CAMPANAS_HJB = ["2026/27", "2025/26", "2024/25", "2023/24"];
 
 const CULTIVOS_PRESET = [
@@ -102,6 +102,7 @@ function emptyActivity(campo = "Aguilera", lote = "Lote Único", campana = "2026
     id: "",
     campo,
     lote,
+    cliente: campo === "A Terceros" ? lote : undefined,
     campana,
     cultivo: "",
     cultivoAntecesor: "",
@@ -227,7 +228,7 @@ export default function NewActivityModal({
     if (editingActivity) {
       setForm({
         ...editingActivity,
-        insumos: isRolloLabor(editingActivity.tipo) ? [] : (editingActivity.insumos || []),
+        insumos: isLaborSinInsumos(editingActivity.tipo) ? [] : (editingActivity.insumos || []),
       });
       const isGroup = Boolean(
         editingActivity.esGrupal ||
@@ -326,6 +327,18 @@ export default function NewActivityModal({
   }
 
   function handleCampoChange(nuevoCampo: string) {
+    if (nuevoCampo === "A Terceros") {
+      setForm((prev) => ({
+        ...prev,
+        campo: "A Terceros",
+        lote: prev.cliente || (prev.lote !== "Lote Único" && prev.lote !== "General" ? prev.lote : ""),
+        cliente: prev.cliente || (prev.lote !== "Lote Único" && prev.lote !== "General" ? prev.lote : ""),
+        esGrupal: false,
+        lotesAfectados: [],
+      }));
+      setIsMultiLote(false);
+      return;
+    }
     const dynamicLots = agricultureData.listLotes(nuevoCampo);
     const lotNames = dynamicLots.map((l) => l.nombre);
     const nuevosLotes = lotNames.length > 0 ? lotNames : LOTES_POR_CAMPO[nuevoCampo] || ["Lote Único"];
@@ -336,6 +349,7 @@ export default function NewActivityModal({
       ...prev,
       campo: nuevoCampo,
       lote: firstLote,
+      cliente: undefined,
       superficiePlanificada: ha !== null ? ha : prev.superficiePlanificada,
       superficieReal: ha !== null ? ha : prev.superficieReal,
       cultivo: prev.cultivo || "",
@@ -515,14 +529,22 @@ export default function NewActivityModal({
       }
     }
 
+    const isTerceros = form.campo === "A Terceros";
+    const finalCliente = isTerceros ? (form.cliente || form.lote || "").trim() : undefined;
+    if (isTerceros && !finalCliente) {
+      alert("Por favor ingresá el nombre del cliente o destinatario del trabajo a terceros.");
+      return;
+    }
+
     const activityToSave: Activity = {
       ...form,
-      insumos: isRolloLabor(form.tipo) ? [] : validInsumos,
+      insumos: isLaborSinInsumos(form.tipo) ? [] : validInsumos,
       cultivo: finalCultivo,
       cultivoAntecesor: autoCultivoAntecesor || undefined,
       id: form.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `act-${Date.now()}`),
       campo: isMultiLote ? (form.campo || "Multicampo") : form.campo,
-      lote: isMultiLote ? (form.lote || (form.lotesAfectados || []).join(", ")) : (form.lote || "Lote Único"),
+      lote: isTerceros ? (finalCliente || "Cliente Tercero") : (isMultiLote ? (form.lote || (form.lotesAfectados || []).join(", ")) : (form.lote || "Lote Único")),
+      cliente: finalCliente,
       esGrupal: isMultiLote ? true : false,
       lotesAfectados: isMultiLote ? form.lotesAfectados : undefined,
       fechaPlanificada: form.fechaPlanificada || form.fechaReal || "",
@@ -556,6 +578,19 @@ export default function NewActivityModal({
   const allLoteOptions = Array.from(
     new Set([...baseLotes, ...(form.lote ? [form.lote] : []), "General", "Lote Único"])
   );
+
+  const pastClientes = useMemo(() => {
+    try {
+      const allActs = agricultureData.listActivities();
+      const list = allActs
+        .filter((a) => a.campo === "A Terceros" || a.cliente)
+        .map((a) => a.cliente || a.lote)
+        .filter((c): c is string => Boolean(c && c.trim() && c !== "Lote Único" && c !== "General" && c !== "Cliente Tercero"));
+      return Array.from(new Set(list));
+    } catch {
+      return [];
+    }
+  }, []);
 
   const isTambo = (form.campo || "").toLowerCase() === "tambo";
 
@@ -592,9 +627,13 @@ export default function NewActivityModal({
               {editingActivity
                 ? (isMultiLote
                     ? `👥 Labor Grupal (${(form.lotesAfectados || []).length} lotes) · Campaña ${form.campana}`
+                    : form.campo === "A Terceros"
+                    ? `🤝 A Terceros · ${form.cliente || form.lote || "Cliente"} · Campaña ${form.campana}`
                     : `📍 ${form.campo} · ${form.lote || "Lote"} · Campaña ${form.campana}`)
                 : (isMultiLote
                     ? `👥 Labor Grupal (${(form.lotesAfectados || []).length} lotes)`
+                    : form.campo === "A Terceros"
+                    ? `🤝 A Terceros · ${form.cliente || form.lote || "Cliente"} · Campaña ${form.campana}`
                     : `${form.campo} · ${form.lote || "Lote"} · Campaña ${form.campana}`)}
             </p>
             <h2>
@@ -617,6 +656,8 @@ export default function NewActivityModal({
               <span className="pill badgeNeutral" style={{ fontSize: "12px", padding: "4px 10px" }}>
                 {isMultiLote
                   ? `👥 Multilote (${(form.lotesAfectados || []).length} lotes)`
+                  : form.campo === "A Terceros"
+                  ? `🤝 A Terceros · 👤 ${form.cliente || form.lote || "Cliente"}`
                   : `📍 ${form.campo} · ${form.lote || "Lote único"}`}
               </span>
             </div>
@@ -637,29 +678,54 @@ export default function NewActivityModal({
                   ))}
                 </select>
               </div>
-              <div>
-                <label>Lote</label>
-                {isMultiLote ? (
+              {form.campo === "A Terceros" ? (
+                <div>
+                  <label>👤 Cliente / Destinatario</label>
                   <input
                     className="input"
-                    value={form.lote || "Múltiples lotes"}
-                    disabled
-                    title="Labor aplicada a múltiples lotes"
+                    value={form.cliente ?? form.lote ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForm((prev) => ({
+                        ...prev,
+                        cliente: val,
+                        lote: val || "Cliente Tercero",
+                      }));
+                    }}
+                    placeholder="Nombre del cliente o campo..."
+                    list="clientes-preset"
                   />
-                ) : (
-                  <select
-                    className="input"
-                    value={form.lote || allLoteOptions[0]}
-                    onChange={(e) => handleLoteChange(e.target.value)}
-                  >
-                    {allLoteOptions.map((l) => (
-                      <option key={l} value={l}>
-                        {l}
-                      </option>
+                  <datalist id="clientes-preset">
+                    {pastClientes.map((cli) => (
+                      <option key={cli} value={cli} />
                     ))}
-                  </select>
-                )}
-              </div>
+                  </datalist>
+                </div>
+              ) : (
+                <div>
+                  <label>Lote</label>
+                  {isMultiLote ? (
+                    <input
+                      className="input"
+                      value={form.lote || "Múltiples lotes"}
+                      disabled
+                      title="Labor aplicada a múltiples lotes"
+                    />
+                  ) : (
+                    <select
+                      className="input"
+                      value={form.lote || allLoteOptions[0]}
+                      onChange={(e) => handleLoteChange(e.target.value)}
+                    >
+                      {allLoteOptions.map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
               <div>
                 <label>Campaña</label>
                 <select
@@ -715,53 +781,55 @@ export default function NewActivityModal({
               <h3>Ubicación y Asignación de Lotes</h3>
 
               {/* Selector interactivo de Modo Individual vs Múltiple */}
-              <div style={{ display: "flex", gap: "8px", background: "var(--slate-100)", padding: "3px", borderRadius: "8px" }}>
-                <button
-                  type="button"
-                  className={!isMultiLote ? "primaryButton" : "secondaryButton"}
-                  style={{
-                    padding: "5px 12px",
-                    fontSize: "12px",
-                    borderRadius: "6px",
-                    border: 0,
-                    boxShadow: !isMultiLote ? "var(--shadow-sm)" : "none",
-                  }}
-                  onClick={() => {
-                    setIsMultiLote(false);
-                    const c = fixedCampo || "Aguilera";
-                    const lots = LOTES_POR_CAMPO[c] || ["Lote Único"];
-                    setForm((prev) => ({
-                      ...prev,
-                      esGrupal: false,
-                      campo: c,
-                      lote: lots[0],
-                    }));
-                  }}
-                >
-                  📍 Lote Individual
-                </button>
-                <button
-                  type="button"
-                  className={isMultiLote ? "primaryButton" : "secondaryButton"}
-                  style={{
-                    padding: "5px 12px",
-                    fontSize: "12px",
-                    borderRadius: "6px",
-                    border: 0,
-                    boxShadow: isMultiLote ? "var(--shadow-sm)" : "none",
-                  }}
-                  onClick={() => {
-                    setIsMultiLote(true);
-                    setForm((prev) => ({
-                      ...prev,
-                      esGrupal: true,
-                      lotesAfectados: prev.lotesAfectados && prev.lotesAfectados.length > 0 ? prev.lotesAfectados : [],
-                    }));
-                  }}
-                >
-                  👥 Múltiples Lotes / Campos
-                </button>
-              </div>
+              {form.campo !== "A Terceros" && (
+                <div style={{ display: "flex", gap: "8px", background: "var(--slate-100)", padding: "3px", borderRadius: "8px" }}>
+                  <button
+                    type="button"
+                    className={!isMultiLote ? "primaryButton" : "secondaryButton"}
+                    style={{
+                      padding: "5px 12px",
+                      fontSize: "12px",
+                      borderRadius: "6px",
+                      border: 0,
+                      boxShadow: !isMultiLote ? "var(--shadow-sm)" : "none",
+                    }}
+                    onClick={() => {
+                      setIsMultiLote(false);
+                      const c = fixedCampo || "Aguilera";
+                      const lots = LOTES_POR_CAMPO[c] || ["Lote Único"];
+                      setForm((prev) => ({
+                        ...prev,
+                        esGrupal: false,
+                        campo: c,
+                        lote: lots[0],
+                      }));
+                    }}
+                  >
+                    📍 Lote Individual
+                  </button>
+                  <button
+                    type="button"
+                    className={isMultiLote ? "primaryButton" : "secondaryButton"}
+                    style={{
+                      padding: "5px 12px",
+                      fontSize: "12px",
+                      borderRadius: "6px",
+                      border: 0,
+                      boxShadow: isMultiLote ? "var(--shadow-sm)" : "none",
+                    }}
+                    onClick={() => {
+                      setIsMultiLote(true);
+                      setForm((prev) => ({
+                        ...prev,
+                        esGrupal: true,
+                        lotesAfectados: prev.lotesAfectados && prev.lotesAfectados.length > 0 ? prev.lotesAfectados : [],
+                      }));
+                    }}
+                  >
+                    👥 Múltiples Lotes / Campos
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* MODO A: Lote Individual */}
@@ -772,7 +840,6 @@ export default function NewActivityModal({
                   <select
                     className="input"
                     value={form.campo}
-                    disabled={Boolean(fixedCampo)}
                     onChange={(e) => handleCampoChange(e.target.value)}
                   >
                     {CAMPOS_HJB.map((c) => (
@@ -782,20 +849,46 @@ export default function NewActivityModal({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label>Lote</label>
-                  <select
-                    className="input"
-                    value={form.lote || allLoteOptions[0]}
-                    onChange={(e) => handleLoteChange(e.target.value)}
-                  >
-                    {allLoteOptions.map((l) => (
-                      <option key={l} value={l}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {form.campo === "A Terceros" ? (
+                  <div>
+                    <label>👤 Cliente / Destinatario</label>
+                    <input
+                      className="input"
+                      value={form.cliente ?? (form.lote !== "Lote Único" && form.lote !== "General" ? form.lote : "")}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((prev) => ({
+                          ...prev,
+                          cliente: val,
+                          lote: val || "Cliente Tercero",
+                        }));
+                      }}
+                      placeholder="Nombre del cliente o campo tercero..."
+                      list="clientes-preset"
+                      autoFocus
+                    />
+                    <datalist id="clientes-preset">
+                      {pastClientes.map((cli) => (
+                        <option key={cli} value={cli} />
+                      ))}
+                    </datalist>
+                  </div>
+                ) : (
+                  <div>
+                    <label>Lote</label>
+                    <select
+                      className="input"
+                      value={form.lote || allLoteOptions[0]}
+                      onChange={(e) => handleLoteChange(e.target.value)}
+                    >
+                      {allLoteOptions.map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label>Campaña</label>
                   <select
@@ -1008,14 +1101,11 @@ export default function NewActivityModal({
                   const newTipo = e.target.value;
                   const newMaq = getDefaultMaquinaria(newTipo);
                   const sinInsumos = isLaborSinInsumos(newTipo);
-                  const esRollo = isRolloLabor(newTipo);
                   setForm((prev) => {
                     let nextInsumos = prev.insumos;
-                    if (esRollo) {
+                    if (sinInsumos) {
                       nextInsumos = [];
-                    } else if (sinInsumos && prev.insumos.length <= 1 && (!prev.insumos[0] || !prev.insumos[0].producto)) {
-                      nextInsumos = [];
-                    } else if (!sinInsumos && prev.insumos.length === 0 && !isBiofertilizacion(newTipo)) {
+                    } else if (prev.insumos.length === 0 && !isBiofertilizacion(newTipo)) {
                       nextInsumos = [newInput("")];
                     }
                     return {
@@ -1226,8 +1316,8 @@ export default function NewActivityModal({
           </div>
         </div>
 
-        {/* SECCIÓN 4: Insumos y Dosis (Oculto para actividades de rollos) */}
-        {!isRolloLabor(form.tipo) && (
+        {/* SECCIÓN 4: Insumos y Dosis (Oculto para labores mecánicas y rollos) */}
+        {!isLaborSinInsumos(form.tipo) && (
           <div className="formSection">
             <div style={{ marginBottom: "12px" }}>
               <h3>Insumos y Dosis</h3>
@@ -1333,39 +1423,14 @@ export default function NewActivityModal({
 
           {!isBiofertilizacion(form.tipo) && (
             <>
-              {isLaborSinInsumos(form.tipo) && form.insumos.length === 0 ? (
-                <div
-                  style={{
-                    padding: "16px 20px",
-                    background: "var(--slate-50)",
-                    borderRadius: "8px",
-                    border: "1px dashed var(--slate-300)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: "12px",
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
-                      ✓ Labor mecánica de suelo sin insumos ({form.tipo})
-                    </strong>
-                    <p style={{ margin: "3px 0 0", fontSize: "12px", color: "var(--slate-500)" }}>
-                      Para esta labor no se requiere cargar productos ni agroquímicos. Podés guardar directamente la labor.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="secondaryButton smallButton"
-                    onClick={addInput}
-                  >
-                    + Agregar insumo si fuese necesario
-                  </button>
-                </div>
-              ) : form.insumos.length === 0 ? (
+              {form.insumos.length === 0 ? (
                 <div style={{ padding: "16px", background: "var(--slate-50)", borderRadius: "8px", textAlign: "center", color: "var(--muted)", fontSize: "13px" }}>
                   Esta labor no registra insumos cargados.
+                  <div style={{ marginTop: "8px" }}>
+                    <button type="button" className="secondaryButton smallButton" onClick={addInput}>
+                      + Agregar insumo
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="inputLines">

@@ -27,6 +27,7 @@ export type Activity = {
   id: string;
   campo: string;
   lote?: string;
+  cliente?: string;
   campana: string;
   cultivo: string;
   cultivoAntecesor?: string;
@@ -745,10 +746,26 @@ export function isLaborSinInsumos(tipo: string): boolean {
     t.includes("disco") ||
     t.includes("rastra") ||
     t.includes("rolad") ||
+    t.includes("rolo") ||
     t.includes("laboreo") ||
     t.includes("desmalez") ||
     t.includes("arado") ||
+    t.includes("arada") ||
     t.includes("escarific") ||
-    t.includes("cincel")
+    t.includes("cincel") ||
+    t.includes("nivelac") ||
+    t.includes("rabasto") ||
+    t.includes("cosecha") ||
+    t.includes("picado") ||
+    t.includes("mecanic") ||
+    t.includes("mecánic") ||
+    t.includes("transporte") ||
+    t.includes("acarreo") ||
+    t.includes("enfard") ||
+    t.includes("enroll") ||
+    t.includes("corte") ||
+    t.includes("hilerad") ||
+    t.includes("segad") ||
+    t.includes("andana")
   );
 }
