@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Activity,
   ActivityInput,
@@ -23,6 +23,7 @@ const CULTIVOS_PRESET = [
   "Trigo Catalpa",
   "Avena",
   "Alfalfa",
+  "Avena / Alfalfa",
   "Pastura Consociada",
   "Moha",
   "Sorgo Forrajero",
@@ -32,6 +33,8 @@ const CULTIVOS_PRESET = [
 const MAQUINARIAS_PRESET = [
   "Fumigador Metalford",
   "Tractor Case 150",
+  "Rastrillo Hilerador / Giroscópico",
+  "Rotoenfardadora / Enrolladora Mainero",
   ...INITIAL_EQUIPMENT.map((eq) => `${eq.nombre} (${eq.marca} ${eq.modelo})`),
   "Tractor John Deere 6120E (120 HP)",
   "Tractor John Deere 5705 (85 HP)",
@@ -59,7 +62,10 @@ function isLaborSinInsumos(tipo: string): boolean {
     t.includes("desmalez") ||
     t.includes("arado") ||
     t.includes("escarific") ||
-    t.includes("cincel")
+    t.includes("cincel") ||
+    t.includes("voltead") ||
+    t.includes("hilerad") ||
+    t.includes("rastrill")
   );
 }
 
@@ -73,7 +79,13 @@ function getDefaultMaquinaria(tipo: string): string {
   if (t.includes("fumiga") || t.includes("pulveri") || t.includes("barbecho")) {
     return "Fumigador Metalford";
   }
-  if (t.includes("cosecha") || t.includes("picado") || t.includes("rollo")) {
+  if (t.includes("voltead") || t.includes("hilerad") || t.includes("rastrill")) {
+    return "Rastrillo Hilerador / Giroscópico";
+  }
+  if (t.includes("armado") || t.includes("rollo") || t.includes("confecci") || t.includes("enrollad")) {
+    return "Rotoenfardadora / Enrolladora";
+  }
+  if (t.includes("cosecha") || t.includes("picado")) {
     return "";
   }
   return "Tractor Case 150";
@@ -153,6 +165,24 @@ export default function NewActivityModal({
   // Lista de todos los lotes configurados en la app
   const allLotes = agricultureData.listLotes();
 
+  // Buscar si hubo una labor de volteada previa en este campo y lote
+  const previousVolteada = useMemo(() => {
+    if (!form.campo || !form.lote) return null;
+    try {
+      const allActs = agricultureData.listActivities();
+      return (
+        allActs.find(
+          (a) =>
+            a.campo === form.campo &&
+            a.lote === form.lote &&
+            (a.tipo || "").toLowerCase().includes("voltead")
+        ) || null
+      );
+    } catch {
+      return null;
+    }
+  }, [form.campo, form.lote]);
+
   useEffect(() => {
     if (!open) return;
     if (editingActivity) {
@@ -165,14 +195,18 @@ export default function NewActivityModal({
         (editingActivity.lotesAfectados && editingActivity.lotesAfectados.length > 1)
       );
       setIsMultiLote(isGroup);
+      const isRollOrHarv =
+        editingActivity.tipo === "Cosecha" ||
+        editingActivity.tipo === "Picado" ||
+        editingActivity.tipo === "Rollos" ||
+        editingActivity.tipo === "Armado de rollos" ||
+        editingActivity.tipo.toLowerCase().includes("rollo") ||
+        editingActivity.tipo.toLowerCase().includes("armado");
       setShowProduccion(
         Boolean(
           editingActivity.produccion &&
           (editingActivity.produccion.rendimiento !== null || editingActivity.produccion.cantidad !== null)
-        ) ||
-        editingActivity.tipo === "Cosecha" ||
-        editingActivity.tipo === "Picado" ||
-        editingActivity.tipo === "Rollos"
+        ) || isRollOrHarv
       );
     } else {
       const c = fixedCampo || "Aguilera";
@@ -488,6 +522,8 @@ export default function NewActivityModal({
       "Fumigación",
       "Fertilización",
       "Biofertilización",
+      "Volteada de rollos",
+      "Armado de rollos",
       "Subsolado",
       "Laboreo",
       "Rastra de discos",
@@ -947,9 +983,28 @@ export default function NewActivityModal({
                   const isCosechaPicado =
                     newTipo.toLowerCase().includes("cosecha") ||
                     newTipo.toLowerCase().includes("picado") ||
-                    newTipo.toLowerCase().includes("rollo");
+                    newTipo.toLowerCase().includes("rollo") ||
+                    newTipo.toLowerCase().includes("armado");
                   if (isCosechaPicado) {
                     setShowProduccion(true);
+                    if (newTipo.toLowerCase().includes("rollo") || newTipo.toLowerCase().includes("armado")) {
+                      setForm((prev) => ({
+                        ...prev,
+                        produccion: prev.produccion || {
+                          rendimiento: null,
+                          unidadRendimiento: "rollos/ha",
+                          cantidad: null,
+                          unidad: "rollos",
+                          destino: "Stock de Forrajes",
+                          fechaVolteada: previousVolteada ? (previousVolteada.fechaReal || previousVolteada.fechaPlanificada) : "",
+                          rollosDesglose: {
+                            avena: null,
+                            alfalfa: null,
+                            rastrojo: null,
+                          },
+                        },
+                      }));
+                    }
                   } else {
                     setShowProduccion(false);
                   }
@@ -1385,14 +1440,25 @@ export default function NewActivityModal({
           </datalist>
         </div>
 
-        {/* SECCIÓN 5: Producción / Rendimiento (Solo en Cosecha, Picado o Rollos) */}
-        {(form.tipo === "Cosecha" || form.tipo === "Picado" || form.tipo === "Rollos") && (
+        {/* SECCIÓN 5: Producción / Rendimiento (Cosecha, Picado o Confección de Rollos) */}
+        {(form.tipo === "Cosecha" ||
+          form.tipo === "Picado" ||
+          form.tipo === "Rollos" ||
+          form.tipo === "Armado de rollos" ||
+          form.tipo.toLowerCase().includes("rollo") ||
+          form.tipo.toLowerCase().includes("armado")) && (
           <div className="formSection">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
               <div>
-                <h3>Resultado Productivo / Cosecha / Forraje</h3>
+                <h3>
+                  {form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado")
+                    ? "Confección de Rollos / Cosecha de Forraje"
+                    : "Resultado Productivo / Cosecha / Forraje"}
+                </h3>
                 <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
-                  Rinde por hectárea, volumen cosechado y destino productivo.
+                  {form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado")
+                    ? "Rollos obtenidos por cultivo (Avena / Alfalfa), rendimiento por hectárea y fecha de volteada."
+                    : "Rinde por hectárea, volumen cosechado y destino productivo."}
                 </p>
               </div>
 
@@ -1415,110 +1481,379 @@ export default function NewActivityModal({
                   onClick={() => {
                     setShowProduccion(true);
                     if (!form.produccion) {
+                      const isRol = form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado");
                       set("produccion", {
                         rendimiento: null,
-                        unidadRendimiento: form.tipo === "Picado" ? "m/ha" : form.tipo === "Rollos" ? "rollos/ha" : "qq/ha",
+                        unidadRendimiento: form.tipo === "Picado" ? "m/ha" : isRol ? "rollos/ha" : "qq/ha",
                         cantidad: null,
-                        unidad: form.tipo === "Picado" ? "metros silo" : form.tipo === "Rollos" ? "rollos" : "kg",
-                        destino: form.tipo === "Picado" ? "Silo" : form.tipo === "Rollos" ? "Rollos" : "Grano",
+                        unidad: form.tipo === "Picado" ? "metros silo" : isRol ? "rollos" : "kg",
+                        destino: form.tipo === "Picado" ? "Silo" : isRol ? "Stock de Forrajes" : "Grano",
+                        fechaVolteada: previousVolteada ? (previousVolteada.fechaReal || previousVolteada.fechaPlanificada) : "",
+                        rollosDesglose: {
+                          avena: null,
+                          alfalfa: null,
+                          rastrojo: null,
+                        },
                       });
                     }
                   }}
                 >
-                  + Cargar rendimiento / cosecha
+                  + Cargar rendimiento / rollos
                 </button>
               )}
             </div>
 
             {showProduccion && (
-              <div className="formGrid fourForm">
-                <div>
-                  <label>Rendimiento</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="input"
-                    value={form.produccion?.rendimiento ?? ""}
-                    onChange={(e) => {
-                      const val = e.target.value ? Number(e.target.value) : null;
-                      set("produccion", {
-                        rendimiento: val,
-                        unidadRendimiento: form.produccion?.unidadRendimiento || (form.tipo === "Picado" ? "m/ha" : form.tipo === "Rollos" ? "rollos/ha" : "qq/ha"),
-                        cantidad: form.produccion?.cantidad ?? null,
-                        unidad: form.produccion?.unidad || (form.tipo === "Picado" ? "metros silo" : form.tipo === "Rollos" ? "rollos" : "kg"),
-                        destino: form.produccion?.destino || (form.tipo === "Picado" ? "Silo" : form.tipo === "Rollos" ? "Rollos" : "Grano"),
-                      });
-                    }}
-                    placeholder="ej: 39.37"
-                  />
-                </div>
-                <div>
-                  <label>Unidad Rendimiento</label>
-                  <select
-                    className="input"
-                    value={form.produccion?.unidadRendimiento || "qq/ha"}
-                    onChange={(e) => {
-                      set("produccion", {
-                        ...form.produccion,
-                        unidadRendimiento: e.target.value as any,
-                        cantidad: form.produccion?.cantidad ?? null,
-                        unidad: form.produccion?.unidad || "kg",
-                        rendimiento: form.produccion?.rendimiento ?? null,
-                      });
+              form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado") ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {/* Banner de Acreditación Automática en Stock */}
+                  <div
+                    style={{
+                      background: "rgba(22, 163, 74, 0.08)",
+                      border: "1px solid rgba(22, 163, 74, 0.25)",
+                      borderRadius: "8px",
+                      padding: "10px 14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      fontSize: "12.5px",
+                      color: "#166534",
                     }}
                   >
-                    <option value="qq/ha">qq/ha (Quintales/ha)</option>
-                    <option value="m/ha">m/ha (Metros silo/ha)</option>
-                    <option value="rollos/ha">rollos/ha</option>
-                    <option value="kg/ha">kg/ha</option>
-                    <option value="t/ha">t/ha</option>
-                  </select>
+                    <span style={{ fontSize: "18px" }}>📦</span>
+                    <div>
+                      <strong>Acreditación Automática en Stock de Insumos:</strong> Al marcar esta labor como <em>"Realizada"</em>, los rollos anotados por cultivo se sumarán automáticamente al stock general (<strong>Rollos de Avena</strong> y/o <strong>Rollos de Alfalfa</strong>) y se valorizarán en vivo en <em>Insumos & Stock</em>.
+                    </div>
+                  </div>
+
+                  {/* Desglose de Rollos por Cultivo */}
+                  <div>
+                    <label style={{ fontWeight: 700, fontSize: "13px", color: "var(--slate-800)", marginBottom: "6px", display: "block" }}>
+                      🌾 Cantidad de Rollos Confeccionados por Cultivo:
+                    </label>
+                    <div className="formGrid threeForm" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                      <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                        <label style={{ fontSize: "12px", color: "var(--brand-800)", fontWeight: 700 }}>
+                          🌾 Rollos de Avena
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="input"
+                          value={form.produccion?.rollosDesglose?.avena ?? ""}
+                          onChange={(e) => {
+                            const av = e.target.value ? Number(e.target.value) : null;
+                            const alf = form.produccion?.rollosDesglose?.alfalfa ?? null;
+                            const rast = form.produccion?.rollosDesglose?.rastrojo ?? null;
+                            const tot = (av || 0) + (alf || 0) + (rast || 0);
+                            const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                            const rinde = tot > 0 && sup && sup > 0 ? Number((tot / sup).toFixed(2)) : null;
+                            set("produccion", {
+                              ...form.produccion,
+                              unidad: "rollos",
+                              unidadRendimiento: "rollos/ha",
+                              destino: form.produccion?.destino || "Stock de Forrajes",
+                              cantidad: tot > 0 ? tot : (form.produccion?.cantidad ?? null),
+                              rendimiento: rinde ?? form.produccion?.rendimiento ?? null,
+                              rollosDesglose: {
+                                ...form.produccion?.rollosDesglose,
+                                avena: av,
+                              },
+                            });
+                          }}
+                          placeholder="ej: 40 rollos"
+                        />
+                      </div>
+
+                      <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                        <label style={{ fontSize: "12px", color: "#15803d", fontWeight: 700 }}>
+                          🌿 Rollos de Alfalfa
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="input"
+                          value={form.produccion?.rollosDesglose?.alfalfa ?? ""}
+                          onChange={(e) => {
+                            const alf = e.target.value ? Number(e.target.value) : null;
+                            const av = form.produccion?.rollosDesglose?.avena ?? null;
+                            const rast = form.produccion?.rollosDesglose?.rastrojo ?? null;
+                            const tot = (av || 0) + (alf || 0) + (rast || 0);
+                            const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                            const rinde = tot > 0 && sup && sup > 0 ? Number((tot / sup).toFixed(2)) : null;
+                            set("produccion", {
+                              ...form.produccion,
+                              unidad: "rollos",
+                              unidadRendimiento: "rollos/ha",
+                              destino: form.produccion?.destino || "Stock de Forrajes",
+                              cantidad: tot > 0 ? tot : (form.produccion?.cantidad ?? null),
+                              rendimiento: rinde ?? form.produccion?.rendimiento ?? null,
+                              rollosDesglose: {
+                                ...form.produccion?.rollosDesglose,
+                                alfalfa: alf,
+                              },
+                            });
+                          }}
+                          placeholder="ej: 35 rollos"
+                        />
+                      </div>
+
+                      <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                        <label style={{ fontSize: "12px", color: "var(--slate-700)", fontWeight: 700 }}>
+                          🌽 Rastrojo / Otros
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="input"
+                          value={form.produccion?.rollosDesglose?.rastrojo ?? ""}
+                          onChange={(e) => {
+                            const rast = e.target.value ? Number(e.target.value) : null;
+                            const av = form.produccion?.rollosDesglose?.avena ?? null;
+                            const alf = form.produccion?.rollosDesglose?.alfalfa ?? null;
+                            const tot = (av || 0) + (alf || 0) + (rast || 0);
+                            const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                            const rinde = tot > 0 && sup && sup > 0 ? Number((tot / sup).toFixed(2)) : null;
+                            set("produccion", {
+                              ...form.produccion,
+                              unidad: "rollos",
+                              unidadRendimiento: "rollos/ha",
+                              destino: form.produccion?.destino || "Stock de Forrajes",
+                              cantidad: tot > 0 ? tot : (form.produccion?.cantidad ?? null),
+                              rendimiento: rinde ?? form.produccion?.rendimiento ?? null,
+                              rollosDesglose: {
+                                ...form.produccion?.rollosDesglose,
+                                rastrojo: rast,
+                              },
+                            });
+                          }}
+                          placeholder="ej: 20 rollos"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Totales, Rendimiento y Destino */}
+                  <div className="formGrid threeForm" style={{ gridTemplateColumns: "1fr 1fr 1.2fr" }}>
+                    <div>
+                      <label>Total de Rollos Obtenidos</label>
+                      <input
+                        type="number"
+                        step="1"
+                        className="input"
+                        value={form.produccion?.cantidad ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value ? Number(e.target.value) : null;
+                          const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                          const rinde = val && sup && sup > 0 ? Number((val / sup).toFixed(2)) : form.produccion?.rendimiento ?? null;
+                          set("produccion", {
+                            ...form.produccion,
+                            cantidad: val,
+                            rendimiento: rinde,
+                            unidad: "rollos",
+                            unidadRendimiento: "rollos/ha",
+                            destino: form.produccion?.destino || "Stock de Forrajes",
+                          });
+                        }}
+                        placeholder="Total rollos confeccionados"
+                      />
+                    </div>
+
+                    <div>
+                      <label>Rendimiento (rollos/ha)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className="input"
+                        value={form.produccion?.rendimiento ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value ? Number(e.target.value) : null;
+                          set("produccion", {
+                            ...form.produccion,
+                            rendimiento: val,
+                            unidadRendimiento: "rollos/ha",
+                            unidad: "rollos",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            destino: form.produccion?.destino || "Stock de Forrajes",
+                          });
+                        }}
+                        placeholder="ej: 4.5 rollos/ha"
+                      />
+                    </div>
+
+                    <div>
+                      <label>Destino de los Rollos</label>
+                      <select
+                        className="input"
+                        value={form.produccion?.destino || "Stock de Forrajes"}
+                        onChange={(e) => {
+                          set("produccion", {
+                            ...form.produccion,
+                            destino: e.target.value,
+                            unidad: "rollos",
+                            unidadRendimiento: "rollos/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                          });
+                        }}
+                      >
+                        <option value="Stock de Forrajes">Stock de Forrajes (Galpón / Tinglado)</option>
+                        <option value="Tambo">Tambo (Alimentación directa)</option>
+                        <option value="Ganadería">Ganadería (Corrales / Recría)</option>
+                        <option value="Venta directa">Venta directa a terceros</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Fecha de Volteada Previa */}
+                  <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                      <div>
+                        <label style={{ fontWeight: 700, fontSize: "12.5px", color: "var(--slate-800)" }}>
+                          🔄 Fecha en que se volteó la andana (Avena / Alfalfa)
+                        </label>
+                        <div style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
+                          Indica la fecha en que se rastrilló / volteó el forraje previo a la confección.
+                        </div>
+                      </div>
+
+                      {previousVolteada && (
+                        <button
+                          type="button"
+                          className="secondaryButton smallButton"
+                          style={{ fontSize: "11px", padding: "4px 8px" }}
+                          onClick={() => {
+                            const fv = previousVolteada.fechaReal || previousVolteada.fechaPlanificada;
+                            if (fv) {
+                              set("produccion", {
+                                ...form.produccion,
+                                unidad: form.produccion?.unidad || "rollos",
+                                unidadRendimiento: form.produccion?.unidadRendimiento || "rollos/ha",
+                                cantidad: form.produccion?.cantidad ?? null,
+                                rendimiento: form.produccion?.rendimiento ?? null,
+                                fechaVolteada: fv,
+                              });
+                            }
+                          }}
+                          title="Usar la fecha de la volteada registrada previamente en este lote"
+                        >
+                          💡 Usar fecha de volteada previa ({previousVolteada.fechaReal || previousVolteada.fechaPlanificada})
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: "8px", maxWidth: "240px" }}>
+                      <input
+                        type="date"
+                        className="input"
+                        value={form.produccion?.fechaVolteada || ""}
+                        onChange={(e) => {
+                          set("produccion", {
+                            ...form.produccion,
+                            unidad: form.produccion?.unidad || "rollos",
+                            unidadRendimiento: form.produccion?.unidadRendimiento || "rollos/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                            fechaVolteada: e.target.value,
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label>Producción Total</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="input"
-                    value={form.produccion?.cantidad ?? ""}
-                    onChange={(e) => {
-                      const val = e.target.value ? Number(e.target.value) : null;
-                      set("produccion", {
-                        ...form.produccion,
-                        cantidad: val,
-                        unidad: form.produccion?.unidad || "kg",
-                        rendimiento: form.produccion?.rendimiento ?? null,
-                        unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
-                      });
-                    }}
-                    placeholder="Total kilos / metros"
-                  />
+              ) : (
+                <div className="formGrid fourForm">
+                  <div>
+                    <label>Rendimiento</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input"
+                      value={form.produccion?.rendimiento ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value ? Number(e.target.value) : null;
+                        set("produccion", {
+                          rendimiento: val,
+                          unidadRendimiento: form.produccion?.unidadRendimiento || (form.tipo === "Picado" ? "m/ha" : "qq/ha"),
+                          cantidad: form.produccion?.cantidad ?? null,
+                          unidad: form.produccion?.unidad || (form.tipo === "Picado" ? "metros silo" : "kg"),
+                          destino: form.produccion?.destino || (form.tipo === "Picado" ? "Silo" : "Grano"),
+                        });
+                      }}
+                      placeholder="ej: 39.37"
+                    />
+                  </div>
+                  <div>
+                    <label>Unidad Rendimiento</label>
+                    <select
+                      className="input"
+                      value={form.produccion?.unidadRendimiento || "qq/ha"}
+                      onChange={(e) => {
+                        set("produccion", {
+                          ...form.produccion,
+                          unidadRendimiento: e.target.value as any,
+                          cantidad: form.produccion?.cantidad ?? null,
+                          unidad: form.produccion?.unidad || "kg",
+                          rendimiento: form.produccion?.rendimiento ?? null,
+                        });
+                      }}
+                    >
+                      <option value="qq/ha">qq/ha (Quintales/ha)</option>
+                      <option value="m/ha">m/ha (Metros silo/ha)</option>
+                      <option value="rollos/ha">rollos/ha</option>
+                      <option value="kg/ha">kg/ha</option>
+                      <option value="t/ha">t/ha</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Producción Total</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="input"
+                      value={form.produccion?.cantidad ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value ? Number(e.target.value) : null;
+                        set("produccion", {
+                          ...form.produccion,
+                          cantidad: val,
+                          unidad: form.produccion?.unidad || "kg",
+                          rendimiento: form.produccion?.rendimiento ?? null,
+                          unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                        });
+                      }}
+                      placeholder="Total kilos / metros"
+                    />
+                  </div>
+                  <div>
+                    <label>Destino</label>
+                    <select
+                      className="input"
+                      value={form.produccion?.destino || "Grano"}
+                      onChange={(e) => {
+                        set("produccion", {
+                          ...form.produccion,
+                          destino: e.target.value as any,
+                          cantidad: form.produccion?.cantidad ?? null,
+                          unidad: form.produccion?.unidad || "kg",
+                          rendimiento: form.produccion?.rendimiento ?? null,
+                          unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                        });
+                      }}
+                    >
+                      <option value="Grano">Grano</option>
+                      <option value="Silo">Silo</option>
+                      <option value="Rollos">Rollos</option>
+                      <option value="Forraje Tambo">Forraje Tambo</option>
+                      <option value="Pastoreo">Pastoreo</option>
+                      <option value="Venta directa">Venta directa</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label>Destino</label>
-                  <select
-                    className="input"
-                    value={form.produccion?.destino || "Grano"}
-                    onChange={(e) => {
-                      set("produccion", {
-                        ...form.produccion,
-                        destino: e.target.value as any,
-                        cantidad: form.produccion?.cantidad ?? null,
-                        unidad: form.produccion?.unidad || "kg",
-                        rendimiento: form.produccion?.rendimiento ?? null,
-                        unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
-                      });
-                    }}
-                  >
-                    <option value="Grano">Grano</option>
-                    <option value="Silo">Silo</option>
-                    <option value="Rollos">Rollos</option>
-                    <option value="Forraje Tambo">Forraje Tambo</option>
-                    <option value="Pastoreo">Pastoreo</option>
-                    <option value="Venta directa">Venta directa</option>
-                  </select>
-                </div>
-              </div>
+              )
             )}
           </div>
         )}

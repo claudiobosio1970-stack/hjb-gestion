@@ -7,7 +7,8 @@ import { formatHistoricalDate, sortActivitiesRecentFirst } from "@/lib/dateUtils
 function getTipoBadge(tipo: string) {
   const t = (tipo || "").toLowerCase();
   if (t.includes("siembra")) return "pill badgeGreen";
-  if (t.includes("cosecha") || t.includes("picado") || t.includes("rollo")) return "pill badgePurple";
+  if (t.includes("cosecha") || t.includes("picado") || t.includes("rollo") || t.includes("armado")) return "pill badgePurple";
+  if (t.includes("voltead") || t.includes("hilerad") || t.includes("rastrill")) return "pill badgeBlue";
   if (t.includes("fertiliz")) return "pill badgeTeal";
   if (t.includes("fumiga") || t.includes("pulveri") || t.includes("barbecho")) return "pill badgeBlue";
   if (t.includes("subsol") || t.includes("laboreo") || t.includes("rastra")) return "pill badgeAmber";
@@ -175,6 +176,8 @@ export default function ActivityTable({
       "Siembra",
       "Fertilización",
       "Biofertilización",
+      "Volteada de rollos",
+      "Armado de rollos",
       "Fumigación",
       "Barbecho",
       "Subsolado",
@@ -545,6 +548,30 @@ export default function ActivityTable({
                             <small style={{ fontWeight: 600, color: "var(--slate-700)" }}>
                               Total: {activity.produccion.cantidad.toLocaleString("es-AR")} {activity.produccion.unidad}
                             </small>
+                          )}
+                          {activity.produccion.rollosDesglose && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "2px" }}>
+                              {activity.produccion.rollosDesglose.avena ? (
+                                <span className="pill badgeBlue" style={{ fontSize: "10px", padding: "1px 5px", fontWeight: 600 }}>
+                                  🌾 {activity.produccion.rollosDesglose.avena} Avena
+                                </span>
+                              ) : null}
+                              {activity.produccion.rollosDesglose.alfalfa ? (
+                                <span className="pill badgeGreen" style={{ fontSize: "10px", padding: "1px 5px", fontWeight: 600 }}>
+                                  🌿 {activity.produccion.rollosDesglose.alfalfa} Alfalfa
+                                </span>
+                              ) : null}
+                              {activity.produccion.rollosDesglose.rastrojo ? (
+                                <span className="pill badgeSlate" style={{ fontSize: "10px", padding: "1px 5px", fontWeight: 600 }}>
+                                  🌽 {activity.produccion.rollosDesglose.rastrojo} Rastrojo
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
+                          {activity.produccion.fechaVolteada && (
+                            <div style={{ fontSize: "10.5px", color: "var(--brand-700)", fontWeight: 600 }}>
+                              🔄 Volteado: {formatHistoricalDate(activity.produccion.fechaVolteada)}
+                            </div>
                           )}
                           {activity.produccion.destino && (
                             <span className="pill badgeSlate" style={{ width: "fit-content", fontSize: "10px" }}>

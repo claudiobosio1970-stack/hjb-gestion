@@ -341,12 +341,20 @@ export default function InsumosPage() {
                         {item.stockActual.toLocaleString("es-AR")} {item.unidad}
                       </div>
                       <div style={{ fontSize: "11px", color: "var(--slate-400)" }}>
-                        {item.ingresosCompras > 0 ? `Ingresados: +${item.ingresosCompras} ${item.unidad}` : "Sin ingresos aún"}
+                        {item.produccionPropia > 0 ? (
+                          <span style={{ color: "#166534", fontWeight: 600 }}>
+                            🌾 Confección: +{item.produccionPropia.toLocaleString("es-AR")} {item.unidad}
+                          </span>
+                        ) : item.ingresosCompras > 0 ? (
+                          `Ingresados: +${item.ingresosCompras.toLocaleString("es-AR")} ${item.unidad}`
+                        ) : (
+                          "Sin ingresos aún"
+                        )}
                       </div>
                     </td>
 
                     <td style={{ textAlign: "center" }}>
-                      {item.ingresosCompras === 0 && item.stockActual === 0 ? (
+                      {item.ingresosCompras === 0 && item.produccionPropia === 0 && item.stockActual === 0 ? (
                         <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
                           Sin existencias (0)
                         </span>
@@ -359,7 +367,7 @@ export default function InsumosPage() {
                           ✓ Con Stock
                         </span>
                       )}
-                      {item.ingresosCompras > 0 && (
+                      {(item.ingresosCompras > 0 || item.produccionPropia > 0) && (
                         <div style={{ width: "100%", height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginTop: "5px" }}>
                           <div
                             style={{
@@ -656,12 +664,19 @@ export default function InsumosPage() {
             </div>
 
             <div style={{ padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div className="metricsGrid three">
+              <div className={`metricsGrid ${insumoTrazabilidad.produccionPropia > 0 ? "four" : "three"}`}>
                 <MetricCard
                   label="Stock Inicial"
                   value={`${insumoTrazabilidad.stockInicial.toLocaleString("es-AR")} ${insumoTrazabilidad.unidad}`}
                   note="Punto de partida de campaña"
                 />
+                {insumoTrazabilidad.produccionPropia > 0 && (
+                  <MetricCard
+                    label="Producción Propia"
+                    value={`+${insumoTrazabilidad.produccionPropia.toLocaleString("es-AR")} ${insumoTrazabilidad.unidad}`}
+                    note="Confección de rollos a campo"
+                  />
+                )}
                 <MetricCard
                   label="Ingresos / Compras"
                   value={`+${insumoTrazabilidad.ingresosCompras.toLocaleString("es-AR")} ${insumoTrazabilidad.unidad}`}
@@ -712,7 +727,7 @@ export default function InsumosPage() {
                                   fontWeight: 700,
                                 }}
                               >
-                                {m.tipo}
+                                {m.tipo === "Producción Propia" ? `🚜 ${m.tipo}` : m.tipo}
                               </span>
                             </td>
                             <td style={{ textAlign: "right", fontWeight: 800, color: m.cantidad > 0 ? "#166534" : "#991b1b" }}>

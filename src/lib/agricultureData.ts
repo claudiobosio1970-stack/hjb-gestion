@@ -47,6 +47,13 @@ export type Activity = {
     rendimiento: number | null;
     unidadRendimiento: string;
     destino?: string;
+    fechaVolteada?: string;
+    rollosDesglose?: {
+      alfalfa?: number | null;
+      avena?: number | null;
+      rastrojo?: number | null;
+      otros?: number | null;
+    };
   };
   discrepancia?: string;
   maquinaria?: string;

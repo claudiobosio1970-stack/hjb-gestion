@@ -26,6 +26,7 @@ export interface InsumoStockItem {
   stockActual: number;
   consumoAgricola: number;
   ingresosCompras: number;
+  produccionPropia: number;
   precioUnitarioArs: number;
   precioUnitarioUsd: number;
   valorTotalArs: number;
@@ -39,8 +40,8 @@ export interface MovimientoStockItem {
   insumoId: string;
   insumoNombre: string;
   fecha: string;
-  tipo: "Ingreso / Compra" | "Consumo Agrícola" | "Consumo Ganadería" | "Ajuste de Inventario";
-  cantidad: number; // Positivo para ingresos, negativo para consumos
+  tipo: "Ingreso / Compra" | "Consumo Agrícola" | "Consumo Ganadería" | "Ajuste de Inventario" | "Producción Propia";
+  cantidad: number; // Positivo para ingresos y producción, negativo para consumos
   unidad: string;
   detalle: string;
   remitoProveedor?: string;
@@ -65,6 +66,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   | "stockActual"
   | "consumoAgricola"
   | "ingresosCompras"
+  | "produccionPropia"
   | "precioUnitarioArs"
   | "precioUnitarioUsd"
   | "valorTotalArs"
@@ -278,6 +280,17 @@ export const INSUMOS_BASE_CATALOGO: Omit<
     aliasLabores: ["rollo alfalfa", "rollos alfalfa", "rollo de alfalfa"],
   },
   {
+    id: "rollo-avena",
+    nombre: "Rollos de Avena Henificada",
+    categoria: "Forrajes & Granos",
+    unidad: "Rollos",
+    stockInicial: 0,
+    stockMinimoAlerta: 30,
+    ubicacion: "Tinglado de Forrajes",
+    valorMovilId: "rollo-avena",
+    aliasLabores: ["rollo avena", "rollos avena", "rollo de avena", "avena para rollos"],
+  },
+  {
     id: "rollo-rastrojo",
     nombre: "Rollos de Rastrojo / Chala",
     categoria: "Forrajes & Granos",
@@ -479,10 +492,106 @@ export function getStockActualInsumos(): {
     });
   }
 
+  // 3. Sumar producción propia de labores agrícolas realizadas (Armado de rollos, forrajes)
+  const produccionMap = new Map<string, number>();
+  for (const act of activities) {
+    if (act.estado === "Realizada" && act.produccion) {
+      const supHa = act.superficieReal || act.superficiePlanificada || 0;
+      const fecha = act.fechaReal || act.fechaPlanificada;
+      const tipoLabor = (act.tipo || "").toLowerCase();
+      const cultivo = (act.cultivo || "").toLowerCase();
+      const isRollos =
+        tipoLabor.includes("rollo") ||
+        tipoLabor.includes("armado") ||
+        tipoLabor.includes("confecci") ||
+        tipoLabor.includes("enrollad") ||
+        act.produccion.unidad?.toLowerCase().includes("rollo") ||
+        act.produccion.destino === "Rollos";
+
+      if (isRollos) {
+        // A. Si tiene desglose específico por cultivo (avena, alfalfa, rastrojo)
+        if (act.produccion.rollosDesglose) {
+          const { alfalfa, avena, rastrojo } = act.produccion.rollosDesglose;
+          if (alfalfa && alfalfa > 0) {
+            const curr = produccionMap.get("rollo-alfalfa") || 0;
+            produccionMap.set("rollo-alfalfa", curr + alfalfa);
+            movimientos.push({
+              id: `mov-prod-alfalfa-${act.id}`,
+              insumoId: "rollo-alfalfa",
+              insumoNombre: "Rollos de Alfalfa Primera Henificada",
+              fecha,
+              tipo: "Producción Propia",
+              cantidad: alfalfa,
+              unidad: "Rollos",
+              detalle: `Confección de ${alfalfa} rollos de alfalfa en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}`,
+            });
+          }
+          if (avena && avena > 0) {
+            const curr = produccionMap.get("rollo-avena") || 0;
+            produccionMap.set("rollo-avena", curr + avena);
+            movimientos.push({
+              id: `mov-prod-avena-${act.id}`,
+              insumoId: "rollo-avena",
+              insumoNombre: "Rollos de Avena Henificada",
+              fecha,
+              tipo: "Producción Propia",
+              cantidad: avena,
+              unidad: "Rollos",
+              detalle: `Confección de ${avena} rollos de avena en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}`,
+            });
+          }
+          if (rastrojo && rastrojo > 0) {
+            const curr = produccionMap.get("rollo-rastrojo") || 0;
+            produccionMap.set("rollo-rastrojo", curr + rastrojo);
+            movimientos.push({
+              id: `mov-prod-rastrojo-${act.id}`,
+              insumoId: "rollo-rastrojo",
+              insumoNombre: "Rollos de Rastrojo / Chala",
+              fecha,
+              tipo: "Producción Propia",
+              cantidad: rastrojo,
+              unidad: "Rollos",
+              detalle: `Confección de ${rastrojo} rollos de rastrojo en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}`,
+            });
+          }
+        } else {
+          // B. Si tiene cantidad total directa
+          let cant = act.produccion.cantidad;
+          if (!cant && act.produccion.rendimiento && supHa > 0) {
+            cant = Math.round(act.produccion.rendimiento * supHa);
+          }
+          if (cant && cant > 0) {
+            let targetInsumoId = "rollo-alfalfa";
+            let targetInsumoNombre = "Rollos de Alfalfa Primera Henificada";
+            if (cultivo.includes("avena")) {
+              targetInsumoId = "rollo-avena";
+              targetInsumoNombre = "Rollos de Avena Henificada";
+            } else if (cultivo.includes("rastrojo") || cultivo.includes("chala") || cultivo.includes("maiz")) {
+              targetInsumoId = "rollo-rastrojo";
+              targetInsumoNombre = "Rollos de Rastrojo / Chala";
+            }
+            const curr = produccionMap.get(targetInsumoId) || 0;
+            produccionMap.set(targetInsumoId, curr + cant);
+            movimientos.push({
+              id: `mov-prod-gen-${act.id}`,
+              insumoId: targetInsumoId,
+              insumoNombre: targetInsumoNombre,
+              fecha,
+              tipo: "Producción Propia",
+              cantidad: cant,
+              unidad: "Rollos",
+              detalle: `Confección de ${cant} rollos (${act.cultivo || "Forraje"}) en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}`,
+            });
+          }
+        }
+      }
+    }
+  }
+
   // Ordenar movimientos recientes primero
   movimientos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
-  // 3. Armar lista completa de items con valorización económica
+  // 4. Armar lista completa de items con valorización económica
   let valorTotalGeneralArs = 0;
   let valorTotalGeneralUsd = 0;
   let insumosEnAlerta = 0;
@@ -490,8 +599,9 @@ export function getStockActualInsumos(): {
   const items: InsumoStockItem[] = INSUMOS_BASE_CATALOGO.map((base) => {
     const consumo = Math.round((consumosMap.get(base.id) || 0) * 10) / 10;
     const ingreso = Math.round((ingresosMap.get(base.id) || 0) * 10) / 10;
-    const stockActual = Math.max(0, Math.round((base.stockInicial + ingreso - consumo) * 10) / 10);
-    const enAlerta = (base.stockInicial + ingreso > 0) && stockActual <= base.stockMinimoAlerta;
+    const produccionPropia = Math.round((produccionMap.get(base.id) || 0) * 10) / 10;
+    const stockActual = Math.max(0, Math.round((base.stockInicial + ingreso + produccionPropia - consumo) * 10) / 10);
+    const enAlerta = (base.stockInicial + ingreso + produccionPropia > 0) && stockActual <= base.stockMinimoAlerta;
     if (enAlerta) insumosEnAlerta++;
 
     // Obtener precio de referencia desde Valores Móviles
@@ -517,6 +627,9 @@ export function getStockActualInsumos(): {
     } else if (base.id === "balanceado-iniciador") {
       precioArs = 340;
       precioUsd = Number((340 / dolarBNA).toFixed(3));
+    } else if (base.id === "rollo-avena") {
+      precioArs = 27600;
+      precioUsd = Number((27600 / dolarBNA).toFixed(2));
     } else if (base.id === "rollo-rastrojo") {
       precioArs = 22000;
       precioUsd = Number((22000 / dolarBNA).toFixed(2));
@@ -542,7 +655,7 @@ export function getStockActualInsumos(): {
 
     const porcentajeStock = Math.min(
       100,
-      Math.max(0, Math.round((stockActual / (base.stockInicial + ingreso || 1)) * 100))
+      Math.max(0, Math.round((stockActual / (base.stockInicial + ingreso + produccionPropia || 1)) * 100))
     );
 
     return {
@@ -550,6 +663,7 @@ export function getStockActualInsumos(): {
       stockActual,
       consumoAgricola: consumo,
       ingresosCompras: ingreso,
+      produccionPropia,
       precioUnitarioArs: Math.round(precioArs * 100) / 100,
       precioUnitarioUsd: Number(precioUsd.toFixed(3)),
       valorTotalArs,
