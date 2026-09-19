@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { SoilAnalysis, agricultureData, HJB_AGRICULTURE_SYNC_EVENT, Lote } from "@/lib/agricultureData";
 import {
   SoilChemicalAnalysis,
@@ -270,6 +271,14 @@ export default function SoilPanel({
         </div>
 
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <Link
+            href="/suelos"
+            className="secondaryButton"
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px" }}
+          >
+            <span>🔬</span>
+            <span>Panel Central de Suelos</span>
+          </Link>
           {isTambo && (
             <button
               type="button"

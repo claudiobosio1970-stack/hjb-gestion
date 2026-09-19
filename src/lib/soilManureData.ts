@@ -83,6 +83,37 @@ export interface ManureAnalysis {
   toneladasPorCarro: number; // 5 tn netas por carro
 }
 
+export interface LiquidManureAnalysis {
+  id: string;
+  protocolo: string; // "LIQ-01"
+  matriz: string; // "Efluente Tambo - Líquido de laguna/fosa"
+  laboratorio: string;
+  fecha: string;
+  nitrogenoKgM3: number; // 1.8 kg N / m³
+  fosforoKgM3: number;   // 0.6 kg P / m³
+  potasioKgM3: number;   // 2.2 kg K / m³
+  azufreKgM3: number;    // 0.2 kg S / m³
+  materiaOrganicaKgM3: number; // 15 kg MO / m³
+  ph: number;            // 7.8
+  ceUsCm: number;        // 4500 uS/cm
+  m3PorTanque: number;   // 12 m³
+  observaciones?: string;
+}
+
+export interface OtherLabAnalysis {
+  id: string;
+  tipo: "Foliar" | "Agua" | "Forraje / Silaje" | "Granos" | "Otro";
+  titulo: string;
+  campo?: string;
+  lote?: string;
+  fecha: string;
+  laboratorio: string;
+  protocolo?: string;
+  parametros: { nombre: string; valor: string | number; unidad?: string }[];
+  conclusion?: string;
+  observaciones?: string;
+}
+
 // =========================================================================
 // DATOS REALES DE REFERENCIA EXTRAÍDOS DE LOS INFORMES (CLOVER & MOLISOL)
 // =========================================================================
@@ -117,6 +148,68 @@ export const DEFAULT_MANURE_ANALYSIS: ManureAnalysis = {
   hierroPct: 1.55,
   toneladasPorCarro: 5,
 };
+
+export const DEFAULT_LIQUID_MANURE_ANALYSIS: LiquidManureAnalysis = {
+  id: "liquid-manure-tambo-01",
+  protocolo: "LIQ-TAMBO-26",
+  matriz: "Efluente Tambo Líquido (Fosa / Laguna de decantación)",
+  laboratorio: "Clover Laboratorio (El Trébol)",
+  fecha: "2026-08-23",
+  nitrogenoKgM3: 1.8,
+  fosforoKgM3: 0.6,
+  potasioKgM3: 2.2,
+  azufreKgM3: 0.2,
+  materiaOrganicaKgM3: 15.0,
+  ph: 7.8,
+  ceUsCm: 4500,
+  m3PorTanque: 12,
+  observaciones: "Muestreo representativo de fosa de efluentes líquidos previa homogenización.",
+};
+
+export const DEFAULT_OTHER_ANALYSES: OtherLabAnalysis[] = [
+  {
+    id: "other-lab-silo-maiz-2026",
+    tipo: "Forraje / Silaje",
+    titulo: "Calidad Nutricional Silaje de Maíz Planta Entera",
+    campo: "Tambo",
+    lote: "Lote 4",
+    fecha: "2026-04-15",
+    laboratorio: "Laboratorio Molisol",
+    protocolo: "FORR-2026-041",
+    parametros: [
+      { nombre: "Materia Seca", valor: 34.5, unidad: "%" },
+      { nombre: "Proteína Bruta (PB)", valor: 8.2, unidad: "%" },
+      { nombre: "FDN (Fibra Neutro)", valor: 42.1, unidad: "%" },
+      { nombre: "FDA (Fibra Ácido)", valor: 23.4, unidad: "%" },
+      { nombre: "Almidón", valor: 31.8, unidad: "%" },
+      { nombre: "Digestibilidad MS", valor: 68.5, unidad: "%" },
+      { nombre: "Energía Metabolizable", valor: 2.45, unidad: "Mcal/kg MS" },
+      { nombre: "pH Silaje", valor: 3.85, unidad: "" },
+    ],
+    conclusion: "Excelente calidad de fermentación, óptimo porcentaje de almidón y adecuada digestibilidad para vacas en ordeñe.",
+    observaciones: "Muestra extraída de frente de silo bolsa Tambo.",
+  },
+  {
+    id: "other-lab-agua-tambo-2026",
+    tipo: "Agua",
+    titulo: "Análisis Físico-Químico de Agua de Bebida Bovina",
+    campo: "Tambo",
+    fecha: "2026-05-10",
+    laboratorio: "Laboratorio Molisol",
+    protocolo: "AGUA-2026-118",
+    parametros: [
+      { nombre: "pH", valor: 7.4, unidad: "" },
+      { nombre: "Conductividad Eléctrica", valor: 1450, unidad: "uS/cm" },
+      { nombre: "Sólidos Totales Disueltos", valor: 930, unidad: "mg/L" },
+      { nombre: "Sulfatos", valor: 180, unidad: "mg/L" },
+      { nombre: "Cloruros", valor: 120, unidad: "mg/L" },
+      { nombre: "Nitratos", valor: 22, unidad: "mg/L" },
+      { nombre: "Dureza Total (CaCO3)", valor: 260, unidad: "mg/L" },
+    ],
+    conclusion: "Agua apta para consumo de rodeo lechero de alta producción. Salinidad moderada y bajo tenor de sulfatos.",
+    observaciones: "Muestra de salida directa de molino y tanque australiano.",
+  },
+];
 
 export const DEFAULT_SOIL_ANALYSES: SoilChemicalAnalysis[] = [
   {
@@ -444,6 +537,8 @@ export const DEFAULT_MOISTURE_PROFILES: SoilMoistureProfile[] = [
 const SOIL_STORAGE_KEY = "hjb_soil_analyses_v1";
 const MOISTURE_STORAGE_KEY = "hjb_moisture_profiles_v1";
 const MANURE_STORAGE_KEY = "hjb_manure_analysis_v1";
+const LIQUID_MANURE_STORAGE_KEY = "hjb_liquid_manure_analysis_v1";
+const OTHER_ANALYSES_STORAGE_KEY = "hjb_other_analyses_v1";
 export const HJB_SOIL_SYNC_EVENT = "hjb_soil_sync";
 
 export function notifySoilSync() {
@@ -464,6 +559,36 @@ export function listSoilAnalyses(): SoilChemicalAnalysis[] {
   }
 }
 
+export function saveSoilAnalysis(record: SoilChemicalAnalysis) {
+  if (typeof window === "undefined") return;
+  const current = listSoilAnalyses();
+  const idx = current.findIndex((x) => x.id === record.id);
+  const updated = idx >= 0 ? [...current] : [record, ...current];
+  if (idx >= 0) updated[idx] = record;
+  localStorage.setItem(SOIL_STORAGE_KEY, JSON.stringify(updated));
+  notifySoilSync();
+  if (db) {
+    setDoc(doc(db, "config", "soil_manure_data"), {
+      soil_analyses: updated,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch(console.error);
+  }
+}
+
+export function deleteSoilAnalysis(id: string) {
+  if (typeof window === "undefined") return;
+  const current = listSoilAnalyses();
+  const updated = current.filter((x) => x.id !== id);
+  localStorage.setItem(SOIL_STORAGE_KEY, JSON.stringify(updated));
+  notifySoilSync();
+  if (db) {
+    setDoc(doc(db, "config", "soil_manure_data"), {
+      soil_analyses: updated,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch(console.error);
+  }
+}
+
 export function listMoistureProfiles(): SoilMoistureProfile[] {
   if (typeof window === "undefined") return DEFAULT_MOISTURE_PROFILES;
   try {
@@ -473,6 +598,36 @@ export function listMoistureProfiles(): SoilMoistureProfile[] {
     return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_MOISTURE_PROFILES;
   } catch {
     return DEFAULT_MOISTURE_PROFILES;
+  }
+}
+
+export function saveMoistureProfile(record: SoilMoistureProfile) {
+  if (typeof window === "undefined") return;
+  const current = listMoistureProfiles();
+  const idx = current.findIndex((x) => x.id === record.id);
+  const updated = idx >= 0 ? [...current] : [record, ...current];
+  if (idx >= 0) updated[idx] = record;
+  localStorage.setItem(MOISTURE_STORAGE_KEY, JSON.stringify(updated));
+  notifySoilSync();
+  if (db) {
+    setDoc(doc(db, "config", "soil_manure_data"), {
+      moisture_profiles: updated,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch(console.error);
+  }
+}
+
+export function deleteMoistureProfile(id: string) {
+  if (typeof window === "undefined") return;
+  const current = listMoistureProfiles();
+  const updated = current.filter((x) => x.id !== id);
+  localStorage.setItem(MOISTURE_STORAGE_KEY, JSON.stringify(updated));
+  notifySoilSync();
+  if (db) {
+    setDoc(doc(db, "config", "soil_manure_data"), {
+      moisture_profiles: updated,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch(console.error);
   }
 }
 
@@ -487,17 +642,78 @@ export function getManureAnalysis(): ManureAnalysis {
   }
 }
 
-export function saveSoilAnalysis(record: SoilChemicalAnalysis) {
+export function saveManureAnalysis(record: ManureAnalysis) {
   if (typeof window === "undefined") return;
-  const current = listSoilAnalyses();
-  const idx = current.findIndex((x) => x.id === record.id);
-  const updated = idx >= 0 ? [...current] : [...current, record];
-  if (idx >= 0) updated[idx] = record;
-  localStorage.setItem(SOIL_STORAGE_KEY, JSON.stringify(updated));
+  localStorage.setItem(MANURE_STORAGE_KEY, JSON.stringify(record));
   notifySoilSync();
   if (db) {
     setDoc(doc(db, "config", "soil_manure_data"), {
-      soil_analyses: updated,
+      manure_analysis: record,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch(console.error);
+  }
+}
+
+export function getLiquidManureAnalysis(): LiquidManureAnalysis {
+  if (typeof window === "undefined") return DEFAULT_LIQUID_MANURE_ANALYSIS;
+  try {
+    const raw = localStorage.getItem(LIQUID_MANURE_STORAGE_KEY);
+    if (!raw) return DEFAULT_LIQUID_MANURE_ANALYSIS;
+    return JSON.parse(raw) || DEFAULT_LIQUID_MANURE_ANALYSIS;
+  } catch {
+    return DEFAULT_LIQUID_MANURE_ANALYSIS;
+  }
+}
+
+export function saveLiquidManureAnalysis(record: LiquidManureAnalysis) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LIQUID_MANURE_STORAGE_KEY, JSON.stringify(record));
+  notifySoilSync();
+  if (db) {
+    setDoc(doc(db, "config", "soil_manure_data"), {
+      liquid_manure_analysis: record,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch(console.error);
+  }
+}
+
+export function listOtherAnalyses(): OtherLabAnalysis[] {
+  if (typeof window === "undefined") return DEFAULT_OTHER_ANALYSES;
+  try {
+    const raw = localStorage.getItem(OTHER_ANALYSES_STORAGE_KEY);
+    if (!raw) return DEFAULT_OTHER_ANALYSES;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_OTHER_ANALYSES;
+  } catch {
+    return DEFAULT_OTHER_ANALYSES;
+  }
+}
+
+export function saveOtherAnalysis(record: OtherLabAnalysis) {
+  if (typeof window === "undefined") return;
+  const current = listOtherAnalyses();
+  const idx = current.findIndex((x) => x.id === record.id);
+  const updated = idx >= 0 ? [...current] : [record, ...current];
+  if (idx >= 0) updated[idx] = record;
+  localStorage.setItem(OTHER_ANALYSES_STORAGE_KEY, JSON.stringify(updated));
+  notifySoilSync();
+  if (db) {
+    setDoc(doc(db, "config", "soil_manure_data"), {
+      other_analyses: updated,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch(console.error);
+  }
+}
+
+export function deleteOtherAnalysis(id: string) {
+  if (typeof window === "undefined") return;
+  const current = listOtherAnalyses();
+  const updated = current.filter((x) => x.id !== id);
+  localStorage.setItem(OTHER_ANALYSES_STORAGE_KEY, JSON.stringify(updated));
+  notifySoilSync();
+  if (db) {
+    setDoc(doc(db, "config", "soil_manure_data"), {
+      other_analyses: updated,
       updatedAt: new Date().toISOString(),
     }, { merge: true }).catch(console.error);
   }
@@ -525,6 +741,12 @@ export function initSoilFirestoreSync() {
           if (data.manure_analysis && typeof data.manure_analysis === "object") {
             localStorage.setItem(MANURE_STORAGE_KEY, JSON.stringify(data.manure_analysis));
           }
+          if (data.liquid_manure_analysis && typeof data.liquid_manure_analysis === "object") {
+            localStorage.setItem(LIQUID_MANURE_STORAGE_KEY, JSON.stringify(data.liquid_manure_analysis));
+          }
+          if (Array.isArray(data.other_analyses)) {
+            localStorage.setItem(OTHER_ANALYSES_STORAGE_KEY, JSON.stringify(data.other_analyses));
+          }
           notifySoilSync();
         } else {
           // Inicializar por primera vez en la nube
@@ -532,6 +754,8 @@ export function initSoilFirestoreSync() {
             soil_analyses: DEFAULT_SOIL_ANALYSES,
             moisture_profiles: DEFAULT_MOISTURE_PROFILES,
             manure_analysis: DEFAULT_MANURE_ANALYSIS,
+            liquid_manure_analysis: DEFAULT_LIQUID_MANURE_ANALYSIS,
+            other_analyses: DEFAULT_OTHER_ANALYSES,
             updatedAt: new Date().toISOString(),
           }).catch(console.error);
         }
@@ -652,6 +876,7 @@ export function computeLoteNutrientSummary(
   const soils = listSoilAnalyses();
   const moistures = listMoistureProfiles();
   const manure = getManureAnalysis();
+  const liquidManure = getLiquidManureAnalysis();
 
   const sueloPrevio = soils.find((s) => {
     if (s.campo.toLowerCase() !== cClean) return false;
@@ -673,7 +898,7 @@ export function computeLoteNutrientSummary(
     const c = Math.max(0, simulatedCarros ?? 0);
     const t = Math.max(0, simulatedTanques ?? 0);
     totalTnSolido = c * (manure.toneladasPorCarro || 5);
-    totalM3Liquido = t * 12;
+    totalM3Liquido = t * (liquidManure.m3PorTanque || 12);
   } else {
     const activities = agricultureData.listActivities();
     const lotesActs = activities.filter((act) => {
@@ -706,7 +931,7 @@ export function computeLoteNutrientSummary(
   }
 
   const carrosSolido = Math.round(totalTnSolido / (manure.toneladasPorCarro || 5));
-  const tanquesLiquido = Math.round(totalM3Liquido / 12); // Tanque de 12.000 L = 12 m³
+  const tanquesLiquido = Math.round(totalM3Liquido / (liquidManure.m3PorTanque || 12));
 
   // 3. Aportes de nutrientes del estiércol sólido (Clover E326)
   // 1 tn aporta: 12 kg N, 10 kg P (22.9 kg P2O5), 24.7 kg K (29.8 kg K2O), 2.2 kg S, 264 kg MO
@@ -716,12 +941,12 @@ export function computeLoteNutrientSummary(
   const sSolido = totalTnSolido * (manure.azufreTotalPct * 10);
   const moSolido = totalTnSolido * (manure.materiaOrganicaPct * 10);
 
-  // Aportes de efluente líquido (1 m³: 1.8 kg N, 0.6 kg P, 2.2 kg K)
-  const nLiquido = totalM3Liquido * 1.8;
-  const pLiquido = totalM3Liquido * 0.6;
-  const kLiquido = totalM3Liquido * 2.2;
-  const sLiquido = totalM3Liquido * 0.2;
-  const moLiquido = totalM3Liquido * 15;
+  // Aportes de efluente líquido
+  const nLiquido = totalM3Liquido * (liquidManure.nitrogenoKgM3 || 1.8);
+  const pLiquido = totalM3Liquido * (liquidManure.fosforoKgM3 || 0.6);
+  const kLiquido = totalM3Liquido * (liquidManure.potasioKgM3 || 2.2);
+  const sLiquido = totalM3Liquido * (liquidManure.azufreKgM3 || 0.2);
+  const moLiquido = totalM3Liquido * (liquidManure.materiaOrganicaKgM3 || 15);
 
   const totalN = Math.round(nSolido + nLiquido);
   const totalP = Math.round(pSolido + pLiquido);
