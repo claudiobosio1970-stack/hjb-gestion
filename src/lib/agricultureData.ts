@@ -630,3 +630,46 @@ export function realQuantity(activity: Activity, input: ActivityInput) {
   if (!activity.superficieReal || !input.dosisReal) return null;
   return activity.superficieReal * input.dosisReal;
 }
+
+/**
+ * Determina de forma estricta si una labor pertenece a un lote específico de un campo.
+ * - En labores individuales: exige que coincida el campo Y el lote (excluye labores generales de campo sin lote específico).
+ * - En labores grupales / multilote: exige que en `lotesAfectados` figure explícitamente ese lote de ese campo específico.
+ */
+export function isActivityInLote(act: Activity, campo: string, loteNombre: string): boolean {
+  if (!act || !campo || !loteNombre) return false;
+  const cTarget = campo.toLowerCase().trim();
+  const lTarget = loteNombre.toLowerCase().trim();
+  const lTargetClean = lTarget.replace(/lote\s*/g, "").trim();
+
+  // Caso 1: Labor grupal / multilote
+  if (act.esGrupal && Array.isArray(act.lotesAfectados) && act.lotesAfectados.length > 0) {
+    return act.lotesAfectados.some((la) => {
+      const laClean = (la || "").toLowerCase().trim();
+      // Formato estándar: "Campo - Lote"
+      if (laClean.includes("-")) {
+        const parts = laClean.split("-").map((p) => p.trim());
+        const laCampo = parts[0];
+        const laLote = parts.slice(1).join("-").trim();
+        const laLoteClean = laLote.replace(/lote\s*/g, "").trim();
+        return laCampo === cTarget && (laLote === lTarget || laLoteClean === lTargetClean);
+      }
+      // Si no tiene guión, debe contener ambos de forma inequívoca
+      return laClean.includes(cTarget) && (laClean.includes(lTarget) || laClean.endsWith(lTargetClean));
+    });
+  }
+
+  // Caso 2: Labor individual
+  const actCampo = (act.campo || "").toLowerCase().trim();
+  if (actCampo !== cTarget) return false;
+
+  const actLote = (act.lote || "").toLowerCase().trim();
+  // Excluir labores generales del campo o sin lote definido
+  if (!actLote || actLote === "general" || actLote === "campo" || actLote === "todos") {
+    return false;
+  }
+
+  const actLoteClean = actLote.replace(/lote\s*/g, "").trim();
+  return actLote === lTarget || actLoteClean === lTargetClean;
+}
+

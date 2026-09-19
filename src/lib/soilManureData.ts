@@ -1,6 +1,6 @@
 import { db } from "./firebase";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
-import { agricultureData, Activity } from "./agricultureData";
+import { agricultureData, Activity, isActivityInLote } from "./agricultureData";
 
 export interface SoilChemicalAnalysis {
   id: string;
@@ -677,16 +677,12 @@ export function computeLoteNutrientSummary(
   } else {
     const activities = agricultureData.listActivities();
     const lotesActs = activities.filter((act) => {
-      if (act.campo.toLowerCase() !== cClean) return false;
       if (act.tipo !== "Biofertilización") return false;
       if (act.estado === "Cancelada") return false;
       // FILTRO ESTRICTO POR CAMPAÑA
       if (campana && act.campana && act.campana.trim() !== campana.trim()) return false;
 
-      const actLoteClean = (act.lote || "").toLowerCase().replace(/lote\s*/g, "").trim();
-      if (actLoteClean === lClean) return true;
-      if (act.esGrupal && act.lotesAfectados?.some((la) => la.toLowerCase().includes(lClean))) return true;
-      return false;
+      return isActivityInLote(act, campo, loteNombre);
     });
 
     lotesActs.forEach((act) => {

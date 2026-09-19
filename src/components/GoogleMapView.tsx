@@ -14,7 +14,7 @@ import {
   deleteLoteGeo,
   HJB_GEO_SYNC_EVENT,
 } from "@/lib/geoData";
-import { agricultureData, Activity, HJB_AGRICULTURE_SYNC_EVENT } from "@/lib/agricultureData";
+import { agricultureData, Activity, HJB_AGRICULTURE_SYNC_EVENT, isActivityInLote } from "@/lib/agricultureData";
 import { computeLoteNutrientSummary } from "@/lib/soilManureData";
 import NewActivityModal from "@/components/NewActivityModal";
 
@@ -540,22 +540,16 @@ export default function GoogleMapView() {
 
   // Filtrar labores asociadas a un lote o perímetro de campo
   function getLaboresForLote(lote: LoteGeo): Activity[] {
-    const cNom = lote.campoNombre.toLowerCase();
-    const lNomClean = lote.nombre.toLowerCase().replace(/lote\s*/g, "").trim();
+    if (lote.tipo === "perimetro_campo") {
+      const cNom = lote.campoNombre.toLowerCase();
+      return activities.filter((act) => {
+        if (act.campo.toLowerCase() === cNom) return true;
+        if (act.esGrupal && act.lotesAfectados?.some((la) => la.toLowerCase().includes(cNom))) return true;
+        return false;
+      });
+    }
 
-    return activities.filter((act) => {
-      if (act.campo.toLowerCase() !== cNom) return false;
-      if (lote.tipo === "perimetro_campo") return true; // Perímetro abarca todas las labores del campo
-      if (!act.lote || act.lote.toLowerCase() === "lote único") return true;
-      if (act.esGrupal) return true;
-
-      const actLoteClean = act.lote.toLowerCase().replace(/lote\s*/g, "").trim();
-      return (
-        actLoteClean === lNomClean ||
-        act.lote.toLowerCase().includes(lote.nombre.toLowerCase()) ||
-        lote.nombre.toLowerCase().includes(act.lote.toLowerCase())
-      );
-    });
+    return activities.filter((act) => isActivityInLote(act, lote.campoNombre, lote.nombre));
   }
 
   // =========================================================================

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, agricultureData, Lote, LoteStatus } from "@/lib/agricultureData";
+import { Activity, agricultureData, Lote, LoteStatus, isActivityInLote } from "@/lib/agricultureData";
 import ActivityTable from "@/components/ActivityTable";
 import NewActivityModal from "@/components/NewActivityModal";
 
@@ -308,14 +308,8 @@ export default function LotesPanel({
 
   const activeLoteActivities = useMemo(() => {
     if (!activeLote) return [];
-    return activities.filter((act) => {
-      const matchesLote = (act.lote || "").toLowerCase() === activeLote.nombre.toLowerCase();
-      const matchesGrupal =
-        act.esGrupal &&
-        act.lotesAfectados?.some((la) => la.toLowerCase().includes(activeLote.nombre.toLowerCase()));
-      return matchesLote || matchesGrupal;
-    });
-  }, [activities, activeLote]);
+    return activities.filter((act) => isActivityInLote(act, campoNombre, activeLote.nombre));
+  }, [activities, activeLote, campoNombre]);
 
   // Resumen agronómico automático del lote: Biofertilización/ha, Fertilizantes/ha y Fumigaciones
   const resumenAgronomico = useMemo(() => {
@@ -767,13 +761,9 @@ export default function LotesPanel({
       ) : (
         <div className="fieldCardsGrid">
           {lotes.map((lote) => {
-            const countLabores = activities.filter((act) => {
-              const matchesLote = (act.lote || "").toLowerCase() === lote.nombre.toLowerCase();
-              const matchesGrupal = act.esGrupal && act.lotesAfectados?.some(
-                (la) => la.toLowerCase() === lote.nombre.toLowerCase()
-              );
-              return matchesLote || matchesGrupal;
-            }).length;
+            const countLabores = activities.filter((act) =>
+              isActivityInLote(act, campoNombre, lote.nombre)
+            ).length;
 
             return (
               <div
