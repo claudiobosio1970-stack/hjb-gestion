@@ -8,6 +8,9 @@ import {
   agricultureData,
   isRolloLabor,
   isLaborSinInsumos,
+  isVolteoORastrillado,
+  isSacadoRollosLabor,
+  isArmadoRollosLabor,
 } from "@/lib/agricultureData";
 import { LOTES_POR_CAMPO } from "@/lib/historicalData";
 import { productos, tiposActividad } from "@/lib/mockData";
@@ -38,6 +41,7 @@ const MAQUINARIAS_PRESET = [
   "Rastrillo Volteador / Giroscópico",
   "Rastrillo Hilerador",
   "Rotoenfardadora / Enrolladora Mainero",
+  "Tractor con Pala / Pinche de rollos / Carretón",
   ...INITIAL_EQUIPMENT.map((eq) => `${eq.nombre} (${eq.marca} ${eq.modelo})`),
   "Tractor John Deere 6120E (120 HP)",
   "Tractor John Deere 5705 (85 HP)",
@@ -62,7 +66,10 @@ function getDefaultMaquinaria(tipo: string): string {
   if (t.includes("rastrill") || t.includes("hilerad")) {
     return "Rastrillo Hilerador";
   }
-  if (t.includes("armado") || t.includes("rollo") || t.includes("confecci") || t.includes("enrollad")) {
+  if (isSacadoRollosLabor(t)) {
+    return "Tractor con Pala / Pinche de rollos / Carretón";
+  }
+  if (isArmadoRollosLabor(t) || t.includes("armado") || t.includes("rollo") || t.includes("confecci") || t.includes("enrollad")) {
     return "Rotoenfardadora / Enrolladora";
   }
   if (t.includes("cosecha") || t.includes("picado")) {
@@ -189,6 +196,32 @@ export default function NewActivityModal({
     }
   }, [form.campo, form.lote]);
 
+  // Buscar si hubo una labor de armado de rollos previa en este campo y lote
+  const previousArmado = useMemo(() => {
+    const c = form.campo;
+    const l = form.lote;
+    if (!c || !l) return null;
+    const cLow = c.toLowerCase();
+    const lLow = l.toLowerCase();
+    try {
+      const allActs = agricultureData.listActivities();
+      return (
+        allActs.find(
+          (a) =>
+            a.id !== form.id &&
+            a.campo.toLowerCase() === cLow &&
+            (a.lote || "").toLowerCase() === lLow &&
+            !isSacadoRollosLabor(a.tipo || "") &&
+            !isVolteoORastrillado(a.tipo || "") &&
+            isArmadoRollosLabor(a.tipo || "") &&
+            a.estado !== "Cancelada"
+        ) || null
+      );
+    } catch {
+      return null;
+    }
+  }, [form.campo, form.lote, form.id]);
+
   useEffect(() => {
     if (!open) return;
     if (editingActivity) {
@@ -201,19 +234,16 @@ export default function NewActivityModal({
         (editingActivity.lotesAfectados && editingActivity.lotesAfectados.length > 1)
       );
       setIsMultiLote(isGroup);
-      const isVolteoORastrillado =
-        editingActivity.tipo.toLowerCase().includes("volteo") ||
-        editingActivity.tipo.toLowerCase().includes("voltead") ||
-        editingActivity.tipo.toLowerCase().includes("rastrill") ||
-        editingActivity.tipo.toLowerCase().includes("hilerad");
+      const isVolteoORastrill = isVolteoORastrillado(editingActivity.tipo);
       const isRollOrHarv =
-        !isVolteoORastrillado &&
+        !isVolteoORastrill &&
         (editingActivity.tipo === "Cosecha" ||
           editingActivity.tipo === "Picado" ||
           editingActivity.tipo === "Rollos" ||
           editingActivity.tipo === "Armado de rollos" ||
-          editingActivity.tipo.toLowerCase().includes("armado") ||
-          editingActivity.tipo.toLowerCase().includes("confecci"));
+          editingActivity.tipo === "Sacado de rollos" ||
+          isArmadoRollosLabor(editingActivity.tipo) ||
+          isSacadoRollosLabor(editingActivity.tipo));
       setShowProduccion(
         Boolean(
           editingActivity.produccion &&
@@ -539,6 +569,7 @@ export default function NewActivityModal({
       "Volteo",
       "Rastrillado",
       "Armado de rollos",
+      "Sacado de rollos",
       "Subsolado",
       "Laboreo",
       "Rastra de discos",
@@ -997,21 +1028,21 @@ export default function NewActivityModal({
                       insumos: nextInsumos,
                     };
                   });
-                  const isVolteoORastrillado =
-                    newTipo.toLowerCase().includes("volteo") ||
-                    newTipo.toLowerCase().includes("voltead") ||
-                    newTipo.toLowerCase().includes("rastrill") ||
-                    newTipo.toLowerCase().includes("hilerad");
+                  const isVolteoORastrill = isVolteoORastrillado(newTipo);
+                  const isSacado = isSacadoRollosLabor(newTipo);
                   const isArmado =
-                    !isVolteoORastrillado &&
-                    (newTipo.toLowerCase().includes("armado") ||
+                    !isVolteoORastrill &&
+                    !isSacado &&
+                    (isArmadoRollosLabor(newTipo) ||
+                      newTipo.toLowerCase().includes("armado") ||
                       newTipo.toLowerCase().includes("rollo") ||
                       newTipo.toLowerCase().includes("confecci") ||
                       newTipo.toLowerCase().includes("enrollad"));
                   const isCosechaPicado =
                     newTipo.toLowerCase().includes("cosecha") ||
                     newTipo.toLowerCase().includes("picado") ||
-                    isArmado;
+                    isArmado ||
+                    isSacado;
                   if (isCosechaPicado) {
                     setShowProduccion(true);
                     if (isArmado) {
@@ -1022,10 +1053,33 @@ export default function NewActivityModal({
                           unidadRendimiento: "rollos/ha",
                           cantidad: null,
                           unidad: "rollos",
-                          destino: "Stock de Forrajes",
+                          destino: (prev.campo || "").toLowerCase() === "tambo" ? "Tambo (Patio de forrajes)" : `Almacenado en ${prev.campo || "campo"}`,
                           fechaVolteada: previousVolteo ? (previousVolteo.fechaReal || previousVolteo.fechaPlanificada) : "",
                           fechaRastrillado: previousRastrillado ? (previousRastrillado.fechaReal || previousRastrillado.fechaPlanificada) : "",
                           rollosDesglose: {
+                            avena: null,
+                            alfalfa: null,
+                            rastrojo: null,
+                          },
+                        },
+                      }));
+                    } else if (isSacado) {
+                      const prevProd = previousArmado?.produccion;
+                      const defaultDestino = (form.campo || "").toLowerCase() === "tambo"
+                        ? "Tambo (Patio de forrajes)"
+                        : `Almacenado en ${form.campo || "este campo"}`;
+                      setForm((prev) => ({
+                        ...prev,
+                        produccion: prev.produccion || {
+                          rendimiento: prevProd?.rendimiento ?? null,
+                          unidadRendimiento: "rollos/ha",
+                          cantidad: prevProd?.cantidad ?? null,
+                          unidad: "rollos",
+                          destino: defaultDestino,
+                          fechaArmado: previousArmado ? (previousArmado.fechaReal || previousArmado.fechaPlanificada) : "",
+                          fechaVolteada: prevProd?.fechaVolteada || (previousVolteo ? (previousVolteo.fechaReal || previousVolteo.fechaPlanificada) : ""),
+                          fechaRastrillado: prevProd?.fechaRastrillado || (previousRastrillado ? (previousRastrillado.fechaReal || previousRastrillado.fechaPlanificada) : ""),
+                          rollosDesglose: prevProd?.rollosDesglose || {
                             avena: null,
                             alfalfa: null,
                             rastrojo: null,
@@ -1470,27 +1524,29 @@ export default function NewActivityModal({
         </div>
         )}
 
-        {/* SECCIÓN 5: Producción / Rendimiento (Cosecha, Picado o Armado de Rollos) */}
+        {/* SECCIÓN 5: Producción / Rendimiento (Cosecha, Picado, Armado de Rollos o Sacado de Rollos) */}
         {(form.tipo === "Cosecha" ||
           form.tipo === "Picado" ||
-          (!form.tipo.toLowerCase().includes("volteo") &&
-            !form.tipo.toLowerCase().includes("voltead") &&
-            !form.tipo.toLowerCase().includes("rastrill") &&
-            !form.tipo.toLowerCase().includes("hilerad") &&
+          (!isVolteoORastrillado(form.tipo) &&
             (form.tipo === "Armado de rollos" ||
+              form.tipo === "Sacado de rollos" ||
               form.tipo === "Rollos" ||
-              form.tipo.toLowerCase().includes("armado") ||
-              form.tipo.toLowerCase().includes("confecci")))) && (
+              isArmadoRollosLabor(form.tipo) ||
+              isSacadoRollosLabor(form.tipo)))) && (
           <div className="formSection">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
               <div>
                 <h3>
-                  {form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado")
+                  {isSacadoRollosLabor(form.tipo)
+                    ? "🚜 Sacado de Rollos del Lote y Destino"
+                    : isArmadoRollosLabor(form.tipo) || form.tipo.toLowerCase().includes("rollo")
                     ? "Confección y Armado de Rollos"
                     : "Resultado Productivo / Cosecha / Forraje"}
                 </h3>
                 <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
-                  {form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado")
+                  {isSacadoRollosLabor(form.tipo)
+                    ? "4° y última etapa: retiro físico de los rollos del lote y selección del destino (almacenamiento en este campo o traslado al Tambo)."
+                    : isArmadoRollosLabor(form.tipo) || form.tipo.toLowerCase().includes("rollo")
                     ? "Rollos obtenidos por especie (Avena / Alfalfa / Rastrojo), rendimiento (rollos/ha) y fechas de volteo y rastrillado."
                     : "Rinde por hectárea, volumen cosechado y destino productivo."}
                 </p>
@@ -1515,16 +1571,22 @@ export default function NewActivityModal({
                   onClick={() => {
                     setShowProduccion(true);
                     if (!form.produccion) {
-                      const isRol = form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado");
+                      const isSac = isSacadoRollosLabor(form.tipo);
+                      const isRol = isSac || isArmadoRollosLabor(form.tipo) || form.tipo.toLowerCase().includes("rollo");
+                      const defaultDest = isSac || isRol
+                        ? ((form.campo || "").toLowerCase() === "tambo" ? "Tambo (Patio de forrajes)" : `Almacenado en ${form.campo}`)
+                        : (form.tipo === "Picado" ? "Silo" : "Grano");
+                      const prevProd = isSac ? previousArmado?.produccion : undefined;
                       set("produccion", {
-                        rendimiento: null,
+                        rendimiento: prevProd?.rendimiento ?? null,
                         unidadRendimiento: form.tipo === "Picado" ? "m/ha" : isRol ? "rollos/ha" : "qq/ha",
-                        cantidad: null,
+                        cantidad: prevProd?.cantidad ?? null,
                         unidad: form.tipo === "Picado" ? "metros silo" : isRol ? "rollos" : "kg",
-                        destino: form.tipo === "Picado" ? "Silo" : isRol ? "Stock de Forrajes" : "Grano",
+                        destino: prevProd?.destino || defaultDest,
+                        fechaArmado: previousArmado ? (previousArmado.fechaReal || previousArmado.fechaPlanificada) : "",
                         fechaVolteada: previousVolteo ? (previousVolteo.fechaReal || previousVolteo.fechaPlanificada) : "",
                         fechaRastrillado: previousRastrillado ? (previousRastrillado.fechaReal || previousRastrillado.fechaPlanificada) : "",
-                        rollosDesglose: {
+                        rollosDesglose: prevProd?.rollosDesglose || {
                           avena: null,
                           alfalfa: null,
                           rastrojo: null,
@@ -1539,7 +1601,405 @@ export default function NewActivityModal({
             </div>
 
             {showProduccion && (
-              form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado") ? (
+              isSacadoRollosLabor(form.tipo) ? (
+                /* VISTA ESPECÍFICA: SACADO DE ROLLOS DEL LOTE Y SELECCIÓN DE DESTINO */
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {/* Banner 4° etapa */}
+                  <div
+                    style={{
+                      background: "rgba(37, 99, 235, 0.08)",
+                      border: "1px solid rgba(37, 99, 235, 0.25)",
+                      borderRadius: "8px",
+                      padding: "10px 14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      fontSize: "12.5px",
+                      color: "#1e40af",
+                    }}
+                  >
+                    <span style={{ fontSize: "20px" }}>🚜</span>
+                    <div>
+                      <strong>4° y Última Etapa del Ciclo de Rollos:</strong> Registrá el retiro de los rollos del lote y seleccioná su destino final (si quedaron acopiados en <strong>{form.campo}</strong> o si se llevaron al <strong>Tambo</strong>).
+                    </div>
+                  </div>
+
+                  {/* Banner de Labor Previa de Armado Detectada */}
+                  {previousArmado && (
+                    <div
+                      style={{
+                        background: "#f0fdf4",
+                        border: "1px solid #bbf7d0",
+                        borderRadius: "8px",
+                        padding: "10px 14px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                      }}
+                    >
+                      <div style={{ fontSize: "12.5px", color: "#166534" }}>
+                        💡 <strong>Armado previo detectado en este lote:</strong>{" "}
+                        <strong>{previousArmado.produccion?.cantidad || "Varios"} rollos</strong>
+                        {previousArmado.produccion?.rollosDesglose ? (
+                          <span>
+                            {" "}
+                            (
+                            {[
+                              previousArmado.produccion.rollosDesglose.avena ? `${previousArmado.produccion.rollosDesglose.avena} avena` : "",
+                              previousArmado.produccion.rollosDesglose.alfalfa ? `${previousArmado.produccion.rollosDesglose.alfalfa} alfalfa` : "",
+                              previousArmado.produccion.rollosDesglose.rastrojo ? `${previousArmado.produccion.rollosDesglose.rastrojo} rastrojo` : "",
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                            )
+                          </span>
+                        ) : null}{" "}
+                        el {previousArmado.fechaReal || previousArmado.fechaPlanificada}.
+                      </div>
+                      <button
+                        type="button"
+                        className="secondaryButton smallButton"
+                        style={{
+                          fontSize: "11px",
+                          padding: "4px 10px",
+                          background: "#ffffff",
+                          borderColor: "#86efac",
+                          color: "#15803d",
+                          fontWeight: 700,
+                        }}
+                        onClick={() => {
+                          const p = previousArmado.produccion;
+                          const defDest = (form.campo || "").toLowerCase() === "tambo" ? "Tambo (Patio de forrajes)" : `Almacenado en ${form.campo}`;
+                          set("produccion", {
+                            ...form.produccion,
+                            cantidad: p?.cantidad ?? form.produccion?.cantidad ?? null,
+                            rendimiento: p?.rendimiento ?? form.produccion?.rendimiento ?? null,
+                            unidad: "rollos",
+                            unidadRendimiento: "rollos/ha",
+                            destino: form.produccion?.destino || defDest,
+                            fechaArmado: previousArmado.fechaReal || previousArmado.fechaPlanificada || "",
+                            fechaVolteada: p?.fechaVolteada || "",
+                            fechaRastrillado: p?.fechaRastrillado || "",
+                            rollosDesglose: p?.rollosDesglose || form.produccion?.rollosDesglose || {
+                              avena: null,
+                              alfalfa: null,
+                              rastrojo: null,
+                            },
+                          });
+                        }}
+                      >
+                        ⚡ Copiar datos del armado
+                      </button>
+                    </div>
+                  )}
+
+                  {/* SELECCIÓN DE DESTINO: ¿Almacenados en este campo o llevados al tambo? */}
+                  <div>
+                    <label style={{ fontWeight: 700, fontSize: "13px", color: "var(--slate-800)", display: "block", marginBottom: "6px" }}>
+                      📍 Destino de los Rollos Retirados:
+                    </label>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "10px", marginBottom: "10px" }}>
+                      {/* Opción 1: Almacenado en este campo */}
+                      <div
+                        onClick={() => {
+                          const dest = (form.campo || "").toLowerCase() === "tambo" ? "Tambo (Patio de forrajes)" : `Almacenado en ${form.campo}`;
+                          set("produccion", {
+                            ...form.produccion,
+                            destino: dest,
+                            unidad: "rollos",
+                            unidadRendimiento: "rollos/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                          });
+                        }}
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: "8px",
+                          border: (form.produccion?.destino?.toLowerCase().includes("almacen") || form.produccion?.destino?.toLowerCase().includes((form.campo || "").toLowerCase()))
+                            ? "2px solid #2563eb"
+                            : "1px solid var(--line)",
+                          background: (form.produccion?.destino?.toLowerCase().includes("almacen") || form.produccion?.destino?.toLowerCase().includes((form.campo || "").toLowerCase()))
+                            ? "#eff6ff"
+                            : "#ffffff",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <strong style={{ fontSize: "13px", color: "#1e40af" }}>
+                            🏠 Almacenado en {form.campo}
+                          </strong>
+                          {(form.produccion?.destino?.toLowerCase().includes("almacen") || form.produccion?.destino?.toLowerCase().includes((form.campo || "").toLowerCase())) && (
+                            <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 700 }}>✓ Seleccionado</span>
+                          )}
+                        </div>
+                        <p style={{ margin: "4px 0 0", fontSize: "11.5px", color: "var(--slate-500)" }}>
+                          Quedan guardados en el galpón, tinglado o cabecera de este campo ({form.campo}).
+                        </p>
+                      </div>
+
+                      {/* Opción 2: Llevado al Tambo */}
+                      <div
+                        onClick={() => {
+                          set("produccion", {
+                            ...form.produccion,
+                            destino: "Llevado al Tambo",
+                            unidad: "rollos",
+                            unidadRendimiento: "rollos/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                          });
+                        }}
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: "8px",
+                          border: form.produccion?.destino?.toLowerCase().includes("tambo")
+                            ? "2px solid #16a34a"
+                            : "1px solid var(--line)",
+                          background: form.produccion?.destino?.toLowerCase().includes("tambo")
+                            ? "#f0fdf4"
+                            : "#ffffff",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <strong style={{ fontSize: "13px", color: "#166534" }}>
+                            🥛 Llevado al Tambo
+                          </strong>
+                          {form.produccion?.destino?.toLowerCase().includes("tambo") && (
+                            <span style={{ fontSize: "12px", color: "#166534", fontWeight: 700 }}>✓ Seleccionado</span>
+                          )}
+                        </div>
+                        <p style={{ margin: "4px 0 0", fontSize: "11.5px", color: "var(--slate-500)" }}>
+                          Trasladados al Tambo para patio de forrajes, comedero o ración de vacas lecheras.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Selector para opciones adicionales */}
+                    <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                      <label style={{ fontSize: "11.5px", color: "var(--slate-600)", whiteSpace: "nowrap" }}>
+                        Otras opciones de destino:
+                      </label>
+                      <select
+                        className="input"
+                        style={{ maxWidth: "340px", fontSize: "12px" }}
+                        value={form.produccion?.destino || `Almacenado en ${form.campo}`}
+                        onChange={(e) => {
+                          set("produccion", {
+                            ...form.produccion,
+                            destino: e.target.value,
+                            unidad: "rollos",
+                            unidadRendimiento: "rollos/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                          });
+                        }}
+                      >
+                        <option value={`Almacenado en ${form.campo}`}>Almacenado en este campo ({form.campo})</option>
+                        <option value="Llevado al Tambo">Llevado al Tambo (Patio de forrajes / Comedero)</option>
+                        <option value="Ganadería (Corrales / Recría)">Ganadería (Corrales / Recría)</option>
+                        <option value="Venta directa a terceros">Venta directa a terceros</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Cantidad de rollos retirados */}
+                  <div>
+                    <label style={{ fontWeight: 700, fontSize: "13px", color: "var(--slate-800)", marginBottom: "6px", display: "block" }}>
+                      🌾 Cantidad de Rollos Sacados del Lote:
+                    </label>
+                    <div className="formGrid threeForm" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                      <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                        <label style={{ fontSize: "12px", color: "var(--brand-800)", fontWeight: 700 }}>
+                          🌾 Rollos de Avena
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="input"
+                          value={form.produccion?.rollosDesglose?.avena ?? ""}
+                          onChange={(e) => {
+                            const av = e.target.value ? Number(e.target.value) : null;
+                            const alf = form.produccion?.rollosDesglose?.alfalfa ?? null;
+                            const rast = form.produccion?.rollosDesglose?.rastrojo ?? null;
+                            const tot = (av || 0) + (alf || 0) + (rast || 0);
+                            const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                            const rinde = tot > 0 && sup && sup > 0 ? Number((tot / sup).toFixed(2)) : null;
+                            set("produccion", {
+                              ...form.produccion,
+                              unidad: "rollos",
+                              unidadRendimiento: "rollos/ha",
+                              destino: form.produccion?.destino || `Almacenado en ${form.campo}`,
+                              cantidad: tot > 0 ? tot : (form.produccion?.cantidad ?? null),
+                              rendimiento: rinde ?? form.produccion?.rendimiento ?? null,
+                              rollosDesglose: {
+                                ...form.produccion?.rollosDesglose,
+                                avena: av,
+                              },
+                            });
+                          }}
+                          placeholder="ej: 40 rollos"
+                        />
+                      </div>
+
+                      <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                        <label style={{ fontSize: "12px", color: "#15803d", fontWeight: 700 }}>
+                          🌿 Rollos de Alfalfa
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="input"
+                          value={form.produccion?.rollosDesglose?.alfalfa ?? ""}
+                          onChange={(e) => {
+                            const alf = e.target.value ? Number(e.target.value) : null;
+                            const av = form.produccion?.rollosDesglose?.avena ?? null;
+                            const rast = form.produccion?.rollosDesglose?.rastrojo ?? null;
+                            const tot = (av || 0) + (alf || 0) + (rast || 0);
+                            const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                            const rinde = tot > 0 && sup && sup > 0 ? Number((tot / sup).toFixed(2)) : null;
+                            set("produccion", {
+                              ...form.produccion,
+                              unidad: "rollos",
+                              unidadRendimiento: "rollos/ha",
+                              destino: form.produccion?.destino || `Almacenado en ${form.campo}`,
+                              cantidad: tot > 0 ? tot : (form.produccion?.cantidad ?? null),
+                              rendimiento: rinde ?? form.produccion?.rendimiento ?? null,
+                              rollosDesglose: {
+                                ...form.produccion?.rollosDesglose,
+                                alfalfa: alf,
+                              },
+                            });
+                          }}
+                          placeholder="ej: 35 rollos"
+                        />
+                      </div>
+
+                      <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                        <label style={{ fontSize: "12px", color: "var(--slate-700)", fontWeight: 700 }}>
+                          🌽 Rastrojo / Otros
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="input"
+                          value={form.produccion?.rollosDesglose?.rastrojo ?? ""}
+                          onChange={(e) => {
+                            const rast = e.target.value ? Number(e.target.value) : null;
+                            const av = form.produccion?.rollosDesglose?.avena ?? null;
+                            const alf = form.produccion?.rollosDesglose?.alfalfa ?? null;
+                            const tot = (av || 0) + (alf || 0) + (rast || 0);
+                            const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                            const rinde = tot > 0 && sup && sup > 0 ? Number((tot / sup).toFixed(2)) : null;
+                            set("produccion", {
+                              ...form.produccion,
+                              unidad: "rollos",
+                              unidadRendimiento: "rollos/ha",
+                              destino: form.produccion?.destino || `Almacenado en ${form.campo}`,
+                              cantidad: tot > 0 ? tot : (form.produccion?.cantidad ?? null),
+                              rendimiento: rinde ?? form.produccion?.rendimiento ?? null,
+                              rollosDesglose: {
+                                ...form.produccion?.rollosDesglose,
+                                rastrojo: rast,
+                              },
+                            });
+                          }}
+                          placeholder="ej: 20 rollos"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Totales y Fecha de Armado Previo */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px" }}>
+                    <div>
+                      <label>Total de Rollos Sacados</label>
+                      <input
+                        type="number"
+                        step="1"
+                        className="input"
+                        value={form.produccion?.cantidad ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value ? Number(e.target.value) : null;
+                          const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                          const rinde = val && sup && sup > 0 ? Number((val / sup).toFixed(2)) : form.produccion?.rendimiento ?? null;
+                          set("produccion", {
+                            ...form.produccion,
+                            cantidad: val,
+                            rendimiento: rinde,
+                            unidad: "rollos",
+                            unidadRendimiento: "rollos/ha",
+                            destino: form.produccion?.destino || `Almacenado en ${form.campo}`,
+                          });
+                        }}
+                        placeholder="Total rollos retirados"
+                      />
+                    </div>
+
+                    {/* Fecha de Armado Previo */}
+                    <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "6px", marginBottom: "4px" }}>
+                        <div>
+                          <label style={{ fontWeight: 700, fontSize: "12px", color: "var(--slate-800)", margin: 0 }}>
+                            📦 3° Labor: Fecha de Armado
+                          </label>
+                          <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>
+                            Fecha de confección previa.
+                          </div>
+                        </div>
+
+                        {previousArmado && (
+                          <button
+                            type="button"
+                            className="secondaryButton smallButton"
+                            style={{ fontSize: "10.5px", padding: "2px 6px" }}
+                            onClick={() => {
+                              const fa = previousArmado.fechaReal || previousArmado.fechaPlanificada;
+                              if (fa) {
+                                set("produccion", {
+                                  ...form.produccion,
+                                  unidad: form.produccion?.unidad || "rollos",
+                                  unidadRendimiento: form.produccion?.unidadRendimiento || "rollos/ha",
+                                  cantidad: form.produccion?.cantidad ?? null,
+                                  rendimiento: form.produccion?.rendimiento ?? null,
+                                  fechaArmado: fa,
+                                });
+                              }
+                            }}
+                            title="Usar la fecha del armado registrado previamente en este lote"
+                          >
+                            💡 Usar ({previousArmado.fechaReal || previousArmado.fechaPlanificada})
+                          </button>
+                        )}
+                      </div>
+
+                      <input
+                        type="date"
+                        className="input"
+                        style={{ maxWidth: "200px" }}
+                        value={form.produccion?.fechaArmado || ""}
+                        onChange={(e) => {
+                          set("produccion", {
+                            ...form.produccion,
+                            unidad: form.produccion?.unidad || "rollos",
+                            unidadRendimiento: form.produccion?.unidadRendimiento || "rollos/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                            fechaArmado: e.target.value,
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado") ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                   {/* Banner de Acreditación Automática en Stock */}
                   <div
@@ -1723,7 +2183,7 @@ export default function NewActivityModal({
                       <label>Destino de los Rollos</label>
                       <select
                         className="input"
-                        value={form.produccion?.destino || "Stock de Forrajes"}
+                        value={form.produccion?.destino || "En lote (Pendiente de sacado)"}
                         onChange={(e) => {
                           set("produccion", {
                             ...form.produccion,
@@ -1735,9 +2195,11 @@ export default function NewActivityModal({
                           });
                         }}
                       >
+                        <option value="En lote (Pendiente de sacado)">En lote (Pendiente de sacado)</option>
+                        <option value={`Almacenado en ${form.campo}`}>Almacenado en este campo ({form.campo})</option>
+                        <option value="Llevado al Tambo">Llevado al Tambo (Patio de forrajes / Comedero)</option>
                         <option value="Stock de Forrajes">Stock de Forrajes (Galpón / Tinglado)</option>
-                        <option value="Tambo">Tambo (Alimentación directa)</option>
-                        <option value="Ganadería">Ganadería (Corrales / Recría)</option>
+                        <option value="Ganadería (Corrales / Recría)">Ganadería (Corrales / Recría)</option>
                         <option value="Venta directa">Venta directa a terceros</option>
                       </select>
                     </div>

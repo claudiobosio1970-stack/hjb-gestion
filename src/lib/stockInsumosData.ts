@@ -40,7 +40,7 @@ export interface MovimientoStockItem {
   insumoId: string;
   insumoNombre: string;
   fecha: string;
-  tipo: "Ingreso / Compra" | "Consumo Agrícola" | "Consumo Ganadería" | "Ajuste de Inventario" | "Producción Propia";
+  tipo: "Ingreso / Compra" | "Consumo Agrícola" | "Consumo Ganadería" | "Ajuste de Inventario" | "Producción Propia" | "Traslado / Destino";
   cantidad: number; // Positivo para ingresos y producción, negativo para consumos
   unidad: string;
   detalle: string;
@@ -500,7 +500,12 @@ export function getStockActualInsumos(): {
       const fecha = act.fechaReal || act.fechaPlanificada;
       const tipoLabor = (act.tipo || "").toLowerCase();
       const cultivo = (act.cultivo || "").toLowerCase();
+      const isSacado =
+        tipoLabor.includes("sacado") ||
+        (tipoLabor.includes("rollo") &&
+          (tipoLabor.includes("retiro") || tipoLabor.includes("traslado") || tipoLabor.includes("extracc")));
       const isRollos =
+        isSacado ||
         tipoLabor.includes("rollo") ||
         tipoLabor.includes("armado") ||
         tipoLabor.includes("confecci") ||
@@ -509,49 +514,77 @@ export function getStockActualInsumos(): {
         act.produccion.destino === "Rollos";
 
       if (isRollos) {
+        // Verificar si ya hubo una labor de "Armado de rollos" que acreditó el stock físico en este mismo lote y campaña
+        const hasPreviousArmado = isSacado && activities.some(
+          (other) =>
+            other.id !== act.id &&
+            other.estado === "Realizada" &&
+            other.campo.toLowerCase() === act.campo.toLowerCase() &&
+            (other.lote || "").toLowerCase() === (act.lote || "").toLowerCase() &&
+            other.campana === act.campana &&
+            !other.tipo.toLowerCase().includes("sacado") &&
+            !other.tipo.toLowerCase().includes("volteo") &&
+            !other.tipo.toLowerCase().includes("rastrill") &&
+            (other.tipo.toLowerCase().includes("armado") ||
+              other.tipo.toLowerCase().includes("confecci") ||
+              other.tipo.toLowerCase().includes("enrollad") ||
+              other.tipo.toLowerCase() === "rollos" ||
+              (other.tipo.toLowerCase().includes("rollo") && !other.tipo.toLowerCase().includes("sacado"))) &&
+            Boolean(other.produccion && (other.produccion.cantidad || other.produccion.rollosDesglose))
+        );
+
+        const destinoLabel = act.produccion.destino ? ` → Destino: ${act.produccion.destino}` : "";
+        const movTipo = isSacado ? (hasPreviousArmado ? "Traslado / Destino" : "Producción Propia") : "Producción Propia";
+
         // A. Si tiene desglose específico por cultivo (avena, alfalfa, rastrojo)
         if (act.produccion.rollosDesglose) {
           const { alfalfa, avena, rastrojo } = act.produccion.rollosDesglose;
           if (alfalfa && alfalfa > 0) {
-            const curr = produccionMap.get("rollo-alfalfa") || 0;
-            produccionMap.set("rollo-alfalfa", curr + alfalfa);
+            if (!hasPreviousArmado) {
+              const curr = produccionMap.get("rollo-alfalfa") || 0;
+              produccionMap.set("rollo-alfalfa", curr + alfalfa);
+            }
             movimientos.push({
               id: `mov-prod-alfalfa-${act.id}`,
               insumoId: "rollo-alfalfa",
               insumoNombre: "Rollos de Alfalfa Primera Henificada",
               fecha,
-              tipo: "Producción Propia",
+              tipo: movTipo,
               cantidad: alfalfa,
               unidad: "Rollos",
-              detalle: `Confección de ${alfalfa} rollos de alfalfa en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}`,
+              detalle: `${isSacado ? "Sacado" : "Confección"} de ${alfalfa} rollos de alfalfa en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}${destinoLabel}`,
             });
           }
           if (avena && avena > 0) {
-            const curr = produccionMap.get("rollo-avena") || 0;
-            produccionMap.set("rollo-avena", curr + avena);
+            if (!hasPreviousArmado) {
+              const curr = produccionMap.get("rollo-avena") || 0;
+              produccionMap.set("rollo-avena", curr + avena);
+            }
             movimientos.push({
               id: `mov-prod-avena-${act.id}`,
               insumoId: "rollo-avena",
               insumoNombre: "Rollos de Avena Henificada",
               fecha,
-              tipo: "Producción Propia",
+              tipo: movTipo,
               cantidad: avena,
               unidad: "Rollos",
-              detalle: `Confección de ${avena} rollos de avena en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}`,
+              detalle: `${isSacado ? "Sacado" : "Confección"} de ${avena} rollos de avena en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}${destinoLabel}`,
             });
           }
           if (rastrojo && rastrojo > 0) {
-            const curr = produccionMap.get("rollo-rastrojo") || 0;
-            produccionMap.set("rollo-rastrojo", curr + rastrojo);
+            if (!hasPreviousArmado) {
+              const curr = produccionMap.get("rollo-rastrojo") || 0;
+              produccionMap.set("rollo-rastrojo", curr + rastrojo);
+            }
             movimientos.push({
               id: `mov-prod-rastrojo-${act.id}`,
               insumoId: "rollo-rastrojo",
               insumoNombre: "Rollos de Rastrojo / Chala",
               fecha,
-              tipo: "Producción Propia",
+              tipo: movTipo,
               cantidad: rastrojo,
               unidad: "Rollos",
-              detalle: `Confección de ${rastrojo} rollos de rastrojo en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}`,
+              detalle: `${isSacado ? "Sacado" : "Confección"} de ${rastrojo} rollos de rastrojo en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}${destinoLabel}`,
             });
           }
         } else {
@@ -570,17 +603,19 @@ export function getStockActualInsumos(): {
               targetInsumoId = "rollo-rastrojo";
               targetInsumoNombre = "Rollos de Rastrojo / Chala";
             }
-            const curr = produccionMap.get(targetInsumoId) || 0;
-            produccionMap.set(targetInsumoId, curr + cant);
+            if (!hasPreviousArmado) {
+              const curr = produccionMap.get(targetInsumoId) || 0;
+              produccionMap.set(targetInsumoId, curr + cant);
+            }
             movimientos.push({
               id: `mov-prod-gen-${act.id}`,
               insumoId: targetInsumoId,
               insumoNombre: targetInsumoNombre,
               fecha,
-              tipo: "Producción Propia",
+              tipo: movTipo,
               cantidad: cant,
               unidad: "Rollos",
-              detalle: `Confección de ${cant} rollos (${act.cultivo || "Forraje"}) en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}`,
+              detalle: `${isSacado ? "Sacado" : "Confección"} de ${cant} rollos (${act.cultivo || "Forraje"}) en ${act.campo} ${act.lote ? `(${act.lote})` : ""} · Campaña ${act.campana}${destinoLabel}`,
             });
           }
         }

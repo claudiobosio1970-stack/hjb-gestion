@@ -49,6 +49,7 @@ export type Activity = {
     destino?: string;
     fechaVolteada?: string;
     fechaRastrillado?: string;
+    fechaArmado?: string;
     rollosDesglose?: {
       alfalfa?: number | null;
       avena?: number | null;
@@ -679,6 +680,7 @@ export function isActivityInLote(act: Activity, campo: string, loteNombre: strin
  * 1) Volteo (o Volteada)
  * 2) Rastrillado (o Hilerado)
  * 3) Armado de rollos (Confección)
+ * 4) Sacado de rollos (Retiro del lote y selección de destino)
  */
 export function isRolloLabor(tipo: string): boolean {
   if (!tipo) return false;
@@ -691,7 +693,43 @@ export function isRolloLabor(tipo: string): boolean {
     t.includes("hilerad") ||
     t.includes("armado") ||
     t.includes("confecci") ||
-    t.includes("enrollad")
+    t.includes("enrollad") ||
+    t.includes("sacado") ||
+    t.includes("extracc") ||
+    t.includes("retiro")
+  );
+}
+
+export function isVolteoORastrillado(tipo: string): boolean {
+  if (!tipo) return false;
+  const t = tipo.toLowerCase().trim();
+  return (
+    t.includes("volteo") ||
+    t.includes("voltead") ||
+    t.includes("rastrill") ||
+    t.includes("hilerad")
+  );
+}
+
+export function isSacadoRollosLabor(tipo: string): boolean {
+  if (!tipo) return false;
+  const t = tipo.toLowerCase().trim();
+  return (
+    t.includes("sacado") ||
+    (t.includes("rollo") && (t.includes("retiro") || t.includes("traslado") || t.includes("extracc")))
+  );
+}
+
+export function isArmadoRollosLabor(tipo: string): boolean {
+  if (!tipo) return false;
+  const t = tipo.toLowerCase().trim();
+  if (isVolteoORastrillado(t) || isSacadoRollosLabor(t)) return false;
+  return (
+    t.includes("armado") ||
+    t.includes("confecci") ||
+    t.includes("enrollad") ||
+    t === "rollos" ||
+    t.includes("rollo")
   );
 }
 

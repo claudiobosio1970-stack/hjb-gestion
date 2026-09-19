@@ -179,6 +179,7 @@ export default function ActivityTable({
       "Volteo",
       "Rastrillado",
       "Armado de rollos",
+      "Sacado de rollos",
       "Volteada de rollos",
       "Fumigación",
       "Barbecho",
@@ -575,8 +576,28 @@ export default function ActivityTable({
                               🔄 Volteado: {formatHistoricalDate(activity.produccion.fechaVolteada)}
                             </div>
                           )}
+                          {activity.produccion.fechaRastrillado && (
+                            <div style={{ fontSize: "10.5px", color: "var(--slate-700)", fontWeight: 600 }}>
+                              🚜 Rastrillado: {formatHistoricalDate(activity.produccion.fechaRastrillado)}
+                            </div>
+                          )}
+                          {activity.produccion.fechaArmado && (
+                            <div style={{ fontSize: "10.5px", color: "#166534", fontWeight: 600 }}>
+                              📦 Armado: {formatHistoricalDate(activity.produccion.fechaArmado)}
+                            </div>
+                          )}
                           {activity.produccion.destino && (
-                            <span className="pill badgeSlate" style={{ width: "fit-content", fontSize: "10px" }}>
+                            <span
+                              className={
+                                activity.produccion.destino.toLowerCase().includes("tambo")
+                                  ? "pill badgeGreen"
+                                  : activity.produccion.destino.toLowerCase().includes("almacen") || activity.produccion.destino.toLowerCase().includes("campo")
+                                  ? "pill badgeBlue"
+                                  : "pill badgeSlate"
+                              }
+                              style={{ width: "fit-content", fontSize: "10px", fontWeight: 600 }}
+                            >
+                              {activity.produccion.destino.toLowerCase().includes("tambo") ? "🥛 " : activity.produccion.destino.toLowerCase().includes("almacen") || activity.produccion.destino.toLowerCase().includes("campo") ? "🏠 " : "📍 "}
                               Destino: {activity.produccion.destino}
                             </span>
                           )}

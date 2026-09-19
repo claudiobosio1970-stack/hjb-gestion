@@ -721,13 +721,13 @@ export default function InsumosPage() {
                               <span
                                 className="pill"
                                 style={{
-                                  background: m.cantidad > 0 ? "#dcfce7" : "#fee2e2",
-                                  color: m.cantidad > 0 ? "#166534" : "#991b1b",
+                                  background: m.tipo === "Traslado / Destino" ? "#dbeafe" : m.cantidad > 0 ? "#dcfce7" : "#fee2e2",
+                                  color: m.tipo === "Traslado / Destino" ? "#1e40af" : m.cantidad > 0 ? "#166534" : "#991b1b",
                                   fontSize: "11px",
                                   fontWeight: 700,
                                 }}
                               >
-                                {m.tipo === "Producción Propia" ? `🚜 ${m.tipo}` : m.tipo}
+                                {m.tipo === "Producción Propia" ? `🚜 ${m.tipo}` : m.tipo === "Traslado / Destino" ? `📦 ${m.tipo}` : m.tipo}
                               </span>
                             </td>
                             <td style={{ textAlign: "right", fontWeight: 800, color: m.cantidad > 0 ? "#166534" : "#991b1b" }}>
