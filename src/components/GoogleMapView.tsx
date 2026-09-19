@@ -813,7 +813,7 @@ export default function GoogleMapView() {
     const labores = getLaboresForLote(lote);
 
     let nutrientBadge = "";
-    if (!isPerimetro) {
+    if (!isPerimetro && lote.campoNombre.toLowerCase() === "tambo") {
       try {
         const sum = computeLoteNutrientSummary(
           lote.campoNombre,
@@ -1542,6 +1542,9 @@ export default function GoogleMapView() {
 
               {/* Resumen de Suelos y Recomendación de Enmiendas */}
               {(() => {
+                const isTambo = laboresModalLote.campoNombre.toLowerCase() === "tambo";
+                if (!isTambo) return null;
+
                 const summary = computeLoteNutrientSummary(
                   laboresModalLote.campoNombre,
                   laboresModalLote.nombre,

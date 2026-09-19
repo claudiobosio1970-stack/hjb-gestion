@@ -48,6 +48,7 @@ export type Activity = {
     unidadRendimiento: string;
     destino?: string;
     fechaVolteada?: string;
+    fechaRastrillado?: string;
     rollosDesglose?: {
       alfalfa?: number | null;
       avena?: number | null;
@@ -673,3 +674,43 @@ export function isActivityInLote(act: Activity, campo: string, loteNombre: strin
   return actLote === lTarget || actLoteClean === lTargetClean;
 }
 
+/**
+ * Identifica labores vinculadas a la confección y manejo de rollos:
+ * 1) Volteo (o Volteada)
+ * 2) Rastrillado (o Hilerado)
+ * 3) Armado de rollos (Confección)
+ */
+export function isRolloLabor(tipo: string): boolean {
+  if (!tipo) return false;
+  const t = tipo.toLowerCase().trim();
+  return (
+    t.includes("rollo") ||
+    t.includes("volteo") ||
+    t.includes("voltead") ||
+    t.includes("rastrill") ||
+    t.includes("hilerad") ||
+    t.includes("armado") ||
+    t.includes("confecci") ||
+    t.includes("enrollad")
+  );
+}
+
+/**
+ * Identifica labores mecánicas donde no se aplican insumos (agroquímicos ni fertilizantes).
+ */
+export function isLaborSinInsumos(tipo: string): boolean {
+  if (!tipo) return false;
+  const t = tipo.toLowerCase().trim();
+  return (
+    isRolloLabor(t) ||
+    t.includes("subsol") ||
+    t.includes("disco") ||
+    t.includes("rastra") ||
+    t.includes("rolad") ||
+    t.includes("laboreo") ||
+    t.includes("desmalez") ||
+    t.includes("arado") ||
+    t.includes("escarific") ||
+    t.includes("cincel")
+  );
+}

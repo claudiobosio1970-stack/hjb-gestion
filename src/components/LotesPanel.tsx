@@ -547,10 +547,12 @@ export default function LotesPanel({
             <table className="dataTable" style={{ margin: 0 }}>
               <thead>
                 <tr>
-                  <th style={{ width: "20%" }}>Cultivo</th>
-                  <th style={{ width: "26%" }}>Biofertilización / ha</th>
-                  <th style={{ width: "26%" }}>Fertilización / ha</th>
-                  <th style={{ width: "28%" }}>Con qué se fumigó</th>
+                  <th style={{ width: campoNombre.toLowerCase() === "tambo" ? "20%" : "25%" }}>Cultivo</th>
+                  {campoNombre.toLowerCase() === "tambo" && (
+                    <th style={{ width: "26%" }}>Biofertilización / ha</th>
+                  )}
+                  <th style={{ width: campoNombre.toLowerCase() === "tambo" ? "26%" : "35%" }}>Fertilización / ha</th>
+                  <th style={{ width: campoNombre.toLowerCase() === "tambo" ? "28%" : "40%" }}>Con qué se fumigó</th>
                 </tr>
               </thead>
               <tbody>
@@ -565,35 +567,37 @@ export default function LotesPanel({
                     </span>
                   </td>
 
-                  {/* Biofertilizante / ha */}
-                  <td style={{ verticalAlign: "top" }}>
-                    {resumenAgronomico && (resumenAgronomico.bioLiqTotalKL > 0 || resumenAgronomico.bioSolTotalTn > 0) ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                        {resumenAgronomico.bioLiqTotalKL > 0 && (
-                          <div style={{ background: "#f0f9ff", padding: "6px 10px", borderRadius: "6px", border: "1px solid #bae6fd" }}>
-                            <div style={{ fontWeight: 700, color: "#0369a1", fontSize: "13px" }}>
-                              💧 {resumenAgronomico.bioLiqDosisHa} kL/ha (Líquido)
+                  {/* Biofertilizante / ha (Exclusivo Tambo) */}
+                  {campoNombre.toLowerCase() === "tambo" && (
+                    <td style={{ verticalAlign: "top" }}>
+                      {resumenAgronomico && (resumenAgronomico.bioLiqTotalKL > 0 || resumenAgronomico.bioSolTotalTn > 0) ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          {resumenAgronomico.bioLiqTotalKL > 0 && (
+                            <div style={{ background: "#f0f9ff", padding: "6px 10px", borderRadius: "6px", border: "1px solid #bae6fd" }}>
+                              <div style={{ fontWeight: 700, color: "#0369a1", fontSize: "13px" }}>
+                                💧 {resumenAgronomico.bioLiqDosisHa} kL/ha (Líquido)
+                              </div>
+                              <div style={{ fontSize: "11.5px", color: "#0284c7", marginTop: "2px" }}>
+                                Total: {resumenAgronomico.bioLiqTotalKL} kL · {resumenAgronomico.bioLiqTanques > 0 ? `${resumenAgronomico.bioLiqTanques} tanques` : "Efluente tratado"}
+                              </div>
                             </div>
-                            <div style={{ fontSize: "11.5px", color: "#0284c7", marginTop: "2px" }}>
-                              Total: {resumenAgronomico.bioLiqTotalKL} kL · {resumenAgronomico.bioLiqTanques > 0 ? `${resumenAgronomico.bioLiqTanques} tanques` : "Efluente tratado"}
+                          )}
+                          {resumenAgronomico.bioSolTotalTn > 0 && (
+                            <div style={{ background: "#f0fdf4", padding: "6px 10px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                              <div style={{ fontWeight: 700, color: "#15803d", fontSize: "13px" }}>
+                                🚜 {resumenAgronomico.bioSolDosisHa} tn/ha (Sólido)
+                              </div>
+                              <div style={{ fontSize: "11.5px", color: "#16a34a", marginTop: "2px" }}>
+                                Total: {resumenAgronomico.bioSolTotalTn} tn · {resumenAgronomico.bioSolCarros > 0 ? `${resumenAgronomico.bioSolCarros} carros` : "Estiércol sólido"}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                        {resumenAgronomico.bioSolTotalTn > 0 && (
-                          <div style={{ background: "#f0fdf4", padding: "6px 10px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
-                            <div style={{ fontWeight: 700, color: "#15803d", fontSize: "13px" }}>
-                              🚜 {resumenAgronomico.bioSolDosisHa} tn/ha (Sólido)
-                            </div>
-                            <div style={{ fontSize: "11.5px", color: "#16a34a", marginTop: "2px" }}>
-                              Total: {resumenAgronomico.bioSolTotalTn} tn · {resumenAgronomico.bioSolCarros > 0 ? `${resumenAgronomico.bioSolCarros} carros` : "Estiércol sólido"}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span style={{ color: "var(--muted)", fontSize: "13px" }}>— Sin biofertilización registrada</span>
-                    )}
-                  </td>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: "var(--muted)", fontSize: "13px" }}>— Sin biofertilización registrada</span>
+                      )}
+                    </td>
+                  )}
 
                   {/* Fertilizante / ha */}
                   <td style={{ verticalAlign: "top" }}>

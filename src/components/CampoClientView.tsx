@@ -40,6 +40,15 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
   const [openModal, setOpenModal] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
 
+  const isTambo = campoNombre.toLowerCase() === "tambo";
+
+  // Si cambia de campo y no es Tambo, evitar que quede en pestaña Biofertilización
+  useEffect(() => {
+    if (!isTambo && tab === "Biofertilización") {
+      setTab("Actividades");
+    }
+  }, [isTambo, tab]);
+
   // Estados para botón "Editar Lote" del encabezado
   const [headerLoteModalOpen, setHeaderLoteModalOpen] = useState(false);
   const [headerLoteToEdit, setHeaderLoteToEdit] = useState<Lote | null>(null);
@@ -204,7 +213,10 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
 
           {/* Selector de Pestañas */}
           <div className="tabs">
-            {(["Actividades", "Lotes", "Rotaciones", "Insumos", "Biofertilización", "Suelos", "Documentos"] as Tab[]).map((name) => (
+            {(isTambo
+              ? (["Actividades", "Lotes", "Rotaciones", "Insumos", "Biofertilización", "Suelos", "Documentos"] as Tab[])
+              : (["Actividades", "Lotes", "Rotaciones", "Insumos", "Suelos", "Documentos"] as Tab[])
+            ).map((name) => (
               <button
                 key={name}
                 className={tab === name ? "tab active" : "tab"}
@@ -213,7 +225,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
                   if (name !== "Lotes") setSelectedLote(null);
                 }}
               >
-                {name === "Biofertilización" && campoNombre === "Tambo" ? "🐄 Biofertilización" : name}
+                {name === "Biofertilización" ? "🐄 Biofertilización" : name}
                 {name === "Actividades" && ` (${activities.length})`}
                 {name === "Lotes" && ` (${lotes.length})`}
                 {name === "Rotaciones" && ` (${rotacionesCampo.length})`}
@@ -301,7 +313,7 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
       )}
 
       {/* PESTAÑA: BIOFERTILIZACIÓN */}
-      {tab === "Biofertilización" && (
+      {isTambo && tab === "Biofertilización" && (
         <section className="panel">
           <div className="sectionTitle">
             <div>

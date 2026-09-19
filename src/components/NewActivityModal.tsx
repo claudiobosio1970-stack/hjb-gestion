@@ -6,6 +6,8 @@ import {
   ActivityInput,
   ActivityStatus,
   agricultureData,
+  isRolloLabor,
+  isLaborSinInsumos,
 } from "@/lib/agricultureData";
 import { LOTES_POR_CAMPO } from "@/lib/historicalData";
 import { productos, tiposActividad } from "@/lib/mockData";
@@ -33,41 +35,16 @@ const CULTIVOS_PRESET = [
 const MAQUINARIAS_PRESET = [
   "Fumigador Metalford",
   "Tractor Case 150",
-  "Rastrillo Hilerador / Giroscópico",
+  "Rastrillo Volteador / Giroscópico",
+  "Rastrillo Hilerador",
   "Rotoenfardadora / Enrolladora Mainero",
   ...INITIAL_EQUIPMENT.map((eq) => `${eq.nombre} (${eq.marca} ${eq.modelo})`),
   "Tractor John Deere 6120E (120 HP)",
   "Tractor John Deere 5705 (85 HP)",
-  "Tanque Estercolero Fliegl 14000L",
-  "Removedor de Fosa Cri-Man",
-  "Mixer Kuhn Knight 5144",
-  "Sembradora de Grano Grueso",
-  "Sembradora de Fina",
-  "Pulverizadora Autopropulsada",
-  "Cosechadora (Contratista)",
-  "Picadora de Forraje Claas (Contratista)",
-  "Rastra de Discos",
+  "Camioneta Hilux 4x4",
   "Acoplado Tolva",
   "Sin asignar",
 ];
-
-function isLaborSinInsumos(tipo: string): boolean {
-  const t = (tipo || "").toLowerCase();
-  return (
-    t.includes("subsol") ||
-    t.includes("disco") ||
-    t.includes("rastra") ||
-    t.includes("rolad") ||
-    t.includes("laboreo") ||
-    t.includes("desmalez") ||
-    t.includes("arado") ||
-    t.includes("escarific") ||
-    t.includes("cincel") ||
-    t.includes("voltead") ||
-    t.includes("hilerad") ||
-    t.includes("rastrill")
-  );
-}
 
 function isBiofertilizacion(tipo: string): boolean {
   const t = (tipo || "").toLowerCase();
@@ -79,8 +56,11 @@ function getDefaultMaquinaria(tipo: string): string {
   if (t.includes("fumiga") || t.includes("pulveri") || t.includes("barbecho")) {
     return "Fumigador Metalford";
   }
-  if (t.includes("voltead") || t.includes("hilerad") || t.includes("rastrill")) {
-    return "Rastrillo Hilerador / Giroscópico";
+  if (t.includes("volteo") || t.includes("voltead")) {
+    return "Rastrillo Volteador / Giroscópico";
+  }
+  if (t.includes("rastrill") || t.includes("hilerad")) {
+    return "Rastrillo Hilerador";
   }
   if (t.includes("armado") || t.includes("rollo") || t.includes("confecci") || t.includes("enrollad")) {
     return "Rotoenfardadora / Enrolladora";
@@ -165,17 +145,43 @@ export default function NewActivityModal({
   // Lista de todos los lotes configurados en la app
   const allLotes = agricultureData.listLotes();
 
-  // Buscar si hubo una labor de volteada previa en este campo y lote
-  const previousVolteada = useMemo(() => {
-    if (!form.campo || !form.lote) return null;
+  // Buscar si hubo una labor de volteo previa en este campo y lote
+  const previousVolteo = useMemo(() => {
+    const c = form.campo;
+    const l = form.lote;
+    if (!c || !l) return null;
+    const cLow = c.toLowerCase();
+    const lLow = l.toLowerCase();
     try {
       const allActs = agricultureData.listActivities();
       return (
         allActs.find(
           (a) =>
-            a.campo === form.campo &&
-            a.lote === form.lote &&
-            (a.tipo || "").toLowerCase().includes("voltead")
+            a.campo.toLowerCase() === cLow &&
+            (a.lote || "").toLowerCase() === lLow &&
+            ((a.tipo || "").toLowerCase().includes("volteo") || (a.tipo || "").toLowerCase().includes("voltead"))
+        ) || null
+      );
+    } catch {
+      return null;
+    }
+  }, [form.campo, form.lote]);
+
+  // Buscar si hubo una labor de rastrillado previa en este campo y lote
+  const previousRastrillado = useMemo(() => {
+    const c = form.campo;
+    const l = form.lote;
+    if (!c || !l) return null;
+    const cLow = c.toLowerCase();
+    const lLow = l.toLowerCase();
+    try {
+      const allActs = agricultureData.listActivities();
+      return (
+        allActs.find(
+          (a) =>
+            a.campo.toLowerCase() === cLow &&
+            (a.lote || "").toLowerCase() === lLow &&
+            ((a.tipo || "").toLowerCase().includes("rastrill") || (a.tipo || "").toLowerCase().includes("hilerad"))
         ) || null
       );
     } catch {
@@ -188,20 +194,26 @@ export default function NewActivityModal({
     if (editingActivity) {
       setForm({
         ...editingActivity,
-        insumos: editingActivity.insumos || [],
+        insumos: isRolloLabor(editingActivity.tipo) ? [] : (editingActivity.insumos || []),
       });
       const isGroup = Boolean(
         editingActivity.esGrupal ||
         (editingActivity.lotesAfectados && editingActivity.lotesAfectados.length > 1)
       );
       setIsMultiLote(isGroup);
+      const isVolteoORastrillado =
+        editingActivity.tipo.toLowerCase().includes("volteo") ||
+        editingActivity.tipo.toLowerCase().includes("voltead") ||
+        editingActivity.tipo.toLowerCase().includes("rastrill") ||
+        editingActivity.tipo.toLowerCase().includes("hilerad");
       const isRollOrHarv =
-        editingActivity.tipo === "Cosecha" ||
-        editingActivity.tipo === "Picado" ||
-        editingActivity.tipo === "Rollos" ||
-        editingActivity.tipo === "Armado de rollos" ||
-        editingActivity.tipo.toLowerCase().includes("rollo") ||
-        editingActivity.tipo.toLowerCase().includes("armado");
+        !isVolteoORastrillado &&
+        (editingActivity.tipo === "Cosecha" ||
+          editingActivity.tipo === "Picado" ||
+          editingActivity.tipo === "Rollos" ||
+          editingActivity.tipo === "Armado de rollos" ||
+          editingActivity.tipo.toLowerCase().includes("armado") ||
+          editingActivity.tipo.toLowerCase().includes("confecci"));
       setShowProduccion(
         Boolean(
           editingActivity.produccion &&
@@ -475,7 +487,7 @@ export default function NewActivityModal({
 
     const activityToSave: Activity = {
       ...form,
-      insumos: validInsumos,
+      insumos: isRolloLabor(form.tipo) ? [] : validInsumos,
       cultivo: finalCultivo,
       cultivoAntecesor: autoCultivoAntecesor || undefined,
       id: form.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `act-${Date.now()}`),
@@ -515,24 +527,26 @@ export default function NewActivityModal({
     new Set([...baseLotes, ...(form.lote ? [form.lote] : []), "General", "Lote Único"])
   );
 
+  const isTambo = (form.campo || "").toLowerCase() === "tambo";
+
   const allTiposActividad = Array.from(
     new Set([
       "Siembra",
       "Barbecho",
       "Fumigación",
       "Fertilización",
-      "Biofertilización",
-      "Volteada de rollos",
+      ...(isTambo ? ["Biofertilización"] : []),
+      "Volteo",
+      "Rastrillado",
       "Armado de rollos",
       "Subsolado",
       "Laboreo",
       "Rastra de discos",
       "Cosecha",
       "Picado",
-      "Rollos",
       "Pastoreo",
       "Monitoreo",
-      ...tiposActividad,
+      ...tiposActividad.filter((t) => isTambo || !t.toLowerCase().includes("biofertiliz")),
       ...(form.tipo ? [form.tipo] : []),
     ])
   );
@@ -963,9 +977,12 @@ export default function NewActivityModal({
                   const newTipo = e.target.value;
                   const newMaq = getDefaultMaquinaria(newTipo);
                   const sinInsumos = isLaborSinInsumos(newTipo);
+                  const esRollo = isRolloLabor(newTipo);
                   setForm((prev) => {
                     let nextInsumos = prev.insumos;
-                    if (sinInsumos && prev.insumos.length <= 1 && (!prev.insumos[0] || !prev.insumos[0].producto)) {
+                    if (esRollo) {
+                      nextInsumos = [];
+                    } else if (sinInsumos && prev.insumos.length <= 1 && (!prev.insumos[0] || !prev.insumos[0].producto)) {
                       nextInsumos = [];
                     } else if (!sinInsumos && prev.insumos.length === 0 && !isBiofertilizacion(newTipo)) {
                       nextInsumos = [newInput("")];
@@ -980,14 +997,24 @@ export default function NewActivityModal({
                       insumos: nextInsumos,
                     };
                   });
+                  const isVolteoORastrillado =
+                    newTipo.toLowerCase().includes("volteo") ||
+                    newTipo.toLowerCase().includes("voltead") ||
+                    newTipo.toLowerCase().includes("rastrill") ||
+                    newTipo.toLowerCase().includes("hilerad");
+                  const isArmado =
+                    !isVolteoORastrillado &&
+                    (newTipo.toLowerCase().includes("armado") ||
+                      newTipo.toLowerCase().includes("rollo") ||
+                      newTipo.toLowerCase().includes("confecci") ||
+                      newTipo.toLowerCase().includes("enrollad"));
                   const isCosechaPicado =
                     newTipo.toLowerCase().includes("cosecha") ||
                     newTipo.toLowerCase().includes("picado") ||
-                    newTipo.toLowerCase().includes("rollo") ||
-                    newTipo.toLowerCase().includes("armado");
+                    isArmado;
                   if (isCosechaPicado) {
                     setShowProduccion(true);
-                    if (newTipo.toLowerCase().includes("rollo") || newTipo.toLowerCase().includes("armado")) {
+                    if (isArmado) {
                       setForm((prev) => ({
                         ...prev,
                         produccion: prev.produccion || {
@@ -996,7 +1023,8 @@ export default function NewActivityModal({
                           cantidad: null,
                           unidad: "rollos",
                           destino: "Stock de Forrajes",
-                          fechaVolteada: previousVolteada ? (previousVolteada.fechaReal || previousVolteada.fechaPlanificada) : "",
+                          fechaVolteada: previousVolteo ? (previousVolteo.fechaReal || previousVolteo.fechaPlanificada) : "",
+                          fechaRastrillado: previousRastrillado ? (previousRastrillado.fechaReal || previousRastrillado.fechaPlanificada) : "",
                           rollosDesglose: {
                             avena: null,
                             alfalfa: null,
@@ -1144,14 +1172,15 @@ export default function NewActivityModal({
           </div>
         </div>
 
-        {/* SECCIÓN 4: Insumos y Dosis */}
-        <div className="formSection">
-          <div style={{ marginBottom: "12px" }}>
-            <h3>Insumos y Dosis</h3>
-            <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
-              Productos, fertilizantes, semillas o agroquímicos aplicados sobre la superficie seleccionada.
-            </p>
-          </div>
+        {/* SECCIÓN 4: Insumos y Dosis (Oculto para actividades de rollos) */}
+        {!isRolloLabor(form.tipo) && (
+          <div className="formSection">
+            <div style={{ marginBottom: "12px" }}>
+              <h3>Insumos y Dosis</h3>
+              <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
+                Productos, fertilizantes, semillas o agroquímicos aplicados sobre la superficie seleccionada.
+              </p>
+            </div>
 
           {isBiofertilizacion(form.tipo) && (
             <div
@@ -1439,25 +1468,30 @@ export default function NewActivityModal({
             <option value="Estiércol Tambo (Sólido)" />
           </datalist>
         </div>
+        )}
 
-        {/* SECCIÓN 5: Producción / Rendimiento (Cosecha, Picado o Confección de Rollos) */}
+        {/* SECCIÓN 5: Producción / Rendimiento (Cosecha, Picado o Armado de Rollos) */}
         {(form.tipo === "Cosecha" ||
           form.tipo === "Picado" ||
-          form.tipo === "Rollos" ||
-          form.tipo === "Armado de rollos" ||
-          form.tipo.toLowerCase().includes("rollo") ||
-          form.tipo.toLowerCase().includes("armado")) && (
+          (!form.tipo.toLowerCase().includes("volteo") &&
+            !form.tipo.toLowerCase().includes("voltead") &&
+            !form.tipo.toLowerCase().includes("rastrill") &&
+            !form.tipo.toLowerCase().includes("hilerad") &&
+            (form.tipo === "Armado de rollos" ||
+              form.tipo === "Rollos" ||
+              form.tipo.toLowerCase().includes("armado") ||
+              form.tipo.toLowerCase().includes("confecci")))) && (
           <div className="formSection">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
               <div>
                 <h3>
                   {form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado")
-                    ? "Confección de Rollos / Cosecha de Forraje"
+                    ? "Confección y Armado de Rollos"
                     : "Resultado Productivo / Cosecha / Forraje"}
                 </h3>
                 <p className="muted" style={{ fontSize: "12px", margin: 0 }}>
                   {form.tipo.toLowerCase().includes("rollo") || form.tipo.toLowerCase().includes("armado")
-                    ? "Rollos obtenidos por cultivo (Avena / Alfalfa), rendimiento por hectárea y fecha de volteada."
+                    ? "Rollos obtenidos por especie (Avena / Alfalfa / Rastrojo), rendimiento (rollos/ha) y fechas de volteo y rastrillado."
                     : "Rinde por hectárea, volumen cosechado y destino productivo."}
                 </p>
               </div>
@@ -1488,7 +1522,8 @@ export default function NewActivityModal({
                         cantidad: null,
                         unidad: form.tipo === "Picado" ? "metros silo" : isRol ? "rollos" : "kg",
                         destino: form.tipo === "Picado" ? "Silo" : isRol ? "Stock de Forrajes" : "Grano",
-                        fechaVolteada: previousVolteada ? (previousVolteada.fechaReal || previousVolteada.fechaPlanificada) : "",
+                        fechaVolteada: previousVolteo ? (previousVolteo.fechaReal || previousVolteo.fechaPlanificada) : "",
+                        fechaRastrillado: previousRastrillado ? (previousRastrillado.fechaReal || previousRastrillado.fechaPlanificada) : "",
                         rollosDesglose: {
                           avena: null,
                           alfalfa: null,
@@ -1708,47 +1743,49 @@ export default function NewActivityModal({
                     </div>
                   </div>
 
-                  {/* Fecha de Volteada Previa */}
-                  <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-                      <div>
-                        <label style={{ fontWeight: 700, fontSize: "12.5px", color: "var(--slate-800)" }}>
-                          🔄 Fecha en que se volteó la andana (Avena / Alfalfa)
-                        </label>
-                        <div style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
-                          Indica la fecha en que se rastrilló / volteó el forraje previo a la confección.
+                  {/* Fechas de Labores Previas: Volteo y Rastrillado */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" }}>
+                    {/* Fecha de Volteo Previo */}
+                    <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "6px", marginBottom: "6px" }}>
+                        <div>
+                          <label style={{ fontWeight: 700, fontSize: "12.5px", color: "var(--slate-800)" }}>
+                            🔄 1° Labor: Fecha de Volteo
+                          </label>
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                            Fecha en que se volteó la andana.
+                          </div>
                         </div>
+
+                        {previousVolteo && (
+                          <button
+                            type="button"
+                            className="secondaryButton smallButton"
+                            style={{ fontSize: "10.5px", padding: "3px 7px" }}
+                            onClick={() => {
+                              const fv = previousVolteo.fechaReal || previousVolteo.fechaPlanificada;
+                              if (fv) {
+                                set("produccion", {
+                                  ...form.produccion,
+                                  unidad: form.produccion?.unidad || "rollos",
+                                  unidadRendimiento: form.produccion?.unidadRendimiento || "rollos/ha",
+                                  cantidad: form.produccion?.cantidad ?? null,
+                                  rendimiento: form.produccion?.rendimiento ?? null,
+                                  fechaVolteada: fv,
+                                });
+                              }
+                            }}
+                            title="Usar la fecha del volteo registrado previamente en este lote"
+                          >
+                            💡 Usar ({previousVolteo.fechaReal || previousVolteo.fechaPlanificada})
+                          </button>
+                        )}
                       </div>
 
-                      {previousVolteada && (
-                        <button
-                          type="button"
-                          className="secondaryButton smallButton"
-                          style={{ fontSize: "11px", padding: "4px 8px" }}
-                          onClick={() => {
-                            const fv = previousVolteada.fechaReal || previousVolteada.fechaPlanificada;
-                            if (fv) {
-                              set("produccion", {
-                                ...form.produccion,
-                                unidad: form.produccion?.unidad || "rollos",
-                                unidadRendimiento: form.produccion?.unidadRendimiento || "rollos/ha",
-                                cantidad: form.produccion?.cantidad ?? null,
-                                rendimiento: form.produccion?.rendimiento ?? null,
-                                fechaVolteada: fv,
-                              });
-                            }
-                          }}
-                          title="Usar la fecha de la volteada registrada previamente en este lote"
-                        >
-                          💡 Usar fecha de volteada previa ({previousVolteada.fechaReal || previousVolteada.fechaPlanificada})
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={{ marginTop: "8px", maxWidth: "240px" }}>
                       <input
                         type="date"
                         className="input"
+                        style={{ maxWidth: "200px" }}
                         value={form.produccion?.fechaVolteada || ""}
                         onChange={(e) => {
                           set("produccion", {
@@ -1758,6 +1795,61 @@ export default function NewActivityModal({
                             cantidad: form.produccion?.cantidad ?? null,
                             rendimiento: form.produccion?.rendimiento ?? null,
                             fechaVolteada: e.target.value,
+                          });
+                        }}
+                      />
+                    </div>
+
+                    {/* Fecha de Rastrillado Previo */}
+                    <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "6px", marginBottom: "6px" }}>
+                        <div>
+                          <label style={{ fontWeight: 700, fontSize: "12.5px", color: "var(--slate-800)" }}>
+                            🚜 2° Labor: Fecha de Rastrillado
+                          </label>
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                            Fecha en que se rastrilló / hileró el pasto.
+                          </div>
+                        </div>
+
+                        {previousRastrillado && (
+                          <button
+                            type="button"
+                            className="secondaryButton smallButton"
+                            style={{ fontSize: "10.5px", padding: "3px 7px" }}
+                            onClick={() => {
+                              const fr = previousRastrillado.fechaReal || previousRastrillado.fechaPlanificada;
+                              if (fr) {
+                                set("produccion", {
+                                  ...form.produccion,
+                                  unidad: form.produccion?.unidad || "rollos",
+                                  unidadRendimiento: form.produccion?.unidadRendimiento || "rollos/ha",
+                                  cantidad: form.produccion?.cantidad ?? null,
+                                  rendimiento: form.produccion?.rendimiento ?? null,
+                                  fechaRastrillado: fr,
+                                });
+                              }
+                            }}
+                            title="Usar la fecha del rastrillado registrado previamente en este lote"
+                          >
+                            💡 Usar ({previousRastrillado.fechaReal || previousRastrillado.fechaPlanificada})
+                          </button>
+                        )}
+                      </div>
+
+                      <input
+                        type="date"
+                        className="input"
+                        style={{ maxWidth: "200px" }}
+                        value={form.produccion?.fechaRastrillado || ""}
+                        onChange={(e) => {
+                          set("produccion", {
+                            ...form.produccion,
+                            unidad: form.produccion?.unidad || "rollos",
+                            unidadRendimiento: form.produccion?.unidadRendimiento || "rollos/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                            fechaRastrillado: e.target.value,
                           });
                         }}
                       />
