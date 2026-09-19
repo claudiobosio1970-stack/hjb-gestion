@@ -263,9 +263,6 @@ export default function SoilPanel({
           <h2 style={{ fontSize: "20px", fontWeight: 800, color: "var(--slate-900)", margin: 0 }}>
             🧪 Análisis de Suelos, Perfiles Hídricos y Balance de Enmiendas
           </h2>
-          <p className="muted" style={{ margin: "4px 0 0 0", fontSize: "13px" }}>
-            Los análisis de suelo y humedad se realizaron <strong>previos a la distribución de estiércol y efluentes</strong>. El sistema calcula en tiempo real los nutrientes aportados por los carros esparcidos y recomienda los carros o tanques restantes necesarios para alcanzar el rendimiento potencial.
-          </p>
         </div>
 
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -326,7 +323,7 @@ export default function SoilPanel({
           {lotesDelCampo.map((lote) => {
             const isSelected = selectedLoteNombre.toLowerCase() === lote.nombre.toLowerCase();
             const sum = summariesDelCampo.find((s) => s.lote.toLowerCase() === lote.nombre.toLowerCase());
-            const hasCarts = sum && sum.carrosSolido > 0;
+            const isCovered = sum && sum.estadoBalance === "Cubierto con holgura";
 
             return (
               <button
@@ -336,7 +333,7 @@ export default function SoilPanel({
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "5px",
+                  gap: "6px",
                   padding: "6px 12px",
                   borderRadius: "6px",
                   fontSize: "12px",
@@ -354,18 +351,40 @@ export default function SoilPanel({
                     ? "Lote 2 (Sector 3b)"
                     : lote.nombre}
                 </span>
-                {hasCarts && (
+                {isCovered ? (
                   <span
                     style={{
                       background: "#dcfce7",
                       color: "#166534",
                       fontSize: "10px",
-                      padding: "1px 5px",
+                      padding: "1px 6px",
                       borderRadius: "10px",
                       fontWeight: 800,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "3px",
                     }}
+                    title="Nutrición N-P-K cubierta con creces"
                   >
-                    🚜 {sum.carrosSolido}
+                    🚜 {sum?.carrosSolido || 0} ✓
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      background: "#fef3c7",
+                      color: "#b45309",
+                      border: "1px solid #fde68a",
+                      fontSize: "10px",
+                      padding: "1px 6px",
+                      borderRadius: "10px",
+                      fontWeight: 800,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "3px",
+                    }}
+                    title="Falta biofertilizar para alcanzar la meta nutricional"
+                  >
+                    ⚡ Falta
                   </span>
                 )}
               </button>
@@ -388,24 +407,20 @@ export default function SoilPanel({
             </select>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>Meta Nutricional:</label>
-            <select
-              className="select"
-              style={{ fontSize: "12px", padding: "4px 8px", fontWeight: 600 }}
-              value={targetCrop}
-              onChange={(e) => setTargetCrop(e.target.value)}
-            >
-              <option value="Doble Maíz Silo">Doble Maíz Silo · Meta 300 N / 60 P / 340 K</option>
-              <option value="Avena / Maíz">Avena / Maíz · Meta 230 N / 40 P / 200 K</option>
-              <option value="Maíz Silo">Maíz Silo (120 qq / 45 t MV) · Meta 220 N / 40 P / 220 K</option>
-              <option value="Maíz 1ra">Maíz 1ra Grano (120 qq) · Meta 200 N / 35 P / 120 K</option>
-              <option value="Alfalfa 4°">Alfalfa en Producción (Alta K) · Meta 60 N / 45 P / 300 K</option>
-              <option value="Soja 1ra">Soja de 1ra · Meta 45 N / 30 P / 75 K</option>
-              <option value="Sorgo Silo">Sorgo Silo / Forrajero · Meta 170 N / 30 P / 160 K</option>
-              <option value="Pastura Consociada">Pastura Consociada · Meta 60 N / 40 P / 200 K</option>
-            </select>
-          </div>
+          {activeLote ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>Cultivo planificado:</span>
+              <span className="pill badgeGreen" style={{ fontSize: "12px", fontWeight: 700 }}>
+                🌱 {activeLote.cultivoActual || targetCrop}
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span className="pill badgeSlate" style={{ fontSize: "12px", fontWeight: 700 }}>
+                🌱 Metas fijadas según rotación oficial
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -488,161 +503,82 @@ export default function SoilPanel({
 
             <div
               style={{
-                textAlign: "right",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
                 background: "#ffffff",
-                padding: "12px 18px",
-                borderRadius: "10px",
-                border: "1px solid rgba(0,0,0,0.08)",
-                minWidth: "200px",
+                padding: "10px 14px",
+                borderRadius: "12px",
+                border: "1.5px solid rgba(0,0,0,0.08)",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.03)",
+                flexWrap: "wrap",
               }}
             >
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", display: "block" }}>
-                OPCIÓN RECOMENDADA
-              </span>
-              <span
+              {/* Bloque Sólido */}
+              <div
                 style={{
-                  fontSize: "24px",
-                  fontWeight: 900,
-                  color: activeSummary.soloCarrosRestantes === 0 ? "#16a34a" : "#d97706",
-                  lineHeight: "1.2",
-                  display: "block",
+                  textAlign: "center",
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  background: activeSummary.soloCarrosRestantes === 0 ? "#f0fdf4" : "#fef9c3",
+                  border: activeSummary.soloCarrosRestantes === 0 ? "1px solid #bbf7d0" : "1px solid #fef08a",
+                  minWidth: "130px",
                 }}
               >
-                {activeSummary.soloCarrosRestantes === 0 ? "0 carros" : `${activeSummary.soloCarrosRestantes} carros`}
+                <span style={{ fontSize: "11px", fontWeight: 800, color: activeSummary.soloCarrosRestantes === 0 ? "#16a34a" : "#854d0e", display: "block" }}>
+                  🚜 SÓLIDO (5 tn)
+                </span>
+                <span
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 900,
+                    color: activeSummary.soloCarrosRestantes === 0 ? "#16a34a" : "#a16207",
+                    display: "block",
+                    lineHeight: "1.2",
+                    margin: "2px 0",
+                  }}
+                >
+                  {activeSummary.soloCarrosRestantes === 0 ? "0 carros" : `${activeSummary.soloCarrosRestantes} carros`}
+                </span>
+                <small style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>
+                  {activeSummary.soloCarrosRestantes === 0 ? "✓ Cubierto" : `${activeSummary.soloCarrosRestantes * 5} tn a tirar`}
+                </small>
+              </div>
+
+              <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--slate-500)", textTransform: "uppercase" }}>
+                Ó BIEN
               </span>
-              <small style={{ fontSize: "11.5px", color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                {activeSummary.soloCarrosRestantes === 0
-                  ? "Meta nutricional superada"
-                  : `o bien ${activeSummary.soloTanquesRestantes} tanques`}
-              </small>
-            </div>
-          </div>
 
-          {/* 3 OPCIONES INTERCAMBIABLES DE APLICACIÓN */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px" }}>
-            {/* Opción A: 100% Sólido */}
-            <div
-              style={{
-                background: "#ffffff",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                gap: "12px",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-              }}
-            >
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#854d0e", background: "#fef9c3", padding: "2px 7px", borderRadius: "6px" }}>
-                    Opción A · 100% Sólido
-                  </span>
-                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>Carros 5 tn</span>
-                </div>
-                <strong style={{ fontSize: "22px", display: "block", color: activeSummary.soloCarrosRestantes === 0 ? "#16a34a" : "#0f172a" }}>
-                  {activeSummary.soloCarrosRestantes === 0 ? "0 carros restantes" : `${activeSummary.soloCarrosRestantes} carros a tirar`}
-                </strong>
-                <p style={{ margin: "6px 0 0 0", fontSize: "12px", color: "var(--slate-600)", lineHeight: "1.4" }}>
-                  Aporta <strong>{activeSummary.soloCarrosRestantes * 60} kg N</strong>, <strong>{activeSummary.soloCarrosRestantes * 50} kg P</strong>, <strong>{Math.round(activeSummary.soloCarrosRestantes * 123.5)} kg K</strong> y <strong>{(activeSummary.soloCarrosRestantes * 1.32).toFixed(1)} tn MO</strong>. Óptimo para aumentar materia orgánica y fósforo de fondo.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="secondaryButton"
-                onClick={() => {
-                  setSimCarros((baselineSummary?.carrosSolido || 0) + activeSummary.soloCarrosRestantes);
-                  setSimTanques(baselineSummary?.tanquesLiquido || 0);
+              {/* Bloque Líquido */}
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  background: activeSummary.soloTanquesRestantes === 0 ? "#f0fdf4" : "#e0f2fe",
+                  border: activeSummary.soloTanquesRestantes === 0 ? "1px solid #bbf7d0" : "1px solid #bae6fd",
+                  minWidth: "130px",
                 }}
-                style={{ fontSize: "12px", padding: "6px 10px", width: "100%", justifyContent: "center" }}
               >
-                🔬 Simular aplicar todo sólido
-              </button>
-            </div>
-
-            {/* Opción B: 100% Líquido */}
-            <div
-              style={{
-                background: "#ffffff",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                gap: "12px",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-              }}
-            >
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#0369a1", background: "#e0f2fe", padding: "2px 7px", borderRadius: "6px" }}>
-                    Opción B · 100% Líquido
-                  </span>
-                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>Tanques 12.000 L</span>
-                </div>
-                <strong style={{ fontSize: "22px", display: "block", color: activeSummary.soloTanquesRestantes === 0 ? "#16a34a" : "#0f172a" }}>
-                  {activeSummary.soloTanquesRestantes === 0 ? "0 tanques restantes" : `${activeSummary.soloTanquesRestantes} tanques a tirar`}
-                </strong>
-                <p style={{ margin: "6px 0 0 0", fontSize: "12px", color: "var(--slate-600)", lineHeight: "1.4" }}>
-                  Aporta <strong>{Math.round(activeSummary.soloTanquesRestantes * 21.6)} kg N</strong>, <strong>{Math.round(activeSummary.soloTanquesRestantes * 7.2)} kg P</strong> y <strong>{Math.round(activeSummary.soloTanquesRestantes * 26.4)} kg K</strong> solubles. Disponibilidad rápida sin pisar coronas; ideal para alfalfa o cobertura post-siembra.
-                </p>
+                <span style={{ fontSize: "11px", fontWeight: 800, color: activeSummary.soloTanquesRestantes === 0 ? "#16a34a" : "#0369a1", display: "block" }}>
+                  💧 LÍQUIDO (12 m³)
+                </span>
+                <span
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 900,
+                    color: activeSummary.soloTanquesRestantes === 0 ? "#16a34a" : "#0284c7",
+                    display: "block",
+                    lineHeight: "1.2",
+                    margin: "2px 0",
+                  }}
+                >
+                  {activeSummary.soloTanquesRestantes === 0 ? "0 tanques" : `${activeSummary.soloTanquesRestantes} tanques`}
+                </span>
+                <small style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>
+                  {activeSummary.soloTanquesRestantes === 0 ? "✓ Cubierto" : `${activeSummary.soloTanquesRestantes * 12} m³ a tirar`}
+                </small>
               </div>
-              <button
-                type="button"
-                className="secondaryButton"
-                onClick={() => {
-                  setSimCarros(baselineSummary?.carrosSolido || 0);
-                  setSimTanques((baselineSummary?.tanquesLiquido || 0) + activeSummary.soloTanquesRestantes);
-                }}
-                style={{ fontSize: "12px", padding: "6px 10px", width: "100%", justifyContent: "center" }}
-              >
-                🔬 Simular aplicar todo líquido
-              </button>
-            </div>
-
-            {/* Opción C: Mixta Equilibrada */}
-            <div
-              style={{
-                background: "#ffffff",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                gap: "12px",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-              }}
-            >
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#15803d", background: "#dcfce7", padding: "2px 7px", borderRadius: "6px" }}>
-                    Opción C · Mezcla Sugerida
-                  </span>
-                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>Combinación óptima</span>
-                </div>
-                <strong style={{ fontSize: "20px", display: "block", color: "#0f172a" }}>
-                  {activeSummary.opcionMixtaSugerida.carros === 0 && activeSummary.opcionMixtaSugerida.tanques === 0
-                    ? "0 carros + 0 tanques"
-                    : `${activeSummary.opcionMixtaSugerida.carros} carros + ${activeSummary.opcionMixtaSugerida.tanques} tanques`}
-                </strong>
-                <p style={{ margin: "6px 0 0 0", fontSize: "12px", color: "var(--slate-600)", lineHeight: "1.4" }}>
-                  Aporte balanceado: incorpora biomasa con sólidos y fertilización líquida de rápida asimilación, evitando sobrecargas puntuales en el suelo.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="secondaryButton"
-                onClick={() => {
-                  setSimCarros((baselineSummary?.carrosSolido || 0) + activeSummary.opcionMixtaSugerida.carros);
-                  setSimTanques((baselineSummary?.tanquesLiquido || 0) + activeSummary.opcionMixtaSugerida.tanques);
-                }}
-                style={{ fontSize: "12px", padding: "6px 10px", width: "100%", justifyContent: "center" }}
-              >
-                🔬 Simular mezcla sugerida
-              </button>
             </div>
           </div>
 
@@ -761,69 +697,153 @@ export default function SoilPanel({
             </div>
 
             {/* BARRAS DE COBERTURA NUTRICIONAL N - P - K */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "4px" }}>
-              <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--slate-800)" }}>
-                Porcentaje de Cobertura de Metas del Cultivo ({targetCrop}):
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "4px" }}>
+              <span style={{ fontSize: "12.5px", fontWeight: 800, color: "var(--slate-800)" }}>
+                Porcentaje que llevamos cubierto por mineral ({targetCrop}):
               </span>
 
               {/* Barra N */}
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
-                  <strong style={{ color: "#15803d" }}>Nitrógeno (N): {activeSummary.coberturaPct.nitrogeno}%</strong>
-                  <span style={{ color: "var(--slate-600)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginBottom: "5px", flexWrap: "wrap", gap: "4px" }}>
+                  <strong style={{ color: "#15803d", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <span>🌱 Nitrógeno (N)</span>
+                    <span style={{ background: "#dcfce7", color: "#166534", padding: "1px 7px", borderRadius: "10px", fontSize: "11px", fontWeight: 800 }}>
+                      Llevamos {activeSummary.coberturaPct.nitrogeno}%
+                    </span>
+                  </strong>
+                  <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
                     Disponible: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.nDisponibleKgHa + activeSummary.aportesPorHa.nitrogenoKgHa : activeSummary.aportesPorHa.nitrogenoKgHa} kg/ha (Meta: {activeSummary.metaKgHa.nitrogeno} kg/ha)
                   </span>
                 </div>
-                <div style={{ background: "#e2e8f0", borderRadius: "6px", height: "10px", overflow: "hidden" }}>
+                <div
+                  style={{
+                    position: "relative",
+                    background: "#e2e8f0",
+                    borderRadius: "8px",
+                    height: "26px",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    border: "1px solid #cbd5e1",
+                  }}
+                >
                   <div
                     style={{
-                      background: activeSummary.coberturaPct.nitrogeno >= 100 ? "#22c55e" : activeSummary.coberturaPct.nitrogeno >= 70 ? "#f59e0b" : "#3b82f6",
+                      background: activeSummary.coberturaPct.nitrogeno >= 100 ? "#16a34a" : activeSummary.coberturaPct.nitrogeno >= 70 ? "#f59e0b" : "#2563eb",
                       width: `${Math.min(100, activeSummary.coberturaPct.nitrogeno)}%`,
                       height: "100%",
-                      transition: "width 0.3s ease",
+                      transition: "width 0.4s ease",
                     }}
                   />
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: "12px",
+                      fontSize: "11.5px",
+                      fontWeight: 900,
+                      color: activeSummary.coberturaPct.nitrogeno > 25 ? "#ffffff" : "#0f172a",
+                      textShadow: activeSummary.coberturaPct.nitrogeno > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                    }}
+                  >
+                    {activeSummary.coberturaPct.nitrogeno}% cubierto {activeSummary.coberturaPct.nitrogeno >= 100 ? "✓ (Meta superada)" : ""}
+                  </span>
                 </div>
               </div>
 
               {/* Barra P */}
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
-                  <strong style={{ color: "#0369a1" }}>Fósforo (P): {activeSummary.coberturaPct.fosforo}%</strong>
-                  <span style={{ color: "var(--slate-600)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginBottom: "5px", flexWrap: "wrap", gap: "4px" }}>
+                  <strong style={{ color: "#0369a1", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <span>🌾 Fósforo (P)</span>
+                    <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "1px 7px", borderRadius: "10px", fontSize: "11px", fontWeight: 800 }}>
+                      Llevamos {activeSummary.coberturaPct.fosforo}%
+                    </span>
+                  </strong>
+                  <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
                     Aporte: +{activeSummary.aportesPorHa.fosforoKgHa} kg P/ha · P Bray: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.fosforoBrayPpm : 22} ppm (Meta: {activeSummary.metaKgHa.fosforo} kg/ha)
                   </span>
                 </div>
-                <div style={{ background: "#e2e8f0", borderRadius: "6px", height: "10px", overflow: "hidden" }}>
+                <div
+                  style={{
+                    position: "relative",
+                    background: "#e2e8f0",
+                    borderRadius: "8px",
+                    height: "26px",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    border: "1px solid #cbd5e1",
+                  }}
+                >
                   <div
                     style={{
-                      background: activeSummary.coberturaPct.fosforo >= 100 ? "#22c55e" : activeSummary.coberturaPct.fosforo >= 70 ? "#f59e0b" : "#0284c7",
+                      background: activeSummary.coberturaPct.fosforo >= 100 ? "#16a34a" : activeSummary.coberturaPct.fosforo >= 70 ? "#f59e0b" : "#0284c7",
                       width: `${Math.min(100, activeSummary.coberturaPct.fosforo)}%`,
                       height: "100%",
-                      transition: "width 0.3s ease",
+                      transition: "width 0.4s ease",
                     }}
                   />
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: "12px",
+                      fontSize: "11.5px",
+                      fontWeight: 900,
+                      color: activeSummary.coberturaPct.fosforo > 25 ? "#ffffff" : "#0f172a",
+                      textShadow: activeSummary.coberturaPct.fosforo > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                    }}
+                  >
+                    {activeSummary.coberturaPct.fosforo}% cubierto {activeSummary.coberturaPct.fosforo >= 100 ? "✓ (Meta superada)" : ""}
+                  </span>
                 </div>
               </div>
 
               {/* Barra K */}
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
-                  <strong style={{ color: "#4338ca" }}>Potasio (K): {activeSummary.coberturaPct.potasio}%</strong>
-                  <span style={{ color: "var(--slate-600)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginBottom: "5px", flexWrap: "wrap", gap: "4px" }}>
+                  <strong style={{ color: "#4338ca", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <span>🌽 Potasio (K)</span>
+                    <span style={{ background: "#e0e7ff", color: "#3730a3", padding: "1px 7px", borderRadius: "10px", fontSize: "11px", fontWeight: 800 }}>
+                      Llevamos {activeSummary.coberturaPct.potasio}%
+                    </span>
+                  </strong>
+                  <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
                     Aporte: +{activeSummary.aportesPorHa.potasioKgHa} kg K/ha (Meta: {activeSummary.metaKgHa.potasio} kg/ha)
                     {targetCrop.toLowerCase().includes("silo") || targetCrop.toLowerCase().includes("alfalfa") ? " · ⚠️ Alta extracción por biomasa" : ""}
                   </span>
                 </div>
-                <div style={{ background: "#e2e8f0", borderRadius: "6px", height: "10px", overflow: "hidden" }}>
+                <div
+                  style={{
+                    position: "relative",
+                    background: "#e2e8f0",
+                    borderRadius: "8px",
+                    height: "26px",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    border: "1px solid #cbd5e1",
+                  }}
+                >
                   <div
                     style={{
-                      background: activeSummary.coberturaPct.potasio >= 100 ? "#22c55e" : activeSummary.coberturaPct.potasio >= 70 ? "#f59e0b" : "#6366f1",
+                      background: activeSummary.coberturaPct.potasio >= 100 ? "#16a34a" : activeSummary.coberturaPct.potasio >= 70 ? "#f59e0b" : "#6366f1",
                       width: `${Math.min(100, activeSummary.coberturaPct.potasio)}%`,
                       height: "100%",
-                      transition: "width 0.3s ease",
+                      transition: "width 0.4s ease",
                     }}
                   />
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: "12px",
+                      fontSize: "11.5px",
+                      fontWeight: 900,
+                      color: activeSummary.coberturaPct.potasio > 25 ? "#ffffff" : "#0f172a",
+                      textShadow: activeSummary.coberturaPct.potasio > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                    }}
+                  >
+                    {activeSummary.coberturaPct.potasio}% cubierto {activeSummary.coberturaPct.potasio >= 100 ? "✓ (Meta superada)" : ""}
+                  </span>
                 </div>
               </div>
             </div>

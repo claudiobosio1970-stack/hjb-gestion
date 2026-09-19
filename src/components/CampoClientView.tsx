@@ -165,9 +165,6 @@ export default function CampoClientView({ campoSlug }: { campoSlug: string }) {
                 <span className="pill badgeBlue">{lotesDisponibles.join(" · ")}</span>
               </div>
               <h1>{campoNombre}</h1>
-              <p className="muted">
-                Historial agrícola completo: rotaciones, siembras, fertilizaciones, biofertilizaciones, fumigaciones y cosechas.
-              </p>
             </div>
             <div className="campoHeaderActions">
               <button className="primaryButton" onClick={startNew}>
