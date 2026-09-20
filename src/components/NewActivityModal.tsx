@@ -1770,9 +1770,11 @@ export default function NewActivityModal({
                       <div
                         onClick={() => {
                           const dest = (form.campo || "").toLowerCase() === "tambo" ? "Tambo (Patio de forrajes)" : `Almacenado en ${form.campo}`;
+                          const ub = (form.campo || "").toLowerCase() === "keuneke" ? "Campo Keuneke" : ((form.campo || "").toLowerCase() === "tambo" ? "Tambo" : `Campo ${form.campo}`);
                           set("produccion", {
                             ...form.produccion,
                             destino: dest,
+                            ubicacionRollos: ub,
                             unidad: "rollos",
                             unidadRendimiento: "rollos/ha",
                             cantidad: form.produccion?.cantidad ?? null,
@@ -1811,6 +1813,7 @@ export default function NewActivityModal({
                           set("produccion", {
                             ...form.produccion,
                             destino: "Llevado al Tambo",
+                            ubicacionRollos: "Tambo",
                             unidad: "rollos",
                             unidadRendimiento: "rollos/ha",
                             cantidad: form.produccion?.cantidad ?? null,
@@ -2245,14 +2248,91 @@ export default function NewActivityModal({
                     </div>
 
                     <div>
-                      <label>Destino de los Rollos</label>
+                      <label style={{ fontWeight: 700, fontSize: "12.5px", display: "block", marginBottom: "6px" }}>
+                        📍 ¿Dónde se acopian los rollos?
+                      </label>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                        <div
+                          onClick={() => {
+                            const u = (form.campo || "").toLowerCase() === "keuneke" ? "Campo Keuneke" : `Campo ${form.campo}`;
+                            set("produccion", {
+                              ...form.produccion,
+                              destino: `Almacenado en ${form.campo}`,
+                              ubicacionRollos: u,
+                              unidad: "rollos",
+                              unidadRendimiento: "rollos/ha",
+                              cantidad: form.produccion?.cantidad ?? null,
+                              rendimiento: form.produccion?.rendimiento ?? null,
+                            });
+                          }}
+                          style={{
+                            border: (form.produccion?.destino?.toLowerCase().includes("almacen") || form.produccion?.destino?.toLowerCase().includes((form.campo || "").toLowerCase()) || form.produccion?.ubicacionRollos?.toLowerCase().includes("campo"))
+                              ? "2px solid #0284c7"
+                              : "1px solid var(--line)",
+                            background: (form.produccion?.destino?.toLowerCase().includes("almacen") || form.produccion?.destino?.toLowerCase().includes((form.campo || "").toLowerCase()) || form.produccion?.ubicacionRollos?.toLowerCase().includes("campo"))
+                              ? "rgba(2, 132, 199, 0.08)"
+                              : "#ffffff",
+                            borderRadius: "8px",
+                            padding: "8px 10px",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "var(--slate-900)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                          }}
+                        >
+                          <span>🏠</span>
+                          <span>Quedan en {form.campo}</span>
+                        </div>
+
+                        <div
+                          onClick={() => {
+                            set("produccion", {
+                              ...form.produccion,
+                              destino: "Llevado al Tambo",
+                              ubicacionRollos: "Tambo",
+                              unidad: "rollos",
+                              unidadRendimiento: "rollos/ha",
+                              cantidad: form.produccion?.cantidad ?? null,
+                              rendimiento: form.produccion?.rendimiento ?? null,
+                            });
+                          }}
+                          style={{
+                            border: (form.produccion?.destino?.toLowerCase().includes("tambo") || form.produccion?.ubicacionRollos?.toLowerCase().includes("tambo"))
+                              ? "2px solid #16a34a"
+                              : "1px solid var(--line)",
+                            background: (form.produccion?.destino?.toLowerCase().includes("tambo") || form.produccion?.ubicacionRollos?.toLowerCase().includes("tambo"))
+                              ? "rgba(22, 163, 74, 0.08)"
+                              : "#ffffff",
+                            borderRadius: "8px",
+                            padding: "8px 10px",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "var(--slate-900)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                          }}
+                        >
+                          <span>🥛</span>
+                          <span>Están en el Tambo</span>
+                        </div>
+                      </div>
+
                       <select
                         className="input"
-                        value={form.produccion?.destino || "En lote (Pendiente de sacado)"}
+                        style={{ fontSize: "12px" }}
+                        value={form.produccion?.destino || `Almacenado en ${form.campo}`}
                         onChange={(e) => {
+                          const val = e.target.value;
+                          const ub = val.toLowerCase().includes("tambo") ? "Tambo" : ((form.campo || "").toLowerCase() === "keuneke" ? "Campo Keuneke" : `Campo ${form.campo}`);
                           set("produccion", {
                             ...form.produccion,
-                            destino: e.target.value,
+                            destino: val,
+                            ubicacionRollos: ub,
                             unidad: "rollos",
                             unidadRendimiento: "rollos/ha",
                             cantidad: form.produccion?.cantidad ?? null,
@@ -2260,9 +2340,9 @@ export default function NewActivityModal({
                           });
                         }}
                       >
-                        <option value="En lote (Pendiente de sacado)">En lote (Pendiente de sacado)</option>
                         <option value={`Almacenado en ${form.campo}`}>Almacenado en este campo ({form.campo})</option>
                         <option value="Llevado al Tambo">Llevado al Tambo (Patio de forrajes / Comedero)</option>
+                        <option value="En lote (Pendiente de sacado)">En lote (Pendiente de sacado)</option>
                         <option value="Stock de Forrajes">Stock de Forrajes (Galpón / Tinglado)</option>
                         <option value="Ganadería (Corrales / Recría)">Ganadería (Corrales / Recría)</option>
                         <option value="Venta directa">Venta directa a terceros</option>
@@ -2381,6 +2461,380 @@ export default function NewActivityModal({
                         }}
                       />
                     </div>
+                  </div>
+                </div>
+              ) : form.tipo === "Cosecha" ? (
+                /* VISTA ESPECÍFICA: COSECHA DE CEREALES Y SELECCIÓN DE ACOPIO */
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {/* Banner Informativo Cosecha & Acopio */}
+                  <div
+                    style={{
+                      background: "rgba(217, 119, 6, 0.08)",
+                      border: "1px solid rgba(217, 119, 6, 0.25)",
+                      borderRadius: "8px",
+                      padding: "10px 14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      fontSize: "12.5px",
+                      color: "#92400e",
+                    }}
+                  >
+                    <span style={{ fontSize: "20px" }}>🌾</span>
+                    <div>
+                      <strong>Cosecha & Acopio de Granos:</strong> Determiná dónde estará stockeado este cereal (<strong>Silos</strong>, <strong>Cooperativa</strong>, <strong>Puerto</strong> o <strong>AFA Los Cardos</strong>) para visualizar las toneladas disponibles en <em>Insumos & Stock</em>.
+                    </div>
+                  </div>
+
+                  {/* Rinde y Producción Total con cálculo automático dual */}
+                  <div className="formGrid threeForm" style={{ gridTemplateColumns: "1.1fr 1.1fr 1.2fr", gap: "12px" }}>
+                    <div>
+                      <label style={{ fontWeight: 700, fontSize: "12.5px" }}>Rendimiento</label>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className="input"
+                          value={form.produccion?.rendimiento ?? ""}
+                          onChange={(e) => {
+                            const rinde = e.target.value ? Number(e.target.value) : null;
+                            const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                            const unitRend = form.produccion?.unidadRendimiento || "qq/ha";
+                            let totKg: number | null = null;
+                            if (rinde && sup && sup > 0) {
+                              if (unitRend === "qq/ha") totKg = Math.round(rinde * sup * 100);
+                              else if (unitRend === "tn/ha" || unitRend === "t/ha") totKg = Math.round(rinde * sup * 1000);
+                              else totKg = Math.round(rinde * sup);
+                            }
+                            set("produccion", {
+                              ...form.produccion,
+                              rendimiento: rinde,
+                              unidadRendimiento: unitRend,
+                              cantidad: totKg ?? form.produccion?.cantidad ?? null,
+                              unidad: "kg",
+                              destino: form.produccion?.destino || "Silos",
+                              destinoCereal: form.produccion?.destinoCereal || "Silos",
+                            });
+                          }}
+                          placeholder="ej: 42.5"
+                        />
+                        <select
+                          className="input"
+                          style={{ width: "95px", fontSize: "12px" }}
+                          value={form.produccion?.unidadRendimiento || "qq/ha"}
+                          onChange={(e) => {
+                            const u = e.target.value;
+                            const rinde = form.produccion?.rendimiento ?? null;
+                            const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                            let totKg: number | null = null;
+                            if (rinde && sup && sup > 0) {
+                              if (u === "qq/ha") totKg = Math.round(rinde * sup * 100);
+                              else if (u === "tn/ha" || u === "t/ha") totKg = Math.round(rinde * sup * 1000);
+                              else totKg = Math.round(rinde * sup);
+                            }
+                            set("produccion", {
+                              ...form.produccion,
+                              unidadRendimiento: u,
+                              cantidad: totKg ?? form.produccion?.cantidad ?? null,
+                              unidad: "kg",
+                              rendimiento: rinde,
+                              destino: form.produccion?.destino || "Silos",
+                            });
+                          }}
+                        >
+                          <option value="qq/ha">qq/ha</option>
+                          <option value="tn/ha">tn/ha</option>
+                          <option value="kg/ha">kg/ha</option>
+                        </select>
+                      </div>
+                      <small className="muted" style={{ fontSize: "11px" }}>
+                        {form.produccion?.rendimiento && form.produccion.unidadRendimiento === "qq/ha"
+                          ? `Equivale a ${(form.produccion.rendimiento / 10).toFixed(2)} tn/ha`
+                          : "Rinde medio obtenido"}
+                      </small>
+                    </div>
+
+                    <div>
+                      <label style={{ fontWeight: 700, fontSize: "12.5px" }}>Producción Total (Tn)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="input"
+                        value={
+                          form.produccion?.cantidad
+                            ? Number((form.produccion.cantidad / 1000).toFixed(2))
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const valTn = e.target.value ? Number(e.target.value) : null;
+                          const valKg = valTn ? Math.round(valTn * 1000) : null;
+                          const sup = isReal ? (form.superficieReal ?? form.superficiePlanificada) : form.superficiePlanificada;
+                          let calcRinde: number | null = null;
+                          if (valTn && sup && sup > 0) {
+                            calcRinde = Number(((valTn * 10) / sup).toFixed(2));
+                          }
+                          set("produccion", {
+                            ...form.produccion,
+                            cantidad: valKg,
+                            unidad: "kg",
+                            rendimiento: calcRinde ?? form.produccion?.rendimiento ?? null,
+                            unidadRendimiento: "qq/ha",
+                            destino: form.produccion?.destino || "Silos",
+                            destinoCereal: form.produccion?.destinoCereal || "Silos",
+                          });
+                        }}
+                        placeholder="ej: 212.5 Tn"
+                      />
+                      <small className="muted" style={{ fontSize: "11px" }}>
+                        {form.produccion?.cantidad ? `${form.produccion.cantidad.toLocaleString("es-AR")} kg netos` : "Total cosechado en toneladas"}
+                      </small>
+                    </div>
+
+                    <div>
+                      <label style={{ fontWeight: 700, fontSize: "12.5px" }}>Referencia / Carta de Porte</label>
+                      <input
+                        type="text"
+                        className="input"
+                        value={form.produccion?.lugarAcopio || ""}
+                        onChange={(e) => {
+                          set("produccion", {
+                            ...form.produccion,
+                            lugarAcopio: e.target.value,
+                            unidad: "kg",
+                            unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                          });
+                        }}
+                        placeholder="ej: CP ACA #1042 / Silobolsa 1"
+                      />
+                      <small className="muted" style={{ fontSize: "11px" }}>
+                        Opcional: n° de remito, silobolsa o lote
+                      </small>
+                    </div>
+                  </div>
+
+                  {/* SELECCIÓN DE ACOPIO DEL CEREAL: Silos, Cooperativa, Puerto, AFA Los Cardos */}
+                  <div>
+                    <label style={{ fontWeight: 800, fontSize: "13px", color: "var(--slate-800)", marginBottom: "8px", display: "block" }}>
+                      📍 ¿Dónde va a estar stockeado este cereal? (Destino de Acopio)
+                    </label>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", marginBottom: "12px" }}>
+                      {/* 1. SILOS */}
+                      <div
+                        onClick={() => {
+                          set("produccion", {
+                            ...form.produccion,
+                            destinoCereal: "Silos",
+                            destino: "Silos",
+                            unidad: "kg",
+                            unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                          });
+                        }}
+                        style={{
+                          border: (form.produccion?.destinoCereal === "Silos" || form.produccion?.destino === "Silos" || (!form.produccion?.destinoCereal && form.produccion?.destino?.includes("Silo")))
+                            ? "2px solid #0284c7"
+                            : "1px solid var(--line)",
+                          background: (form.produccion?.destinoCereal === "Silos" || form.produccion?.destino === "Silos" || (!form.produccion?.destinoCereal && form.produccion?.destino?.includes("Silo")))
+                            ? "rgba(2, 132, 199, 0.08)"
+                            : "#ffffff",
+                          borderRadius: "10px",
+                          padding: "12px 14px",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "20px" }}>🏢</span>
+                          <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>Silos</strong>
+                        </div>
+                        <div style={{ fontSize: "11.5px", color: "var(--slate-600)" }}>
+                          Silos propios, silos chapa o silobolsas en el campo.
+                        </div>
+                      </div>
+
+                      {/* 2. COOPERATIVA */}
+                      <div
+                        onClick={() => {
+                          set("produccion", {
+                            ...form.produccion,
+                            destinoCereal: "Cooperativa",
+                            destino: "Cooperativa",
+                            unidad: "kg",
+                            unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                          });
+                        }}
+                        style={{
+                          border: (form.produccion?.destinoCereal === "Cooperativa" || form.produccion?.destino === "Cooperativa")
+                            ? "2px solid #16a34a"
+                            : "1px solid var(--line)",
+                          background: (form.produccion?.destinoCereal === "Cooperativa" || form.produccion?.destino === "Cooperativa")
+                            ? "rgba(22, 163, 74, 0.08)"
+                            : "#ffffff",
+                          borderRadius: "10px",
+                          padding: "12px 14px",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "20px" }}>🏬</span>
+                          <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>Cooperativa</strong>
+                        </div>
+                        <div style={{ fontSize: "11.5px", color: "var(--slate-600)" }}>
+                          Entrega a cooperativa agrícola de la zona.
+                        </div>
+                      </div>
+
+                      {/* 3. PUERTO */}
+                      <div
+                        onClick={() => {
+                          set("produccion", {
+                            ...form.produccion,
+                            destinoCereal: "Puerto",
+                            destino: "Puerto",
+                            puertoNombre: form.produccion?.puertoNombre || "San Lorenzo",
+                            unidad: "kg",
+                            unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                          });
+                        }}
+                        style={{
+                          border: (form.produccion?.destinoCereal === "Puerto" || form.produccion?.destino === "Puerto")
+                            ? "2px solid #2563eb"
+                            : "1px solid var(--line)",
+                          background: (form.produccion?.destinoCereal === "Puerto" || form.produccion?.destino === "Puerto")
+                            ? "rgba(37, 99, 235, 0.08)"
+                            : "#ffffff",
+                          borderRadius: "10px",
+                          padding: "12px 14px",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "20px" }}>🚢</span>
+                          <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>Puerto</strong>
+                        </div>
+                        <div style={{ fontSize: "11.5px", color: "var(--slate-600)" }}>
+                          Envío directo a terminal portuaria exportadora.
+                        </div>
+                      </div>
+
+                      {/* 4. AFA LOS CARDOS */}
+                      <div
+                        onClick={() => {
+                          set("produccion", {
+                            ...form.produccion,
+                            destinoCereal: "AFA Los Cardos",
+                            destino: "AFA Los Cardos",
+                            unidad: "kg",
+                            unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                            cantidad: form.produccion?.cantidad ?? null,
+                            rendimiento: form.produccion?.rendimiento ?? null,
+                          });
+                        }}
+                        style={{
+                          border: (form.produccion?.destinoCereal === "AFA Los Cardos" || form.produccion?.destino === "AFA Los Cardos")
+                            ? "2px solid #d97706"
+                            : "1px solid var(--line)",
+                          background: (form.produccion?.destinoCereal === "AFA Los Cardos" || form.produccion?.destino === "AFA Los Cardos")
+                            ? "rgba(217, 119, 6, 0.08)"
+                            : "#ffffff",
+                          borderRadius: "10px",
+                          padding: "12px 14px",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ fontSize: "20px" }}>🌾</span>
+                          <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>AFA Los Cardos</strong>
+                        </div>
+                        <div style={{ fontSize: "11.5px", color: "var(--slate-600)" }}>
+                          Agricultores Federados Argentinos - Centro Los Cardos.
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Si se seleccionó Puerto: selector de QUÉ PUERTO */}
+                    {(form.produccion?.destinoCereal === "Puerto" || form.produccion?.destino === "Puerto") && (
+                      <div
+                        style={{
+                          background: "#eff6ff",
+                          border: "1px solid #bfdbfe",
+                          borderRadius: "8px",
+                          padding: "12px 16px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px",
+                        }}
+                      >
+                        <label style={{ fontWeight: 700, fontSize: "12.5px", color: "#1e40af" }}>
+                          🚢 ¿A qué puerto se despacha el cereal?
+                        </label>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                          {["San Lorenzo", "Rosario", "Timbúes", "General San Martín", "Arroyo Seco", "Bahía Blanca"].map((puerto) => {
+                            const isSelected = (form.produccion?.puertoNombre || "San Lorenzo") === puerto;
+                            return (
+                              <button
+                                key={puerto}
+                                type="button"
+                                onClick={() => {
+                                  set("produccion", {
+                                    ...form.produccion,
+                                    puertoNombre: puerto,
+                                    destinoCereal: "Puerto",
+                                    destino: "Puerto",
+                                    unidad: "kg",
+                                    unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                                    cantidad: form.produccion?.cantidad ?? null,
+                                    rendimiento: form.produccion?.rendimiento ?? null,
+                                  });
+                                }}
+                                style={{
+                                  padding: "4px 10px",
+                                  borderRadius: "6px",
+                                  border: isSelected ? "2px solid #2563eb" : "1px solid #cbd5e1",
+                                  background: isSelected ? "#2563eb" : "#ffffff",
+                                  color: isSelected ? "#ffffff" : "var(--slate-700)",
+                                  fontSize: "11.5px",
+                                  fontWeight: isSelected ? 700 : 500,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {puerto}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <input
+                          type="text"
+                          className="input"
+                          style={{ maxWidth: "340px", fontSize: "12px", background: "#ffffff", marginTop: "4px" }}
+                          value={form.produccion?.puertoNombre ?? "San Lorenzo"}
+                          onChange={(e) => {
+                            set("produccion", {
+                              ...form.produccion,
+                              puertoNombre: e.target.value,
+                              destinoCereal: "Puerto",
+                              destino: "Puerto",
+                              unidad: "kg",
+                              unidadRendimiento: form.produccion?.unidadRendimiento || "qq/ha",
+                              cantidad: form.produccion?.cantidad ?? null,
+                              rendimiento: form.produccion?.rendimiento ?? null,
+                            });
+                          }}
+                          placeholder="O escribí el puerto o terminal..."
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (

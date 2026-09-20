@@ -141,11 +141,23 @@ export default function ActivityTable({
         const q = filters.produccion.trim().toLowerCase();
         if (!act.produccion) return false;
         const dest = (act.produccion.destino || "").toLowerCase();
+        const acopio = (act.produccion.lugarAcopio || act.produccion.destinoCereal || "").toLowerCase();
+        const ubicRollos = (act.produccion.ubicacionRollos || "").toLowerCase();
+        const puerto = (act.produccion.puertoNombre || "").toLowerCase();
         const unidad = (act.produccion.unidad || "").toLowerCase();
         const unidadRend = (act.produccion.unidadRendimiento || "").toLowerCase();
         const rendStr = String(act.produccion.rendimiento || "");
         const cantStr = String(act.produccion.cantidad || "");
-        if (!dest.includes(q) && !unidad.includes(q) && !unidadRend.includes(q) && !rendStr.includes(q) && !cantStr.includes(q)) {
+        if (
+          !dest.includes(q) &&
+          !acopio.includes(q) &&
+          !ubicRollos.includes(q) &&
+          !puerto.includes(q) &&
+          !unidad.includes(q) &&
+          !unidadRend.includes(q) &&
+          !rendStr.includes(q) &&
+          !cantStr.includes(q)
+        ) {
           return false;
         }
       }
@@ -622,7 +634,40 @@ export default function ActivityTable({
                               📦 Armado: {formatHistoricalDate(activity.produccion.fechaArmado)}
                             </div>
                           )}
-                          {activity.produccion.destino && (
+                          {(activity.produccion.lugarAcopio || activity.produccion.destinoCereal) && (
+                            <span
+                              className={
+                                activity.produccion.destinoCereal === "Silos"
+                                  ? "pill badgeGreen"
+                                  : activity.produccion.destinoCereal === "Cooperativa"
+                                  ? "pill badgeBlue"
+                                  : activity.produccion.destinoCereal === "Puerto"
+                                  ? "pill badgeAmber"
+                                  : "pill badgePurple"
+                              }
+                              style={{ width: "fit-content", fontSize: "10.5px", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "3px" }}
+                            >
+                              {activity.produccion.destinoCereal === "Silos" && "🏢 "}
+                              {activity.produccion.destinoCereal === "Cooperativa" && "🏬 "}
+                              {activity.produccion.destinoCereal === "Puerto" && "🚢 "}
+                              {activity.produccion.destinoCereal === "AFA Los Cardos" && "🌾 "}
+                              Acopio: {activity.produccion.lugarAcopio || activity.produccion.destinoCereal}
+                            </span>
+                          )}
+                          {activity.produccion.ubicacionRollos && (
+                            <span
+                              className={
+                                activity.produccion.ubicacionRollos.toLowerCase().includes("tambo")
+                                  ? "pill badgeGreen"
+                                  : "pill badgeBlue"
+                              }
+                              style={{ width: "fit-content", fontSize: "10.5px", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "3px" }}
+                            >
+                              {activity.produccion.ubicacionRollos.toLowerCase().includes("tambo") ? "🥛 " : "🏠 "}
+                              {activity.produccion.ubicacionRollos}
+                            </span>
+                          )}
+                          {activity.produccion.destino && !activity.produccion.lugarAcopio && !activity.produccion.destinoCereal && !activity.produccion.ubicacionRollos && (
                             <span
                               className={
                                 activity.produccion.destino.toLowerCase().includes("tambo")

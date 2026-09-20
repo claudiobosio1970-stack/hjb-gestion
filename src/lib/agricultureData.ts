@@ -48,6 +48,17 @@ export type Activity = {
     rendimiento: number | null;
     unidadRendimiento: string;
     destino?: string;
+    destinoCereal?: "Silos" | "Cooperativa" | "Puerto" | "AFA Los Cardos" | string;
+    puertoNombre?: string;
+    lugarAcopio?: string;
+    ubicacionRollos?: string;
+    distribucionAcopio?: {
+      silos?: number | null;
+      cooperativa?: number | null;
+      puerto?: number | null;
+      puertoNombre?: string;
+      afaLosCardos?: number | null;
+    };
     fechaVolteada?: string;
     fechaRastrillado?: string;
     fechaArmado?: string;

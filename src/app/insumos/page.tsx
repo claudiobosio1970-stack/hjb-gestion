@@ -49,9 +49,19 @@ export default function InsumosPage() {
   // Modal Trazabilidad / Movimientos de Insumo
   const [insumoTrazabilidad, setInsumoTrazabilidad] = useState<InsumoStockItem | null>(null);
 
+  // Modal Stock por Ubicación (Cereales y Rollos)
+  const [insumoUbicaciones, setInsumoUbicaciones] = useState<InsumoStockItem | null>(null);
+
   function cargarDatos() {
     setData(getStockActualInsumos());
   }
+
+  useEffect(() => {
+    if (insumoUbicaciones) {
+      const updated = data.items.find((x) => x.id === insumoUbicaciones.id);
+      if (updated) setInsumoUbicaciones(updated);
+    }
+  }, [data]);
 
   useEffect(() => {
     cargarDatos();
@@ -319,123 +329,214 @@ export default function InsumosPage() {
                   </td>
                 </tr>
               ) : (
-                itemsFiltrados.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div style={{ fontWeight: 800, color: "var(--slate-950)", fontSize: "13.5px" }}>
-                        {item.nombre}
-                      </div>
-                      <div style={{ fontSize: "11.5px", color: "var(--slate-500)", marginTop: "2px" }}>
-                        📍 {item.ubicacion}
-                      </div>
-                    </td>
+                itemsFiltrados.map((item) => {
+                  const hasUbicaciones = Boolean(
+                    item.esCerealOGrano ||
+                    item.esRollo ||
+                    (item.stockPorUbicacion && item.stockPorUbicacion.length > 0)
+                  );
 
-                    <td>
-                      <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
-                        {item.categoria}
-                      </span>
-                    </td>
-
-                    <td style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: item.stockActual > 0 ? (item.enAlerta ? "#991b1b" : "var(--slate-900)") : "#64748b" }}>
-                        {item.stockActual.toLocaleString("es-AR")} {item.unidad}
-                      </div>
-                      <div style={{ fontSize: "11px", color: "var(--slate-400)" }}>
-                        {item.produccionPropia > 0 ? (
-                          <span style={{ color: "#166534", fontWeight: 600 }}>
-                            🌾 Confección: +{item.produccionPropia.toLocaleString("es-AR")} {item.unidad}
+                  return (
+                    <tr
+                      key={item.id}
+                      style={{
+                        cursor: hasUbicaciones ? "pointer" : "default",
+                        transition: "background 0.15s ease",
+                      }}
+                      onClick={() => {
+                        if (hasUbicaciones) {
+                          setInsumoUbicaciones(item);
+                        }
+                      }}
+                      title={hasUbicaciones ? `Click para ver distribución y toneladas en cada lugar de ${item.nombre}` : undefined}
+                    >
+                      <td>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                          <span style={{ fontWeight: 800, color: "var(--slate-950)", fontSize: "13.5px" }}>
+                            {item.nombre}
                           </span>
-                        ) : item.ingresosCompras > 0 ? (
-                          `Ingresados: +${item.ingresosCompras.toLocaleString("es-AR")} ${item.unidad}`
+                          {hasUbicaciones && (
+                            <span
+                              className="pill"
+                              style={{
+                                fontSize: "10px",
+                                padding: "1px 6px",
+                                background: item.esCerealOGrano ? "rgba(217, 119, 6, 0.12)" : "rgba(37, 99, 235, 0.12)",
+                                color: item.esCerealOGrano ? "#92400e" : "#1e40af",
+                                fontWeight: 700,
+                              }}
+                            >
+                              📍 Ver por lugar
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Chips de Ubicaciones / Acopio */}
+                        {item.stockPorUbicacion && item.stockPorUbicacion.length > 0 ? (
+                          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "4px" }}>
+                            {item.stockPorUbicacion.map((u) => (
+                              <span
+                                key={u.lugar}
+                                className="pill"
+                                style={{
+                                  fontSize: "10px",
+                                  padding: "1px 6px",
+                                  background: u.cantidad > 0 ? "rgba(22, 163, 74, 0.1)" : "#f1f5f9",
+                                  color: u.cantidad > 0 ? "#166534" : "var(--slate-400)",
+                                  fontWeight: u.cantidad > 0 ? 700 : 500,
+                                  border: u.cantidad > 0 ? "1px solid rgba(22, 163, 74, 0.25)" : "1px solid #e2e8f0",
+                                }}
+                              >
+                                {u.icono} {u.lugar}: {item.esCerealOGrano ? `${(u.cantidadTn || 0).toLocaleString("es-AR")} Tn` : `${u.cantidad.toLocaleString("es-AR")} rollos`}
+                              </span>
+                            ))}
+                          </div>
                         ) : (
-                          "Sin ingresos aún"
+                          <div style={{ fontSize: "11.5px", color: "var(--slate-500)", marginTop: "2px" }}>
+                            📍 {item.ubicacion}
+                          </div>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    <td style={{ textAlign: "center" }}>
-                      {item.ingresosCompras === 0 && item.produccionPropia === 0 && item.stockActual === 0 ? (
+                      <td>
                         <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
-                          Sin existencias (0)
+                          {item.categoria}
                         </span>
-                      ) : item.enAlerta ? (
-                        <span className="pill badgeAmber" style={{ fontSize: "11px", fontWeight: 700 }}>
-                          ⚠️ Reponer (Mín: {item.stockMinimoAlerta} {item.unidad})
-                        </span>
-                      ) : (
-                        <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
-                          ✓ Con Stock
-                        </span>
-                      )}
-                      {(item.ingresosCompras > 0 || item.produccionPropia > 0) && (
-                        <div style={{ width: "100%", height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginTop: "5px" }}>
-                          <div
-                            style={{
-                              width: `${item.porcentajeStock}%`,
-                              height: "100%",
-                              background: item.enAlerta ? "#dc2626" : "#16a34a",
-                              borderRadius: "999px",
-                            }}
-                          />
+                      </td>
+
+                      <td style={{ textAlign: "right" }}>
+                        {item.esCerealOGrano ? (
+                          <>
+                            <div style={{ fontSize: "16px", fontWeight: 900, color: item.stockActual > 0 ? "#15803d" : "#64748b" }}>
+                              {(item.totalTn || 0).toLocaleString("es-AR")} Tn
+                            </div>
+                            <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                              {item.stockActual.toLocaleString("es-AR")} kg netos
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: "15px", fontWeight: 800, color: item.stockActual > 0 ? (item.enAlerta ? "#991b1b" : "var(--slate-900)") : "#64748b" }}>
+                            {item.stockActual.toLocaleString("es-AR")} {item.unidad}
+                          </div>
+                        )}
+
+                        <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
+                          {item.produccionPropia > 0 ? (
+                            <span style={{ color: "#166534", fontWeight: 600 }}>
+                              {item.esCerealOGrano
+                                ? `🌾 Cosecha: +${((item.produccionPropia || 0) / 1000).toLocaleString("es-AR")} Tn`
+                                : `🌾 Confección: +${item.produccionPropia.toLocaleString("es-AR")} ${item.unidad}`}
+                            </span>
+                          ) : item.ingresosCompras > 0 ? (
+                            `Ingresados: +${item.ingresosCompras.toLocaleString("es-AR")} ${item.unidad}`
+                          ) : (
+                            "Sin ingresos aún"
+                          )}
                         </div>
-                      )}
-                    </td>
+                      </td>
 
-                    <td style={{ textAlign: "right" }}>
-                      {item.consumoAgricola > 0 ? (
-                        <div>
-                          <strong style={{ color: "#b91c1c", fontSize: "13px" }}>
-                            -{item.consumoAgricola.toLocaleString("es-AR")} {item.unidad}
-                          </strong>
-                          <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>aplicados en campo</div>
+                      <td style={{ textAlign: "center" }}>
+                        {item.ingresosCompras === 0 && item.produccionPropia === 0 && item.stockActual === 0 ? (
+                          <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
+                            Sin existencias (0)
+                          </span>
+                        ) : item.enAlerta ? (
+                          <span className="pill badgeAmber" style={{ fontSize: "11px", fontWeight: 700 }}>
+                            ⚠️ Reponer (Mín: {item.stockMinimoAlerta} {item.unidad})
+                          </span>
+                        ) : (
+                          <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+                            ✓ Con Stock
+                          </span>
+                        )}
+                        {(item.ingresosCompras > 0 || item.produccionPropia > 0) && (
+                          <div style={{ width: "100%", height: "5px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginTop: "5px" }}>
+                            <div
+                              style={{
+                                width: `${item.porcentajeStock}%`,
+                                height: "100%",
+                                background: item.enAlerta ? "#dc2626" : "#16a34a",
+                                borderRadius: "999px",
+                              }}
+                            />
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={{ textAlign: "right" }}>
+                        {item.consumoAgricola > 0 ? (
+                          <div>
+                            <strong style={{ color: "#b91c1c", fontSize: "13px" }}>
+                              -{item.consumoAgricola.toLocaleString("es-AR")} {item.unidad}
+                            </strong>
+                            <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>aplicados en campo</div>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: "12px", color: "var(--slate-400)" }}>Sin consumos</span>
+                        )}
+                      </td>
+
+                      <td style={{ textAlign: "right" }}>
+                        <strong style={{ fontSize: "13px" }}>
+                          ${item.precioUnitarioArs.toLocaleString("es-AR")}
+                        </strong>
+                        <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                          USD {item.precioUnitarioUsd.toLocaleString("es-AR")} / {item.unidad}
                         </div>
-                      ) : (
-                        <span style={{ fontSize: "12px", color: "var(--slate-400)" }}>Sin consumos</span>
-                      )}
-                    </td>
+                      </td>
 
-                    <td style={{ textAlign: "right" }}>
-                      <strong style={{ fontSize: "13px" }}>
-                        ${item.precioUnitarioArs.toLocaleString("es-AR")}
-                      </strong>
-                      <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
-                        USD {item.precioUnitarioUsd.toLocaleString("es-AR")} / {item.unidad}
-                      </div>
-                    </td>
+                      <td style={{ textAlign: "right" }}>
+                        <strong style={{ color: "#166534", fontSize: "14px" }}>
+                          ${item.valorTotalArs.toLocaleString("es-AR")}
+                        </strong>
+                        <div style={{ fontSize: "11px", color: "#15803d" }}>
+                          USD {item.valorTotalUsd.toLocaleString("es-AR")}
+                        </div>
+                      </td>
 
-                    <td style={{ textAlign: "right" }}>
-                      <strong style={{ color: "#166534", fontSize: "14px" }}>
-                        ${item.valorTotalArs.toLocaleString("es-AR")}
-                      </strong>
-                      <div style={{ fontSize: "11px", color: "#15803d" }}>
-                        USD {item.valorTotalUsd.toLocaleString("es-AR")}
-                      </div>
-                    </td>
-
-                    <td style={{ textAlign: "center" }}>
-                      <div style={{ display: "inline-flex", gap: "6px" }}>
-                        <button
-                          type="button"
-                          className="ghostButton"
-                          onClick={() => handleAbrirIngreso(item.id)}
-                          style={{ padding: "4px 8px", fontSize: "11.5px", fontWeight: 700 }}
-                          title="Cargar ingreso o compra de este insumo"
-                        >
-                          ➕ Ingreso
-                        </button>
-                        <button
-                          type="button"
-                          className="ghostButton"
-                          onClick={() => setInsumoTrazabilidad(item)}
-                          style={{ padding: "4px 8px", fontSize: "11.5px", fontWeight: 700 }}
-                          title="Ver historial de aplicaciones y compras"
-                        >
-                          📜 Movimientos
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: "inline-flex", gap: "5px", flexWrap: "wrap", justifyContent: "center" }}>
+                          {hasUbicaciones && (
+                            <button
+                              type="button"
+                              className="ghostButton"
+                              onClick={() => setInsumoUbicaciones(item)}
+                              style={{
+                                padding: "3px 7px",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: "#1e40af",
+                                background: "rgba(37, 99, 235, 0.08)",
+                                borderColor: "rgba(37, 99, 235, 0.25)",
+                              }}
+                              title="Ver toneladas y desglose en cada acopio o campo"
+                            >
+                              📍 Ubicaciones
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="ghostButton"
+                            onClick={() => handleAbrirIngreso(item.id)}
+                            style={{ padding: "3px 7px", fontSize: "11px", fontWeight: 700 }}
+                            title="Cargar ingreso o compra de este insumo"
+                          >
+                            ➕ Ingreso
+                          </button>
+                          <button
+                            type="button"
+                            className="ghostButton"
+                            onClick={() => setInsumoTrazabilidad(item)}
+                            style={{ padding: "3px 7px", fontSize: "11px", fontWeight: 700 }}
+                            title="Ver historial de aplicaciones y compras"
+                          >
+                            📜 Movimientos
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -757,6 +858,273 @@ export default function InsumosPage() {
                 className="ghostButton"
                 onClick={() => setInsumoTrazabilidad(null)}
                 style={{ fontWeight: 700, padding: "6px 14px" }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: STOCK POR UBICACIÓN (CEREALES: TONELADAS EN SILOS, COOP, PUERTO, AFA / ROLLOS) */}
+      {/* ========================================================================= */}
+      {insumoUbicaciones && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "16px",
+          }}
+          onClick={() => setInsumoUbicaciones(null)}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "12px",
+              maxWidth: "860px",
+              width: "100%",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Encabezado */}
+            <div
+              style={{
+                padding: "16px 24px",
+                borderBottom: "1px solid var(--line)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: insumoUbicaciones.esCerealOGrano
+                  ? "linear-gradient(to right, #fffbeb, #ffffff)"
+                  : "linear-gradient(to right, #f0fdf4, #ffffff)",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "24px" }}>{insumoUbicaciones.esCerealOGrano ? "🌾" : "📦"}</span>
+                  <h3 style={{ margin: 0, fontSize: "17.5px", color: "var(--slate-900)" }}>
+                    Stock por Ubicación: {insumoUbicaciones.nombre}
+                  </h3>
+                </div>
+                <p className="muted" style={{ margin: "3px 0 0 0", fontSize: "12.5px" }}>
+                  {insumoUbicaciones.esCerealOGrano
+                    ? "Control de toneladas físicas acopiadas en Silos, Cooperativa, Puerto y AFA Los Cardos."
+                    : "Existencias y distribución de rollos entre el campo de origen (Keuneke) y el Tambo."}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setInsumoUbicaciones(null)}
+                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--slate-400)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Contenido scrolleable */}
+            <div style={{ padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "18px" }}>
+              {/* Tarjeta Resumen Total */}
+              <div
+                style={{
+                  background: "#f8fafc",
+                  border: "1px solid var(--line)",
+                  borderRadius: "10px",
+                  padding: "14px 18px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "12px",
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: "11.5px", color: "var(--slate-500)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.5px" }}>
+                    Stock Físico Disponible
+                  </span>
+                  <div style={{ fontSize: "26px", fontWeight: 900, color: "#166534", marginTop: "2px" }}>
+                    {insumoUbicaciones.esCerealOGrano
+                      ? `${(insumoUbicaciones.totalTn || 0).toLocaleString("es-AR")} Toneladas`
+                      : `${insumoUbicaciones.stockActual.toLocaleString("es-AR")} Rollos`}
+                  </div>
+                  {insumoUbicaciones.esCerealOGrano && (
+                    <small style={{ color: "var(--slate-500)", fontSize: "12px" }}>
+                      Equivale a {insumoUbicaciones.stockActual.toLocaleString("es-AR")} kg netos
+                    </small>
+                  )}
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: "11.5px", color: "var(--slate-500)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.5px" }}>
+                    Valorización Estimada
+                  </span>
+                  <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--slate-900)", marginTop: "2px" }}>
+                    USD {insumoUbicaciones.valorTotalUsd.toLocaleString("es-AR")}
+                  </div>
+                  <small style={{ color: "#15803d", fontWeight: 600, fontSize: "12px" }}>
+                    ${insumoUbicaciones.valorTotalArs.toLocaleString("es-AR")} ARS (Valores Móviles)
+                  </small>
+                </div>
+              </div>
+
+              {/* Grid de Ubicaciones / Acopios */}
+              <div>
+                <h4 style={{ fontSize: "13.5px", margin: "0 0 10px 0", color: "var(--slate-800)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  {insumoUbicaciones.esCerealOGrano
+                    ? "📍 Toneladas Disponibles por Lugar de Acopio"
+                    : "📍 Rollos Disponibles por Ubicación (Keuneke / Tambo)"}
+                </h4>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "12px" }}>
+                  {(insumoUbicaciones.stockPorUbicacion || []).map((ubic) => (
+                    <div
+                      key={ubic.lugar}
+                      style={{
+                        background: ubic.cantidad > 0 ? "#ffffff" : "#f8fafc",
+                        border: ubic.cantidad > 0 ? "2px solid #86efac" : "1px solid var(--line)",
+                        borderRadius: "10px",
+                        padding: "14px",
+                        boxShadow: ubic.cantidad > 0 ? "var(--shadow-sm)" : "none",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                          <span style={{ fontSize: "22px" }}>{ubic.icono}</span>
+                          <span
+                            className="pill"
+                            style={{
+                              fontSize: "10.5px",
+                              fontWeight: 700,
+                              background: ubic.cantidad > 0 ? "#dcfce7" : "#f1f5f9",
+                              color: ubic.cantidad > 0 ? "#166534" : "var(--slate-400)",
+                            }}
+                          >
+                            {ubic.porcentaje}%
+                          </span>
+                        </div>
+                        <strong style={{ fontSize: "14px", color: "var(--slate-900)", display: "block" }}>
+                          {ubic.lugar}
+                        </strong>
+                      </div>
+
+                      <div style={{ marginTop: "12px" }}>
+                        <div style={{ fontSize: "20px", fontWeight: 900, color: ubic.cantidad > 0 ? "#166534" : "#94a3b8" }}>
+                          {insumoUbicaciones.esCerealOGrano
+                            ? `${(ubic.cantidadTn || 0).toLocaleString("es-AR")} Tn`
+                            : `${ubic.cantidad.toLocaleString("es-AR")} rollos`}
+                        </div>
+                        {insumoUbicaciones.esCerealOGrano && (
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                            {ubic.cantidad.toLocaleString("es-AR")} kg
+                          </div>
+                        )}
+                        <div style={{ width: "100%", height: "6px", background: "#e2e8f0", borderRadius: "999px", overflow: "hidden", marginTop: "8px" }}>
+                          <div
+                            style={{
+                              width: `${ubic.porcentaje}%`,
+                              height: "100%",
+                              background: ubic.cantidad > 0 ? "#16a34a" : "transparent",
+                              borderRadius: "999px",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Trazabilidad: Cosechas y Movimientos que explican el acopio */}
+              <div>
+                <h4 style={{ fontSize: "13.5px", margin: "10px 0 8px 0", color: "var(--slate-800)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  📜 Cosechas y Entregas Registradas
+                </h4>
+
+                {(() => {
+                  const allDetalles = (insumoUbicaciones.stockPorUbicacion || []).flatMap((u) => u.detalles);
+                  if (allDetalles.length === 0) {
+                    return (
+                      <div style={{ padding: "24px", textAlign: "center", color: "var(--slate-500)", background: "#f8fafc", borderRadius: "8px", fontSize: "13px" }}>
+                        💡 Todavía no hay cosechas ni traslados registrados para este cereal o rollo. Al cargar una nueva labor de Cosecha seleccionando Silos, Cooperativa, Puerto o AFA Los Cardos (o rollos en Keuneke/Tambo), aparecerá aquí de forma automática.
+                      </div>
+                    );
+                  }
+
+                  allDetalles.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+
+                  return (
+                    <div className="tableWrap">
+                      <table className="dataTable">
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Labor / Origen</th>
+                            <th>Lugar de Acopio</th>
+                            <th style={{ textAlign: "right" }}>Cantidad Acreditada</th>
+                            <th>Detalle de Operación</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allDetalles.map((det) => (
+                            <tr key={det.id}>
+                              <td><strong>{det.fecha}</strong></td>
+                              <td>
+                                <div style={{ fontWeight: 700, color: "var(--slate-900)" }}>
+                                  {det.campo} {det.lote ? `(${det.lote})` : ""}
+                                </div>
+                                <small style={{ color: "var(--slate-500)" }}>{det.tipo}</small>
+                              </td>
+                              <td>
+                                <span className="pill badgeBlue" style={{ fontSize: "11px", fontWeight: 700 }}>
+                                  📍 {det.referencia}
+                                </span>
+                              </td>
+                              <td style={{ textAlign: "right", fontWeight: 800, color: "#166534" }}>
+                                {insumoUbicaciones.esCerealOGrano && det.cantidadTn !== undefined
+                                  ? `+${det.cantidadTn.toLocaleString("es-AR")} Tn (${det.cantidad.toLocaleString("es-AR")} kg)`
+                                  : `+${det.cantidad.toLocaleString("es-AR")} ${det.unidad}`}
+                              </td>
+                              <td style={{ fontSize: "12px", color: "var(--slate-600)" }}>{det.detalle}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Pie */}
+            <div
+              style={{
+                padding: "12px 24px",
+                background: "#f8fafc",
+                borderTop: "1px solid var(--line)",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                className="ghostButton"
+                onClick={() => setInsumoUbicaciones(null)}
+                style={{ fontWeight: 700, padding: "6px 16px" }}
               >
                 Cerrar
               </button>
