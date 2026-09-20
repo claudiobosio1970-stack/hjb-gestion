@@ -15,6 +15,7 @@ import {
 import { LOTES_POR_CAMPO } from "@/lib/historicalData";
 import { productos, tiposActividad } from "@/lib/mockData";
 import { INITIAL_EQUIPMENT } from "@/lib/machineryData";
+import { getLiquidManureAnalysis, getManureAnalysis } from "@/lib/soilManureData";
 
 const CAMPOS_HJB = ["Aguilera", "Tambo", "Racca", "Kitty", "Keuneke", "A Terceros"];
 const CAMPANAS_HJB = ["2026/27", "2025/26", "2024/25", "2023/24"];
@@ -270,6 +271,10 @@ export default function NewActivityModal({
   if (!open) return null;
 
   const isReal = form.estado === "Realizada";
+  const curLiquid = getLiquidManureAnalysis();
+  const curSolid = getManureAnalysis();
+  const curM3Tanque = curLiquid.m3PorTanque || 11;
+  const curTnCarro = curSolid.toneladasPorCarro || 5;
 
   function set<K extends keyof Activity>(key: K, value: Activity[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -288,8 +293,8 @@ export default function NewActivityModal({
     const supVal = supActive && supActive > 0 ? supActive : 1;
 
     if (tipoBio === "liquida") {
-      // 1 tanque = 12 m3 = 12 kL
-      const totalKl = Number((cant * 12).toFixed(2));
+      // 1 tanque = curM3Tanque m3 = curM3Tanque kL
+      const totalKl = Number((cant * curM3Tanque).toFixed(2));
       const dosisKlHa = Number((totalKl / supVal).toFixed(2));
       const bioInput: ActivityInput = {
         id: "bio-efluente-liq",
@@ -299,15 +304,15 @@ export default function NewActivityModal({
         dosisReal: isReal ? dosisKlHa : null,
         cantidadTotal: totalKl,
         unidadTotal: "kL",
-        observacion: `${cant} tanques de 12 m³ (${totalKl} kL totales)`,
+        observacion: `${cant} tanques de ${curM3Tanque} m³ (${totalKl} kL totales)`,
       };
       setForm((prev) => ({
         ...prev,
         insumos: [bioInput],
       }));
     } else {
-      // 1 carro = 5 toneladas
-      const totalTn = Number((cant * 5).toFixed(2));
+      // 1 carro = curTnCarro toneladas
+      const totalTn = Number((cant * curTnCarro).toFixed(2));
       const dosisTnHa = Number((totalTn / supVal).toFixed(2));
       const bioInput: ActivityInput = {
         id: "bio-estiercol-sol",
@@ -317,7 +322,7 @@ export default function NewActivityModal({
         dosisReal: isReal ? dosisTnHa : null,
         cantidadTotal: totalTn,
         unidadTotal: "tn",
-        observacion: `${cant} carros de 5 tn (${totalTn} tn totales)`,
+        observacion: `${cant} carros de ${curTnCarro} tn (${totalTn} tn totales)`,
       };
       setForm((prev) => ({
         ...prev,
@@ -1361,7 +1366,7 @@ export default function NewActivityModal({
                       color: bioTipo === "liquida" ? "#ffffff" : "#475569",
                     }}
                   >
-                    💧 Líquida (Tanques de 12 m³)
+                    💧 Líquida (Tanques de {curM3Tanque} m³)
                   </button>
                   <button
                     type="button"
@@ -1378,7 +1383,7 @@ export default function NewActivityModal({
                       color: bioTipo === "solida" ? "#ffffff" : "#475569",
                     }}
                   >
-                    🚜 Sólida (Carros de 5 tn)
+                    🚜 Sólida (Carros de {curTnCarro} tn)
                   </button>
                 </div>
               </div>
@@ -1387,8 +1392,8 @@ export default function NewActivityModal({
                 <div style={{ minWidth: "220px" }}>
                   <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#166534", display: "block", marginBottom: "4px" }}>
                     {bioTipo === "liquida"
-                      ? "Cantidad de Tanques aplicados (12 m³ c/u):"
-                      : "Cantidad de Carros aplicados (5 tn c/u):"}
+                      ? `Cantidad de Tanques aplicados (${curM3Tanque} m³ c/u):`
+                      : `Cantidad de Carros aplicados (${curTnCarro} tn c/u):`}
                   </label>
                   <input
                     type="number"
@@ -1408,11 +1413,11 @@ export default function NewActivityModal({
                   <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "8px", border: "1px solid #bbf7d0", fontSize: "12px", color: "#166534" }}>
                     {bioTipo === "liquida" ? (
                       <span>
-                        ✓ <strong>{Number(bioCantidadUnidades) * 12} kL (m³) totales</strong> aplicados · Dosis calculada: <strong>{((Number(bioCantidadUnidades) * 12) / (isReal ? (form.superficieReal || 1) : (form.superficiePlanificada || 1))).toFixed(2)} kL/ha</strong> sobre {isReal ? (form.superficieReal || 0) : (form.superficiePlanificada || 0)} ha
+                        ✓ <strong>{Number(bioCantidadUnidades) * curM3Tanque} kL (m³) totales</strong> aplicados · Dosis calculada: <strong>{((Number(bioCantidadUnidades) * curM3Tanque) / (isReal ? (form.superficieReal || 1) : (form.superficiePlanificada || 1))).toFixed(2)} kL/ha</strong> sobre {isReal ? (form.superficieReal || 0) : (form.superficiePlanificada || 0)} ha
                       </span>
                     ) : (
                       <span>
-                        ✓ <strong>{Number(bioCantidadUnidades) * 5} toneladas totales</strong> aplicadas · Dosis calculada: <strong>{((Number(bioCantidadUnidades) * 5) / (isReal ? (form.superficieReal || 1) : (form.superficiePlanificada || 1))).toFixed(2)} tn/ha</strong> sobre {isReal ? (form.superficieReal || 0) : (form.superficiePlanificada || 0)} ha
+                        ✓ <strong>{Number(bioCantidadUnidades) * curTnCarro} toneladas totales</strong> aplicadas · Dosis calculada: <strong>{((Number(bioCantidadUnidades) * curTnCarro) / (isReal ? (form.superficieReal || 1) : (form.superficiePlanificada || 1))).toFixed(2)} tn/ha</strong> sobre {isReal ? (form.superficieReal || 0) : (form.superficiePlanificada || 0)} ha
                       </span>
                     )}
                   </div>

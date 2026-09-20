@@ -162,8 +162,8 @@ export const DEFAULT_LIQUID_MANURE_ANALYSIS: LiquidManureAnalysis = {
   materiaOrganicaKgM3: 15.0,
   ph: 7.8,
   ceUsCm: 4500,
-  m3PorTanque: 12,
-  observaciones: "Muestreo representativo de fosa de efluentes líquidos previa homogenización.",
+  m3PorTanque: 11,
+  observaciones: "Muestreo representativo de fosa de efluentes líquidos previa homogenización. Calibración operativa de tanque a 11.000 L (11 m³).",
 };
 
 export const DEFAULT_OTHER_ANALYSES: OtherLabAnalysis[] = [
@@ -829,9 +829,8 @@ export interface LoteNutrientSummary {
     tanques: number;
   };
   nutrienteLimitante: "Nitrógeno" | "Fósforo" | "Potasio" | "Equilibrado";
-  // Compatibilidad hacia atrás
-  carrosRestantesRecomendados: number;
-  tanquesRestantesRecomendados: number;
+  toneladasPorCarro?: number;
+  m3PorTanque?: number;
   estadoBalance: "Cubierto con holgura" | "Recomendado aplicar" | "Déficit pendiente";
   mensajeDiagnostico: string;
 }
@@ -891,14 +890,17 @@ export function computeLoteNutrientSummary(
   });
 
   // 2. Extraer labores de biofertilización (o usar simulación en vivo)
+  const tnCarro = Math.max(0.1, manure.toneladasPorCarro || 5);
+  const m3Tanque = Math.max(0.1, liquidManure.m3PorTanque || 11);
+
   let totalTnSolido = 0;
   let totalM3Liquido = 0;
 
   if (simulatedCarros !== undefined || simulatedTanques !== undefined) {
     const c = Math.max(0, simulatedCarros ?? 0);
     const t = Math.max(0, simulatedTanques ?? 0);
-    totalTnSolido = c * (manure.toneladasPorCarro || 5);
-    totalM3Liquido = t * (liquidManure.m3PorTanque || 12);
+    totalTnSolido = c * tnCarro;
+    totalM3Liquido = t * m3Tanque;
   } else {
     const activities = agricultureData.listActivities();
     const lotesActs = activities.filter((act) => {
@@ -930,11 +932,10 @@ export function computeLoteNutrientSummary(
     });
   }
 
-  const carrosSolido = Math.round(totalTnSolido / (manure.toneladasPorCarro || 5));
-  const tanquesLiquido = Math.round(totalM3Liquido / (liquidManure.m3PorTanque || 12));
+  const carrosSolido = Math.round(totalTnSolido / tnCarro);
+  const tanquesLiquido = Math.round(totalM3Liquido / m3Tanque);
 
   // 3. Aportes de nutrientes del estiércol sólido (Clover E326)
-  // 1 tn aporta: 12 kg N, 10 kg P (22.9 kg P2O5), 24.7 kg K (29.8 kg K2O), 2.2 kg S, 264 kg MO
   const nSolido = totalTnSolido * (manure.nitrogenoTotalPct * 10);
   const pSolido = totalTnSolido * (manure.fosforoTotalPct * 10);
   const kSolido = totalTnSolido * (manure.potasioTotalPct * 10);
@@ -983,30 +984,28 @@ export function computeLoteNutrientSummary(
   const defPTotal = defPKgHa * sup;
   const defKTotal = defKKgHa * sup;
 
-  // Constantes de aporte unitario:
-  // 1 Carro sólido (5 tn): 60 kg N, 50 kg P, 123.5 kg K
-  // 1 Tanque líquido (12 m³): 21.6 kg N, 7.2 kg P, 26.4 kg K
-  const N_POR_CARRO = 60;
-  const P_POR_CARRO = 50;
-  const K_POR_CARRO = 123.5;
+  // Aportes unitarios dinámicos según capacidad de carro y tanque configuradas
+  const N_POR_CARRO = tnCarro * (manure.nitrogenoTotalPct * 10);
+  const P_POR_CARRO = tnCarro * (manure.fosforoTotalPct * 10);
+  const K_POR_CARRO = tnCarro * (manure.potasioTotalPct * 10);
 
-  const N_POR_TANQUE = 21.6;
-  const P_POR_TANQUE = 7.2;
-  const K_POR_TANQUE = 26.4;
+  const N_POR_TANQUE = m3Tanque * (liquidManure.nitrogenoKgM3 || 1.8);
+  const P_POR_TANQUE = m3Tanque * (liquidManure.fosforoKgM3 || 0.6);
+  const K_POR_TANQUE = m3Tanque * (liquidManure.potasioKgM3 || 2.2);
 
-  // OPCIÓN 100% SÓLIDO (Carros de 5 tn)
-  const cReqN = defNTotal > 0 ? Math.ceil(defNTotal / N_POR_CARRO) : 0;
-  const cReqP = defPTotal > 0 ? Math.ceil(defPTotal / P_POR_CARRO) : 0;
+  // OPCIÓN 100% SÓLIDO (Carros de tnCarro)
+  const cReqN = defNTotal > 0 ? Math.ceil(defNTotal / Math.max(0.1, N_POR_CARRO)) : 0;
+  const cReqP = defPTotal > 0 ? Math.ceil(defPTotal / Math.max(0.1, P_POR_CARRO)) : 0;
   const cReqK = (demand.nombreNormalizado.includes("Silo") || demand.nombreNormalizado.includes("Alfalfa")) && defKTotal > 0
-    ? Math.ceil(defKTotal / K_POR_CARRO)
+    ? Math.ceil(defKTotal / Math.max(0.1, K_POR_CARRO))
     : 0;
 
   const soloCarros = Math.max(cReqN, cReqP, cReqK);
 
-  // OPCIÓN 100% LÍQUIDO (Tanques de 12.000 L)
-  const tReqN = defNTotal > 0 ? Math.ceil(defNTotal / N_POR_TANQUE) : 0;
-  const tReqP = defPTotal > 0 ? Math.ceil(defPTotal / P_POR_TANQUE) : 0;
-  const tReqK = defKTotal > 0 ? Math.ceil(defKTotal / K_POR_TANQUE) : 0;
+  // OPCIÓN 100% LÍQUIDO (Tanques de m3Tanque)
+  const tReqN = defNTotal > 0 ? Math.ceil(defNTotal / Math.max(0.1, N_POR_TANQUE)) : 0;
+  const tReqP = defPTotal > 0 ? Math.ceil(defPTotal / Math.max(0.1, P_POR_TANQUE)) : 0;
+  const tReqK = defKTotal > 0 ? Math.ceil(defKTotal / Math.max(0.1, K_POR_TANQUE)) : 0;
 
   const soloTanques = Math.max(tReqN, tReqK);
 
@@ -1021,7 +1020,7 @@ export function computeLoteNutrientSummary(
       mixtaCarros = Math.ceil(soloCarros * 0.55);
       const remN = Math.max(0, defNTotal - (mixtaCarros * N_POR_CARRO));
       const remK = Math.max(0, defKTotal - (mixtaCarros * K_POR_CARRO));
-      mixtaTanques = Math.ceil(Math.max(remN / N_POR_TANQUE, remK / K_POR_TANQUE));
+      mixtaTanques = Math.ceil(Math.max(remN / Math.max(0.1, N_POR_TANQUE), remK / Math.max(0.1, K_POR_TANQUE)));
     }
   }
 
@@ -1096,8 +1095,8 @@ export function computeLoteNutrientSummary(
       tanques: mixtaTanques,
     },
     nutrienteLimitante,
-    carrosRestantesRecomendados: soloCarros,
-    tanquesRestantesRecomendados: soloTanques,
+    toneladasPorCarro: tnCarro,
+    m3PorTanque: m3Tanque,
     estadoBalance,
     mensajeDiagnostico,
   };

@@ -140,6 +140,30 @@ export default function SuelosPage() {
     return Array.from(new Set(soils.map((s) => s.campo))).join(", ");
   }, [soils]);
 
+  // Cálculos dinámicos de aportes unitarios y equivalencias según protocolos vigentes
+  const tnCarro = solidManure.toneladasPorCarro || 5;
+  const m3Tanque = liquidManure.m3PorTanque || 11;
+
+  const solidoNeto = useMemo(() => ({
+    n: Math.round(tnCarro * solidManure.nitrogenoTotalPct * 10),
+    p: Math.round(tnCarro * solidManure.fosforoTotalPct * 10),
+    k: Number((tnCarro * solidManure.potasioTotalPct * 10).toFixed(1)),
+    mo: Math.round(tnCarro * solidManure.materiaOrganicaPct * 10),
+  }), [tnCarro, solidManure]);
+
+  const liquidoNeto = useMemo(() => ({
+    n: Number((m3Tanque * (liquidManure.nitrogenoKgM3 || 1.8)).toFixed(1)),
+    p: Number((m3Tanque * (liquidManure.fosforoKgM3 || 0.6)).toFixed(1)),
+    k: Number((m3Tanque * (liquidManure.potasioKgM3 || 2.2)).toFixed(1)),
+    mo: Math.round(m3Tanque * (liquidManure.materiaOrganicaKgM3 || 15)),
+  }), [m3Tanque, liquidManure]);
+
+  const equivTanques = useMemo(() => {
+    const ratioN = solidoNeto.n / Math.max(0.1, liquidoNeto.n);
+    const ratioP = solidoNeto.p / Math.max(0.1, liquidoNeto.p);
+    return ((ratioN + ratioP) / 2).toFixed(1);
+  }, [solidoNeto, liquidoNeto]);
+
   // Acciones de eliminación
   function handleDeleteSoil(id: string, lote: string, campo: string) {
     if (window.confirm(`¿Estás seguro de eliminar el análisis químico de ${campo} - ${lote}?`)) {
@@ -217,12 +241,12 @@ export default function SuelosPage() {
           <MetricCard
             label="Estiércol Sólido (Clover E326)"
             value={`${solidManure.toneladasPorCarro || 5} tn / carro`}
-            note="60 kg N · 50 kg P · 123.5 kg K por carro"
+            note={`${Math.round((solidManure.toneladasPorCarro || 5) * solidManure.nitrogenoTotalPct * 10)} kg N · ${Math.round((solidManure.toneladasPorCarro || 5) * solidManure.fosforoTotalPct * 10)} kg P · ${((solidManure.toneladasPorCarro || 5) * solidManure.potasioTotalPct * 10).toFixed(1)} kg K por carro`}
           />
           <MetricCard
             label="Efluente Líquido (Tambo)"
-            value={`${liquidManure.m3PorTanque || 12} m³ / tanque`}
-            note="21.6 kg N · 7.2 kg P · 26.4 kg K por tanque"
+            value={`${liquidManure.m3PorTanque || 11} m³ / tanque`}
+            note={`${((liquidManure.m3PorTanque || 11) * (liquidManure.nitrogenoKgM3 || 1.8)).toFixed(1)} kg N · ${((liquidManure.m3PorTanque || 11) * (liquidManure.fosforoKgM3 || 0.6)).toFixed(1)} kg P · ${((liquidManure.m3PorTanque || 11) * (liquidManure.potasioKgM3 || 2.2)).toFixed(1)} kg K por tanque`}
           />
           <MetricCard
             label="Perfiles Hídricos (0-200 cm)"
@@ -615,13 +639,13 @@ export default function SuelosPage() {
 
                 <div style={{ background: "var(--slate-900)", color: "#ffffff", padding: "12px 16px", borderRadius: "8px" }}>
                   <span style={{ fontSize: "12px", color: "var(--slate-300)", display: "block", marginBottom: "4px" }}>
-                    Aporte Neto por Cada Carro Aplicado (5 toneladas):
+                    Aporte Neto por Cada Carro Aplicado ({tnCarro} tn netas):
                   </span>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#86efac" }}>60 kg N</span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#93c5fd" }}>50 kg P</span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#fcd34d" }}>123.5 kg K</span>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#cbd5e1" }}>1.320 kg MO</span>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#86efac" }}>{solidoNeto.n} kg N</span>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#93c5fd" }}>{solidoNeto.p} kg P</span>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#fcd34d" }}>{solidoNeto.k} kg K</span>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#cbd5e1" }}>{solidoNeto.mo.toLocaleString("es-AR")} kg MO</span>
                   </div>
                 </div>
               </div>
@@ -652,7 +676,9 @@ export default function SuelosPage() {
                 <div style={{ padding: "10px 14px", background: "#f8fafc", borderRadius: "8px", border: "1px solid var(--line)", marginBottom: "16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--slate-800)" }}>Capacidad del Tanque Estercolero:</span>
-                    <strong style={{ fontSize: "15px", color: "#0284c7" }}>{liquidManure.m3PorTanque || 12} m³ (12.000 L)</strong>
+                    <strong style={{ fontSize: "15px", color: "#0284c7" }}>
+                      {m3Tanque} m³ ({(m3Tanque * 1000).toLocaleString("es-AR")} L)
+                    </strong>
                   </div>
                 </div>
 
@@ -678,13 +704,13 @@ export default function SuelosPage() {
 
                 <div style={{ background: "var(--slate-900)", color: "#ffffff", padding: "12px 16px", borderRadius: "8px" }}>
                   <span style={{ fontSize: "12px", color: "var(--slate-300)", display: "block", marginBottom: "4px" }}>
-                    Aporte Neto por Cada Tanque Aplicado (12.000 L / 12 m³):
+                    Aporte Neto por Cada Tanque Aplicado ({(m3Tanque * 1000).toLocaleString("es-AR")} L / {m3Tanque} m³):
                   </span>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#86efac" }}>21.6 kg N</span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#93c5fd" }}>7.2 kg P</span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#fcd34d" }}>26.4 kg K</span>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#cbd5e1" }}>180 kg MO</span>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#86efac" }}>{liquidoNeto.n} kg N</span>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#93c5fd" }}>{liquidoNeto.p} kg P</span>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#fcd34d" }}>{liquidoNeto.k} kg K</span>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#cbd5e1" }}>{liquidoNeto.mo.toLocaleString("es-AR")} kg MO</span>
                   </div>
                 </div>
               </div>
@@ -696,7 +722,7 @@ export default function SuelosPage() {
                 ⚖️ Criterio de Equivalencia e Intercambiabilidad Operativa
               </h3>
               <p style={{ margin: "0 0 12px", fontSize: "13.5px", color: "var(--slate-600)", lineHeight: 1.5 }}>
-                En base a los ensayos de laboratorio, <strong>1 carro de estiércol sólido (5 tn) aporta el equivalente a 3,5 tanques de efluente líquido (12 m³)</strong>. El sistema utiliza estos coeficientes dinámicos para calcular automáticamente las dosis restantes necesarias en cada lote según el cultivo planificado.
+                En base a los ensayos de laboratorio y la calibración operativa ({m3Tanque} m³ por tanque y {tnCarro} tn por carro), <strong>1 carro de estiércol sólido ({tnCarro} tn) aporta el equivalente agronómico promedio a {equivTanques} tanques de efluente líquido ({m3Tanque} m³ / {(m3Tanque * 1000).toLocaleString("es-AR")} L)</strong>. El sistema utiliza estos coeficientes dinámicos para calcular automáticamente las dosis restantes necesarias en cada lote según el cultivo planificado.
               </p>
               <div style={{ display: "flex", gap: "10px" }}>
                 <Link href="/agricultura/tambo" className="primaryButton" style={{ fontSize: "13px" }}>
@@ -1025,7 +1051,7 @@ function AnalisisModal({
   const [kLiquidoKgM3, setKLiquidoKgM3] = useState<number | "">(initialData?.potasioKgM3 ?? 2.2);
   const [sLiquidoKgM3, setSLiquidoKgM3] = useState<number | "">(initialData?.azufreKgM3 ?? 0.2);
   const [moLiquidoKgM3, setMoLiquidoKgM3] = useState<number | "">(initialData?.materiaOrganicaKgM3 ?? 15.0);
-  const [m3PorTanque, setM3PorTanque] = useState<number | "">(initialData?.m3PorTanque ?? 12);
+  const [m3PorTanque, setM3PorTanque] = useState<number | "">(initialData?.m3PorTanque ?? 11);
 
   // Estados específicos de Perfil Hídrico
   const [totalAguaUtilMm, setTotalAguaUtilMm] = useState<number | "">(initialData?.totalAguaUtilMm ?? 280);
@@ -1125,7 +1151,7 @@ function AnalisisModal({
         materiaOrganicaKgM3: Number(moLiquidoKgM3) || 15.0,
         ph: initialData?.ph || 7.8,
         ceUsCm: initialData?.ceUsCm || 4500,
-        m3PorTanque: Number(m3PorTanque) || 12,
+        m3PorTanque: Number(m3PorTanque) || 11,
         observaciones: observaciones || undefined,
       };
       saveLiquidManureAnalysis(record);

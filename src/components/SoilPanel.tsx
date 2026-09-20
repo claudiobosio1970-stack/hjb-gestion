@@ -7,13 +7,16 @@ import {
   SoilChemicalAnalysis,
   SoilMoistureProfile,
   ManureAnalysis,
+  LiquidManureAnalysis,
   LoteNutrientSummary,
   listSoilAnalyses,
   listMoistureProfiles,
   getManureAnalysis,
+  getLiquidManureAnalysis,
   computeLoteNutrientSummary,
   HJB_SOIL_SYNC_EVENT,
   DEFAULT_MANURE_ANALYSIS,
+  DEFAULT_LIQUID_MANURE_ANALYSIS,
 } from "@/lib/soilManureData";
 import {
   evaluarPotasio,
@@ -56,6 +59,7 @@ export default function SoilPanel({
   const [soils, setSoils] = useState<SoilChemicalAnalysis[]>([]);
   const [moistures, setMoistures] = useState<SoilMoistureProfile[]>([]);
   const [manure, setManure] = useState<ManureAnalysis>(DEFAULT_MANURE_ANALYSIS);
+  const [liquidManure, setLiquidManure] = useState<LiquidManureAnalysis>(DEFAULT_LIQUID_MANURE_ANALYSIS);
   const [selectedLoteNombre, setSelectedLoteNombre] = useState<string>("TODOS");
   const [targetCrop, setTargetCrop] = useState<string>("Maíz Silo");
   const [campana, setCampana] = useState<string>("2026/27");
@@ -78,6 +82,7 @@ export default function SoilPanel({
     setSoils(listSoilAnalyses());
     setMoistures(listMoistureProfiles());
     setManure(getManureAnalysis());
+    setLiquidManure(getLiquidManureAnalysis());
   }
 
   useEffect(() => {
@@ -168,7 +173,7 @@ export default function SoilPanel({
         campana
       )
     );
-  }, [lotesDelCampo, campoNombre, targetCrop, campana, soils, moistures, manure]);
+  }, [lotesDelCampo, campoNombre, targetCrop, campana, soils, moistures, manure, liquidManure]);
 
   // Resumen base real (sin simulación) del lote seleccionado
   const baselineSummary: LoteNutrientSummary | null = useMemo(() => {
@@ -180,7 +185,7 @@ export default function SoilPanel({
       targetCrop,
       campana
     );
-  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure]);
+  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure, liquidManure]);
 
   const isSimulating = simCarros !== null || simTanques !== null;
   const currentSimCarros = simCarros !== null ? simCarros : (baselineSummary?.carrosSolido ?? 0);
@@ -198,7 +203,14 @@ export default function SoilPanel({
       isSimulating ? currentSimCarros : undefined,
       isSimulating ? currentSimTanques : undefined
     );
-  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure, isSimulating, currentSimCarros, currentSimTanques]);
+  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure, liquidManure, isSimulating, currentSimCarros, currentSimTanques]);
+
+  // Parámetros de capacidad y equivalencia agronómica dinámica
+  const tnCarro = manure.toneladasPorCarro || 5;
+  const m3Tanque = liquidManure.m3PorTanque || 11;
+  const ratioN = (tnCarro * manure.nitrogenoTotalPct * 10) / Math.max(0.1, m3Tanque * (liquidManure.nitrogenoKgM3 || 1.8));
+  const ratioP = (tnCarro * manure.fosforoTotalPct * 10) / Math.max(0.1, m3Tanque * (liquidManure.fosforoKgM3 || 0.6));
+  const equivTanques = ((ratioN + ratioP) / 2).toFixed(1);
 
   // Totales acumulados en todo el campo
   const totalesCampo = useMemo(() => {
@@ -529,7 +541,7 @@ export default function SoilPanel({
                 {activeSummary.mensajeDiagnostico}
               </p>
               <small style={{ display: "block", color: "var(--muted)", fontSize: "11px", marginTop: "5px" }}>
-                🔒 Balance y carros restantes calculados exclusivamente para la <strong>Campaña {campana}</strong>. Equivalencia promedio: <strong>1 carro sólido (5 tn) ≈ 3.5 tanques líquidos (12.000 L)</strong>.
+                🔒 Balance y carros restantes calculados exclusivamente para la <strong>Campaña {campana}</strong>. Equivalencia agronómica: <strong>1 carro sólido ({tnCarro} tn) ≈ {equivTanques} tanques líquidos ({m3Tanque} m³ / {(m3Tanque * 1000).toLocaleString("es-AR")} L)</strong>.
               </small>
             </div>
 
@@ -558,7 +570,7 @@ export default function SoilPanel({
                 }}
               >
                 <span style={{ fontSize: "11px", fontWeight: 800, color: activeSummary.soloCarrosRestantes === 0 ? "#16a34a" : "#854d0e", display: "block" }}>
-                  🚜 SÓLIDO (5 tn)
+                  🚜 SÓLIDO ({tnCarro} tn)
                 </span>
                 <span
                   style={{
@@ -573,7 +585,7 @@ export default function SoilPanel({
                   {activeSummary.soloCarrosRestantes === 0 ? "0 carros" : `${activeSummary.soloCarrosRestantes} carros`}
                 </span>
                 <small style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>
-                  {activeSummary.soloCarrosRestantes === 0 ? "✓ Cubierto" : `${activeSummary.soloCarrosRestantes * 5} tn a tirar`}
+                  {activeSummary.soloCarrosRestantes === 0 ? "✓ Cubierto" : `${(activeSummary.soloCarrosRestantes * tnCarro).toLocaleString("es-AR")} tn a tirar`}
                 </small>
               </div>
 
@@ -593,7 +605,7 @@ export default function SoilPanel({
                 }}
               >
                 <span style={{ fontSize: "11px", fontWeight: 800, color: activeSummary.soloTanquesRestantes === 0 ? "#16a34a" : "#0369a1", display: "block" }}>
-                  💧 LÍQUIDO (12 m³)
+                  💧 LÍQUIDO ({m3Tanque} m³)
                 </span>
                 <span
                   style={{
@@ -608,7 +620,7 @@ export default function SoilPanel({
                   {activeSummary.soloTanquesRestantes === 0 ? "0 tanques" : `${activeSummary.soloTanquesRestantes} tanques`}
                 </span>
                 <small style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>
-                  {activeSummary.soloTanquesRestantes === 0 ? "✓ Cubierto" : `${activeSummary.soloTanquesRestantes * 12} m³ a tirar`}
+                  {activeSummary.soloTanquesRestantes === 0 ? "✓ Cubierto" : `${(activeSummary.soloTanquesRestantes * m3Tanque).toLocaleString("es-AR")} m³ a tirar`}
                 </small>
               </div>
             </div>
@@ -1272,8 +1284,8 @@ export default function SoilPanel({
                   {isTambo ? (
                     <>
                       <th style={{ padding: "8px 10px" }}>Aplicado Campaña</th>
-                      <th style={{ padding: "8px 10px" }}>Opción 100% Sólido</th>
-                      <th style={{ padding: "8px 10px" }}>Opción 100% Líquido</th>
+                      <th style={{ padding: "8px 10px" }}>Opción 100% Sólido ({tnCarro} tn)</th>
+                      <th style={{ padding: "8px 10px" }}>Opción 100% Líquido ({m3Tanque} m³)</th>
                       <th style={{ padding: "8px 10px" }}>Mezcla Sugerida</th>
                       <th style={{ padding: "8px 10px" }}>Cobertura N-P-K</th>
                       <th style={{ padding: "8px 10px" }}>Limitante</th>
@@ -1491,7 +1503,7 @@ export default function SoilPanel({
                   <div><strong>Fecha de Informe:</strong> 23/08/2026</div>
                   <div><strong>Matriz:</strong> {manure.matriz}</div>
                   <div><strong>Procedencia:</strong> Tambo HJB</div>
-                  <div><strong>Capacidad de Carro:</strong> 5 toneladas netas</div>
+                  <div><strong>Capacidad de Carro:</strong> {tnCarro} toneladas netas</div>
                 </div>
               </div>
 
@@ -1506,23 +1518,23 @@ export default function SoilPanel({
                   </div>
                   <div className="soilParam">
                     <span>Nitrógeno Total</span>
-                    <strong>{manure.nitrogenoTotalPct}% ({manure.nitrogenoTotalPct * 10} kg N/tn)</strong>
+                    <strong>{manure.nitrogenoTotalPct}% ({(manure.nitrogenoTotalPct * 10).toFixed(1)} kg N/tn)</strong>
                   </div>
                   <div className="soilParam">
                     <span>Fósforo Total (P)</span>
-                    <strong>{manure.fosforoTotalPct}% ({manure.fosforoTotalPct * 10} kg P/tn)</strong>
+                    <strong>{manure.fosforoTotalPct}% ({(manure.fosforoTotalPct * 10).toFixed(1)} kg P/tn)</strong>
                   </div>
                   <div className="soilParam">
                     <span>Potasio Total (K)</span>
-                    <strong>{manure.potasioTotalPct}% ({manure.potasioTotalPct * 10} kg K/tn)</strong>
+                    <strong>{manure.potasioTotalPct}% ({(manure.potasioTotalPct * 10).toFixed(1)} kg K/tn)</strong>
                   </div>
                   <div className="soilParam">
                     <span>Azufre Total (S)</span>
-                    <strong>{manure.azufreTotalPct}% ({manure.azufreTotalPct * 10} kg S/tn)</strong>
+                    <strong>{manure.azufreTotalPct}% ({(manure.azufreTotalPct * 10).toFixed(1)} kg S/tn)</strong>
                   </div>
                   <div className="soilParam">
                     <span>Materia Orgánica</span>
-                    <strong>{manure.materiaOrganicaPct}% ({manure.materiaOrganicaPct * 10} kg MO/tn)</strong>
+                    <strong>{manure.materiaOrganicaPct}% ({(manure.materiaOrganicaPct * 10).toFixed(1)} kg MO/tn)</strong>
                   </div>
                   <div className="soilParam">
                     <span>pH / Conductividad</span>
@@ -1542,29 +1554,29 @@ export default function SoilPanel({
               {/* REGLA DE CONVERSIÓN POR CARRO */}
               <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", padding: "14px", borderRadius: "10px" }}>
                 <h4 style={{ margin: "0 0 6px 0", fontSize: "13.5px", color: "#166534" }}>
-                  🚜 Aporte Nutricional Neto por Cada Carro Esparcido (5 Toneladas Netas)
+                  🚜 Aporte Nutricional Neto por Cada Carro Esparcido ({tnCarro} Toneladas Netas)
                 </h4>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px", marginTop: "8px", textAlign: "center" }}>
                   <div style={{ background: "#fff", padding: "8px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
                     <small style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>NITRÓGENO</small>
-                    <strong style={{ color: "#15803d", fontSize: "14px" }}>60 kg N</strong>
+                    <strong style={{ color: "#15803d", fontSize: "14px" }}>{(tnCarro * manure.nitrogenoTotalPct * 10).toFixed(1)} kg N</strong>
                   </div>
                   <div style={{ background: "#fff", padding: "8px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
                     <small style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>FÓSFORO</small>
-                    <strong style={{ color: "#15803d", fontSize: "14px" }}>50 kg P</strong>
-                    <small style={{ display: "block", fontSize: "9px", color: "var(--muted)" }}>114.5 kg P₂O₅</small>
+                    <strong style={{ color: "#15803d", fontSize: "14px" }}>{(tnCarro * manure.fosforoTotalPct * 10).toFixed(1)} kg P</strong>
+                    <small style={{ display: "block", fontSize: "9px", color: "var(--muted)" }}>{(tnCarro * manure.fosforoTotalPct * 10 * 2.29).toFixed(1)} kg P₂O₅</small>
                   </div>
                   <div style={{ background: "#fff", padding: "8px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
                     <small style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>POTASIO</small>
-                    <strong style={{ color: "#15803d", fontSize: "14px" }}>123.5 kg K</strong>
+                    <strong style={{ color: "#15803d", fontSize: "14px" }}>{(tnCarro * manure.potasioTotalPct * 10).toFixed(1)} kg K</strong>
                   </div>
                   <div style={{ background: "#fff", padding: "8px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
                     <small style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>AZUFRE</small>
-                    <strong style={{ color: "#15803d", fontSize: "14px" }}>11 kg S</strong>
+                    <strong style={{ color: "#15803d", fontSize: "14px" }}>{(tnCarro * manure.azufreTotalPct * 10).toFixed(1)} kg S</strong>
                   </div>
                   <div style={{ background: "#fff", padding: "8px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
                     <small style={{ color: "var(--muted)", display: "block", fontSize: "10px" }}>MATERIA ORGÁNICA</small>
-                    <strong style={{ color: "#15803d", fontSize: "14px" }}>1.320 kg MO</strong>
+                    <strong style={{ color: "#15803d", fontSize: "14px" }}>{Math.round(tnCarro * manure.materiaOrganicaPct * 10).toLocaleString("es-AR")} kg MO</strong>
                   </div>
                 </div>
               </div>
