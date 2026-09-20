@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, agricultureData, Lote, LoteStatus, isActivityInLote } from "@/lib/agricultureData";
 import ActivityTable from "@/components/ActivityTable";
 import NewActivityModal from "@/components/NewActivityModal";
+import { getLiquidManureAnalysis, getManureAnalysis, HJB_SOIL_SYNC_EVENT } from "@/lib/soilManureData";
 
 export const CULTIVOS_SUGERIDOS = [
   "Maíz Grano",
@@ -306,6 +307,16 @@ export default function LotesPanel({
     );
   }, [selectedLote, lotes]);
 
+  const [soilVersion, setSoilVersion] = useState(0);
+
+  useEffect(() => {
+    function onSync() {
+      setSoilVersion((v) => v + 1);
+    }
+    window.addEventListener(HJB_SOIL_SYNC_EVENT, onSync);
+    return () => window.removeEventListener(HJB_SOIL_SYNC_EVENT, onSync);
+  }, []);
+
   const activeLoteActivities = useMemo(() => {
     if (!activeLote) return [];
     return activities.filter((act) => isActivityInLote(act, campoNombre, activeLote.nombre));
@@ -333,28 +344,46 @@ export default function LotesPanel({
         act.tipo.toLowerCase().includes("barbecho");
 
       if (isBio) {
+        const curLiquid = getLiquidManureAnalysis();
+        const curSolid = getManureAnalysis();
+        const m3Tanque = curLiquid.m3PorTanque || 11;
+        const tnCarro = curSolid.toneladasPorCarro || 5;
+
         act.insumos?.forEach((ins) => {
           const p = (ins.producto || "").toLowerCase();
           const obs = (ins.observacion || "").toLowerCase();
           const total = ins.cantidadTotal || 0;
           const dosis = ins.dosisReal || ins.dosisPlanificada || (total ? total / supHa : 0);
+          const isLiq =
+            p.includes("líquid") ||
+            p.includes("liquido") ||
+            p.includes("efluente") ||
+            ins.unidad.includes("kL") ||
+            obs.includes("tanque") ||
+            ins.id === "bio-efluente-liq";
 
-          if (p.includes("líquid") || p.includes("efluente") || ins.unidad.includes("kL") || obs.includes("tanque")) {
-            bioLiqTotalKL += total || (dosis * supHa);
-            const matchTanques = obs.match(/(\d+(?:\.\d+)?)\s*tanque/i);
-            if (matchTanques) {
-              bioLiqTanques += Number(matchTanques[1]);
-            } else if (total) {
-              bioLiqTanques += Math.round((total / 12) * 10) / 10;
+          if (isLiq) {
+            const matchTanques = obs.match(/(\d+(?:\.\d+)?)\s*tanque/i) || (act.observaciones || "").match(/(\d+(?:\.\d+)?)\s*tanque/i);
+            let tCount = matchTanques ? Number(matchTanques[1]) : 0;
+            if (!tCount && total) {
+              const prevCapM = obs.match(/(?:tanques? de\s*)(\d+(?:\.\d+)?)\s*(?:m³|kl|l)/i);
+              const prevCap = prevCapM ? parseFloat(prevCapM[1]) : 12;
+              tCount = Math.round((total / prevCap) * 10) / 10;
             }
+            const kl = tCount > 0 ? Number((tCount * m3Tanque).toFixed(2)) : (total || (dosis * supHa));
+            bioLiqTanques += tCount;
+            bioLiqTotalKL += kl;
           } else {
-            bioSolTotalTn += total || (dosis * supHa);
-            const matchCarros = obs.match(/(\d+(?:\.\d+)?)\s*carro/i);
-            if (matchCarros) {
-              bioSolCarros += Number(matchCarros[1]);
-            } else if (total) {
-              bioSolCarros += Math.round((total / 5) * 10) / 10;
+            const matchCarros = obs.match(/(\d+(?:\.\d+)?)\s*carro/i) || (act.observaciones || "").match(/(\d+(?:\.\d+)?)\s*carro/i);
+            let cCount = matchCarros ? Number(matchCarros[1]) : 0;
+            if (!cCount && total) {
+              const prevCapM = obs.match(/(?:carros? de\s*)(\d+(?:\.\d+)?)\s*(?:tn|t|toneladas)/i);
+              const prevCap = prevCapM ? parseFloat(prevCapM[1]) : 5;
+              cCount = Math.round((total / prevCap) * 10) / 10;
             }
+            const tn = cCount > 0 ? Number((cCount * tnCarro).toFixed(2)) : (total || (dosis * supHa));
+            bioSolCarros += cCount;
+            bioSolTotalTn += tn;
           }
         });
       } else if (isFert) {
@@ -404,7 +433,7 @@ export default function LotesPanel({
       })),
       fumigaciones,
     };
-  }, [activeLote, activeLoteActivities]);
+  }, [activeLote, activeLoteActivities, soilVersion]);
 
   // Métricas resumidas de los lotes de este campo
   const stats = useMemo(() => {

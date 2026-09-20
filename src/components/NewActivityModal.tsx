@@ -252,7 +252,28 @@ export default function NewActivityModal({
           (editingActivity.produccion.rendimiento !== null || editingActivity.produccion.cantidad !== null)
         ) || isRollOrHarv
       );
+
+      if (isBiofertilizacion(editingActivity.tipo)) {
+        const ins = editingActivity.insumos?.[0];
+        if (ins) {
+          const pNom = (ins.producto || "").toLowerCase();
+          const obs = ins.observacion || "";
+          const isL = pNom.includes("líquid") || pNom.includes("liquido") || pNom.includes("efluente") || ins.unidad.includes("kL") || obs.includes("tanque") || ins.id === "bio-efluente-liq";
+          setBioTipo(isL ? "liquida" : "solida");
+          const matchT = obs.match(/(\d+(?:\.\d+)?)\s*tanque/i);
+          const matchC = obs.match(/(\d+(?:\.\d+)?)\s*carro/i);
+          if (isL && matchT) {
+            setBioCantidadUnidades(Number(matchT[1]));
+          } else if (!isL && matchC) {
+            setBioCantidadUnidades(Number(matchC[1]));
+          } else if (ins.cantidadTotal) {
+            const cap = isL ? (getLiquidManureAnalysis().m3PorTanque || 11) : (getManureAnalysis().toneladasPorCarro || 5);
+            setBioCantidadUnidades(Math.round((ins.cantidadTotal / cap) * 10) / 10);
+          }
+        }
+      }
     } else {
+      setBioCantidadUnidades("");
       const c = fixedCampo || "Aguilera";
       const dynamicLots = agricultureData.listLotes(c);
       const lotNames = dynamicLots.map((l) => l.nombre);

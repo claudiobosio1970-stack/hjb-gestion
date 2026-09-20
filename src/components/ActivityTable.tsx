@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Activity, agricultureData } from "@/lib/agricultureData";
 import { formatHistoricalDate, sortActivitiesRecentFirst } from "@/lib/dateUtils";
 import ConfirmRealizadaModal from "@/components/ConfirmRealizadaModal";
+import { getLiquidManureAnalysis, getManureAnalysis } from "@/lib/soilManureData";
 
 function getTipoBadge(tipo: string) {
   const t = (tipo || "").toLowerCase();
@@ -526,12 +527,59 @@ export default function ActivityTable({
                               const obsLower = (input.observacion || "").toLowerCase();
                               const isLiq =
                                 prodLower.includes("líquid") ||
+                                prodLower.includes("liquido") ||
                                 prodLower.includes("efluente") ||
                                 input.unidad.includes("kL") ||
-                                obsLower.includes("tanque");
+                                obsLower.includes("tanque") ||
+                                input.id === "bio-efluente-liq";
+                              const isSol =
+                                prodLower.includes("sólid") ||
+                                prodLower.includes("solido") ||
+                                prodLower.includes("estiércol") ||
+                                prodLower.includes("estiercol") ||
+                                input.unidad.includes("t/ha") ||
+                                obsLower.includes("carro") ||
+                                input.id === "bio-estiercol-sol";
                               const tipoLabel = isLiq ? "Líquido" : "Sólido";
-                              const dosis = input.dosisReal ?? input.dosisPlanificada;
                               const unidad = input.unidad || (isLiq ? "kL/ha" : "t/ha");
+
+                              // Recálculo dinámico en base a capacidad activa de tanque/carro
+                              const sup = (activity.estado === "Realizada" ? (activity.superficieReal ?? activity.superficiePlanificada) : activity.superficiePlanificada) || 1;
+                              const supVal = sup > 0 ? sup : 1;
+                              let dosis = input.dosisReal ?? input.dosisPlanificada;
+                              let totalVol = input.cantidadTotal;
+                              let detalleCant = "";
+
+                              if (isLiq) {
+                                const matchT = obsLower.match(/(\d+(?:\.\d+)?)\s*tanque/i) || (activity.observaciones || "").match(/(\d+(?:\.\d+)?)\s*tanque/i);
+                                const m3T = getLiquidManureAnalysis().m3PorTanque || 11;
+                                let tanques = matchT ? parseFloat(matchT[1]) : 0;
+                                if (!tanques && input.cantidadTotal) {
+                                  const prevCapM = obsLower.match(/(?:tanques? de\s*)(\d+(?:\.\d+)?)\s*(?:m³|kl|l)/i);
+                                  const prevCap = prevCapM ? parseFloat(prevCapM[1]) : 12;
+                                  tanques = Math.round((input.cantidadTotal / prevCap) * 100) / 100;
+                                }
+                                if (tanques > 0) {
+                                  totalVol = Number((tanques * m3T).toFixed(2));
+                                  dosis = Number((totalVol / supVal).toFixed(2));
+                                  detalleCant = `${tanques} tanques (${totalVol} kL)`;
+                                }
+                              } else if (isSol) {
+                                const matchC = obsLower.match(/(\d+(?:\.\d+)?)\s*carro/i) || (activity.observaciones || "").match(/(\d+(?:\.\d+)?)\s*carro/i);
+                                const tnC = getManureAnalysis().toneladasPorCarro || 5;
+                                let carros = matchC ? parseFloat(matchC[1]) : 0;
+                                if (!carros && input.cantidadTotal) {
+                                  const prevCapM = obsLower.match(/(?:carros? de\s*)(\d+(?:\.\d+)?)\s*(?:tn|t|toneladas)/i);
+                                  const prevCap = prevCapM ? parseFloat(prevCapM[1]) : 5;
+                                  carros = Math.round((input.cantidadTotal / prevCap) * 100) / 100;
+                                }
+                                if (carros > 0) {
+                                  totalVol = Number((carros * tnC).toFixed(2));
+                                  dosis = Number((totalVol / supVal).toFixed(2));
+                                  detalleCant = `${carros} carros (${totalVol} tn)`;
+                                }
+                              }
+
                               return (
                                 <div
                                   key={input.id}
@@ -541,7 +589,14 @@ export default function ActivityTable({
                                     fontWeight: 600,
                                   }}
                                 >
-                                  {tipoLabel}: {dosis !== null && dosis !== undefined ? `${dosis.toLocaleString("es-AR")} ${unidad}` : "—"}
+                                  <div>
+                                    {tipoLabel}: {dosis !== null && dosis !== undefined ? `${dosis.toLocaleString("es-AR")} ${unidad}` : "—"}
+                                  </div>
+                                  {detalleCant && (
+                                    <small style={{ display: "block", color: "var(--muted)", fontSize: "11px", fontWeight: 500 }}>
+                                      {detalleCant}
+                                    </small>
+                                  )}
                                 </div>
                               );
                             })}

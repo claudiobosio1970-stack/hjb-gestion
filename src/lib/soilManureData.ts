@@ -652,6 +652,7 @@ export function saveManureAnalysis(record: ManureAnalysis) {
       updatedAt: new Date().toISOString(),
     }, { merge: true }).catch(console.error);
   }
+  recalculateBiofertilizationActivities(undefined, record.toneladasPorCarro);
 }
 
 export function getLiquidManureAnalysis(): LiquidManureAnalysis {
@@ -674,6 +675,137 @@ export function saveLiquidManureAnalysis(record: LiquidManureAnalysis) {
       liquid_manure_analysis: record,
       updatedAt: new Date().toISOString(),
     }, { merge: true }).catch(console.error);
+  }
+  recalculateBiofertilizationActivities(record.m3PorTanque);
+}
+
+let isRecalculatingBiofert = false;
+
+/**
+ * Recalcula todas las actividades de biofertilización ya realizadas o planificadas
+ * adaptando los kL/ha, t/ha y volúmenes totales a la capacidad activa de tanques o carros.
+ */
+export function recalculateBiofertilizationActivities(
+  overrideM3Tanque?: number,
+  overrideTnCarro?: number
+): { updatedCount: number } {
+  if (typeof window === "undefined" || isRecalculatingBiofert) return { updatedCount: 0 };
+  isRecalculatingBiofert = true;
+
+  try {
+    const liquid = getLiquidManureAnalysis();
+    const solid = getManureAnalysis();
+    const m3Tanque = overrideM3Tanque || liquid.m3PorTanque || 11;
+    const tnCarro = overrideTnCarro || solid.toneladasPorCarro || 5;
+
+    const activities = agricultureData.listActivities();
+    let updatedCount = 0;
+
+    activities.forEach((act) => {
+      if (!act.tipo || !act.tipo.toLowerCase().includes("biofertiliz")) {
+        return;
+      }
+
+      const sup = (act.estado === "Realizada" ? (act.superficieReal ?? act.superficiePlanificada) : act.superficiePlanificada) || 1;
+      const supVal = sup > 0 ? sup : 1;
+      let actModified = false;
+
+      const newInsumos = (act.insumos || []).map((ins) => {
+        const pNom = (ins.producto || "").toLowerCase();
+        const obs = (ins.observacion || "").toLowerCase();
+        const isLiq =
+          pNom.includes("líquid") ||
+          pNom.includes("liquido") ||
+          pNom.includes("efluente") ||
+          ins.unidad.includes("kL") ||
+          obs.includes("tanque") ||
+          ins.id === "bio-efluente-liq";
+        const isSol =
+          pNom.includes("sólid") ||
+          pNom.includes("solido") ||
+          pNom.includes("estiércol") ||
+          pNom.includes("estiercol") ||
+          ins.unidad.includes("t/ha") ||
+          obs.includes("carro") ||
+          ins.id === "bio-estiercol-sol";
+
+        if (isLiq) {
+          const matchT = obs.match(/(\d+(?:\.\d+)?)\s*tanque/i) || (act.observaciones || "").match(/(\d+(?:\.\d+)?)\s*tanque/i);
+          let tanques = matchT ? parseFloat(matchT[1]) : 0;
+          if (!tanques && ins.cantidadTotal) {
+            const prevCapM = obs.match(/(?:tanques? de\s*)(\d+(?:\.\d+)?)\s*(?:m³|kl|l)/i);
+            const prevCap = prevCapM ? parseFloat(prevCapM[1]) : 12;
+            tanques = Math.round((ins.cantidadTotal / prevCap) * 100) / 100;
+          }
+
+          if (tanques > 0) {
+            const newTotalKl = Number((tanques * m3Tanque).toFixed(2));
+            const newDosis = Number((newTotalKl / supVal).toFixed(2));
+            const currentDosis = ins.dosisReal ?? ins.dosisPlanificada;
+            const currentTotal = ins.cantidadTotal;
+
+            if (currentDosis !== newDosis || currentTotal !== newTotalKl || !obs.includes(`${m3Tanque} m³`)) {
+              actModified = true;
+              return {
+                ...ins,
+                cantidadTotal: newTotalKl,
+                unidadTotal: "kL",
+                unidad: "kL/ha",
+                dosisPlanificada: newDosis,
+                dosisReal: act.estado === "Realizada" || ins.dosisReal !== null ? newDosis : null,
+                observacion: `${tanques} tanques de ${m3Tanque} m³ (${newTotalKl} kL totales)`,
+              };
+            }
+          }
+        } else if (isSol) {
+          const matchC = obs.match(/(\d+(?:\.\d+)?)\s*carro/i) || (act.observaciones || "").match(/(\d+(?:\.\d+)?)\s*carro/i);
+          let carros = matchC ? parseFloat(matchC[1]) : 0;
+          if (!carros && ins.cantidadTotal) {
+            const prevCapM = obs.match(/(?:carros? de\s*)(\d+(?:\.\d+)?)\s*(?:tn|t|toneladas)/i);
+            const prevCap = prevCapM ? parseFloat(prevCapM[1]) : 5;
+            carros = Math.round((ins.cantidadTotal / prevCap) * 100) / 100;
+          }
+
+          if (carros > 0) {
+            const newTotalTn = Number((carros * tnCarro).toFixed(2));
+            const newDosis = Number((newTotalTn / supVal).toFixed(2));
+            const currentDosis = ins.dosisReal ?? ins.dosisPlanificada;
+            const currentTotal = ins.cantidadTotal;
+
+            if (currentDosis !== newDosis || currentTotal !== newTotalTn || !obs.includes(`${tnCarro} tn`)) {
+              actModified = true;
+              return {
+                ...ins,
+                cantidadTotal: newTotalTn,
+                unidadTotal: "tn",
+                unidad: "t/ha",
+                dosisPlanificada: newDosis,
+                dosisReal: act.estado === "Realizada" || ins.dosisReal !== null ? newDosis : null,
+                observacion: `${carros} carros de ${tnCarro} tn (${newTotalTn} tn totales)`,
+              };
+            }
+          }
+        }
+        return ins;
+      });
+
+      if (actModified) {
+        updatedCount++;
+        const updatedAct: Activity = {
+          ...act,
+          insumos: newInsumos,
+          updatedAt: new Date().toISOString(),
+        };
+        agricultureData.saveActivity(updatedAct);
+      }
+    });
+
+    return { updatedCount };
+  } catch (err) {
+    console.error("Error recalculando actividades de biofertilización:", err);
+    return { updatedCount: 0 };
+  } finally {
+    isRecalculatingBiofert = false;
   }
 }
 
@@ -915,18 +1047,21 @@ export function computeLoteNutrientSummary(
     lotesActs.forEach((act) => {
       act.insumos.forEach((ins) => {
         const pNom = (ins.producto || "").toLowerCase();
+        const obs = (ins.observacion || "").toLowerCase();
         if (pNom.includes("sólido") || pNom.includes("solido") || ins.id === "bio-estiercol-sol") {
-          let tn = ins.cantidadTotal || 0;
-          if (!tn && ins.dosisReal && act.superficieReal) {
-            tn = ins.dosisReal * act.superficieReal;
+          const matchC = obs.match(/(\d+(?:\.\d+)?)\s*carro/i) || (act.observaciones || "").match(/(\d+(?:\.\d+)?)\s*carro/i);
+          let carros = matchC ? parseFloat(matchC[1]) : 0;
+          if (!carros && ins.cantidadTotal) {
+            carros = Math.round((ins.cantidadTotal / tnCarro) * 10) / 10;
           }
-          totalTnSolido += tn;
+          totalTnSolido += carros > 0 ? (carros * tnCarro) : (ins.cantidadTotal || 0);
         } else if (pNom.includes("líquido") || pNom.includes("liquido") || ins.id === "bio-efluente-liq") {
-          let m3 = ins.cantidadTotal || 0;
-          if (!m3 && ins.dosisReal && act.superficieReal) {
-            m3 = ins.dosisReal * act.superficieReal;
+          const matchT = obs.match(/(\d+(?:\.\d+)?)\s*tanque/i) || (act.observaciones || "").match(/(\d+(?:\.\d+)?)\s*tanque/i);
+          let tanques = matchT ? parseFloat(matchT[1]) : 0;
+          if (!tanques && ins.cantidadTotal) {
+            tanques = Math.round((ins.cantidadTotal / m3Tanque) * 10) / 10;
           }
-          totalM3Liquido += m3;
+          totalM3Liquido += tanques > 0 ? (tanques * m3Tanque) : (ins.cantidadTotal || 0);
         }
       });
     });
@@ -1101,4 +1236,11 @@ export function computeLoteNutrientSummary(
     mensajeDiagnostico,
   };
 }
+
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    recalculateBiofertilizationActivities();
+  }, 1000);
+}
+
 
