@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Activity, agricultureData } from "@/lib/agricultureData";
 import { formatHistoricalDate, sortActivitiesRecentFirst } from "@/lib/dateUtils";
+import ConfirmRealizadaModal from "@/components/ConfirmRealizadaModal";
 
 function getTipoBadge(tipo: string) {
   const t = (tipo || "").toLowerCase();
@@ -70,23 +71,23 @@ export default function ActivityTable({
     filters.estado !== "Todos" ||
     filters.observacion !== "";
 
-  // Acción de 1 solo clic para pasar de Planificada a Realizada
-  function handleQuickComplete(activity: Activity) {
-    const today = new Date().toISOString().split("T")[0];
-    const updated: Activity = {
-      ...activity,
-      estado: "Realizada",
-      fechaReal: activity.fechaReal || activity.fechaPlanificada || today,
-      superficieReal: activity.superficieReal ?? activity.superficiePlanificada,
-      insumos: activity.insumos.map((i) => ({
-        ...i,
-        dosisReal: i.dosisReal ?? i.dosisPlanificada,
-      })),
-      updatedAt: new Date().toISOString(),
-    };
+  const [confirmingActivity, setConfirmingActivity] = useState<Activity | null>(null);
 
-    agricultureData.saveActivity(updated);
+  // Desplegar panel para confirmar y editar datos al pasar de Planificada a Realizada
+  function handleQuickComplete(activity: Activity) {
+    setConfirmingActivity(activity);
+  }
+
+  function handleConfirmedSaved() {
+    setConfirmingActivity(null);
     if (onSaved) onSaved();
+  }
+
+  function handleOpenFullEdit(activity: Activity) {
+    setConfirmingActivity(null);
+    if (onEdit) {
+      onEdit(activity);
+    }
   }
 
   // Filtrado reactivo en vivo + ordenado desde lo más reciente arriba de todo
@@ -699,6 +700,15 @@ export default function ActivityTable({
                               ? "status neutral"
                               : "status warn"
                           }
+                          onClick={() => {
+                            if (activity.estado === "Planificada") {
+                              handleQuickComplete(activity);
+                            }
+                          }}
+                          style={{
+                            cursor: activity.estado === "Planificada" ? "pointer" : "default",
+                          }}
+                          title={activity.estado === "Planificada" ? "Hacé clic para confirmar y pasar a Realizada" : undefined}
                         >
                           {activity.estado}
                         </span>
@@ -708,9 +718,9 @@ export default function ActivityTable({
                             type="button"
                             className="quickDoneBtn"
                             onClick={() => handleQuickComplete(activity)}
-                            title="Hacé 1 clic para marcar esta labor como Realizada inmediatamente"
+                            title="Desplegar panel para confirmar datos y pasar a Realizada"
                           >
-                            ✓ Marcar realizada
+                            ✓ Pasar a realizada
                           </button>
                         )}
                       </div>
@@ -751,6 +761,15 @@ export default function ActivityTable({
           </tbody>
         </table>
       </div>
+
+      {confirmingActivity && (
+        <ConfirmRealizadaModal
+          activity={confirmingActivity}
+          onClose={() => setConfirmingActivity(null)}
+          onConfirm={handleConfirmedSaved}
+          onOpenFullEdit={onEdit ? handleOpenFullEdit : undefined}
+        />
+      )}
     </div>
   );
 }
