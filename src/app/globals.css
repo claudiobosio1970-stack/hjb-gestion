@@ -1370,3 +1370,35 @@ tr:hover .stickyActionCol {
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
 }
+
+/* Modo Semáforo Indicadores (Verde, Amarillo, Rojo) */
+.semaforoVerde {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #86efac !important;
+}
+
+.semaforoAmarillo {
+  background: #fef3c7 !important;
+  color: #b45309 !important;
+  border-color: #fcd34d !important;
+}
+
+.semaforoRojo {
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
+  border-color: #fca5a5 !important;
+}
+
+.semaforoCardVerde {
+  border-left: 4px solid #16a34a !important;
+}
+
+.semaforoCardAmarillo {
+  border-left: 4px solid #f59e0b !important;
+}
+
+.semaforoCardRojo {
+  border-left: 4px solid #ef4444 !important;
+}
+

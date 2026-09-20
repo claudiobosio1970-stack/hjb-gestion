@@ -15,6 +15,19 @@ import {
   HJB_SOIL_SYNC_EVENT,
   DEFAULT_MANURE_ANALYSIS,
 } from "@/lib/soilManureData";
+import {
+  evaluarPotasio,
+  evaluarFosforoBray,
+  evaluarNitrogenoDisponible,
+  evaluarMateriaOrganica,
+  evaluarPH,
+  evaluarAzufre,
+  evaluarZinc,
+  evaluarCalcio,
+  evaluarAguaUtilTotal,
+  evaluarCoberturaNutriente,
+} from "@/lib/semaforoUtils";
+import { SemaforoCell, SemaforoBadge } from "@/components/SemaforoBadge";
 
 const defaultParams = [
   ["Materia orgánica", "%"],
@@ -723,147 +736,162 @@ export default function SoilPanel({
 
               {/* Barra N */}
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginBottom: "5px", flexWrap: "wrap", gap: "4px" }}>
-                  <strong style={{ color: "#15803d", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                    <span>🌱 Nitrógeno (N)</span>
-                    <span style={{ background: "#dcfce7", color: "#166534", padding: "1px 7px", borderRadius: "10px", fontSize: "11px", fontWeight: 800 }}>
-                      Llevamos {activeSummary.coberturaPct.nitrogeno}%
-                    </span>
-                  </strong>
-                  <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
-                    Disponible: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.nDisponibleKgHa + activeSummary.aportesPorHa.nitrogenoKgHa : activeSummary.aportesPorHa.nitrogenoKgHa} kg/ha (Meta: {activeSummary.metaKgHa.nitrogeno} kg/ha)
-                  </span>
-                </div>
-                <div
-                  style={{
-                    position: "relative",
-                    background: "#e2e8f0",
-                    borderRadius: "8px",
-                    height: "26px",
-                    overflow: "hidden",
-                    display: "flex",
-                    alignItems: "center",
-                    border: "1px solid #cbd5e1",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: activeSummary.coberturaPct.nitrogeno >= 100 ? "#16a34a" : activeSummary.coberturaPct.nitrogeno >= 70 ? "#f59e0b" : "#2563eb",
-                      width: `${Math.min(100, activeSummary.coberturaPct.nitrogeno)}%`,
-                      height: "100%",
-                      transition: "width 0.4s ease",
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: "12px",
-                      fontSize: "11.5px",
-                      fontWeight: 900,
-                      color: activeSummary.coberturaPct.nitrogeno > 25 ? "#ffffff" : "#0f172a",
-                      textShadow: activeSummary.coberturaPct.nitrogeno > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
-                    }}
-                  >
-                    {activeSummary.coberturaPct.nitrogeno}% cubierto {activeSummary.coberturaPct.nitrogeno >= 100 ? "✓ (Meta superada)" : ""}
-                  </span>
-                </div>
+                {(() => {
+                  const semCovN = evaluarCoberturaNutriente(activeSummary.coberturaPct.nitrogeno);
+                  return (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginBottom: "5px", flexWrap: "wrap", gap: "4px" }}>
+                        <strong style={{ color: "var(--slate-800)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                          <span>🌱 Nitrógeno (N)</span>
+                          <SemaforoBadge result={semCovN} customLabel={`${activeSummary.coberturaPct.nitrogeno}% cubierto`} size="sm" />
+                        </strong>
+                        <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
+                          Disponible: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.nDisponibleKgHa + activeSummary.aportesPorHa.nitrogenoKgHa : activeSummary.aportesPorHa.nitrogenoKgHa} kg/ha (Meta: {activeSummary.metaKgHa.nitrogeno} kg/ha)
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          position: "relative",
+                          background: "#e2e8f0",
+                          borderRadius: "8px",
+                          height: "26px",
+                          overflow: "hidden",
+                          display: "flex",
+                          alignItems: "center",
+                          border: `1px solid ${semCovN.borderColor}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: activeSummary.coberturaPct.nitrogeno >= 100 ? "#16a34a" : activeSummary.coberturaPct.nitrogeno >= 50 ? "#f59e0b" : "#dc2626",
+                            width: `${Math.min(100, activeSummary.coberturaPct.nitrogeno)}%`,
+                            height: "100%",
+                            transition: "width 0.4s ease",
+                          }}
+                        />
+                        <span
+                          style={{
+                            position: "absolute",
+                            left: "12px",
+                            fontSize: "11.5px",
+                            fontWeight: 900,
+                            color: activeSummary.coberturaPct.nitrogeno > 25 ? "#ffffff" : "#0f172a",
+                            textShadow: activeSummary.coberturaPct.nitrogeno > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                          }}
+                        >
+                          {semCovN.icon} {activeSummary.coberturaPct.nitrogeno}% cubierto {activeSummary.coberturaPct.nitrogeno >= 100 ? "✓ (Meta superada)" : ""}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Barra P */}
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginBottom: "5px", flexWrap: "wrap", gap: "4px" }}>
-                  <strong style={{ color: "#0369a1", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                    <span>🌾 Fósforo (P)</span>
-                    <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "1px 7px", borderRadius: "10px", fontSize: "11px", fontWeight: 800 }}>
-                      Llevamos {activeSummary.coberturaPct.fosforo}%
-                    </span>
-                  </strong>
-                  <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
-                    Aporte: +{activeSummary.aportesPorHa.fosforoKgHa} kg P/ha · P Bray: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.fosforoBrayPpm : 22} ppm (Meta: {activeSummary.metaKgHa.fosforo} kg/ha)
-                  </span>
-                </div>
-                <div
-                  style={{
-                    position: "relative",
-                    background: "#e2e8f0",
-                    borderRadius: "8px",
-                    height: "26px",
-                    overflow: "hidden",
-                    display: "flex",
-                    alignItems: "center",
-                    border: "1px solid #cbd5e1",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: activeSummary.coberturaPct.fosforo >= 100 ? "#16a34a" : activeSummary.coberturaPct.fosforo >= 70 ? "#f59e0b" : "#0284c7",
-                      width: `${Math.min(100, activeSummary.coberturaPct.fosforo)}%`,
-                      height: "100%",
-                      transition: "width 0.4s ease",
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: "12px",
-                      fontSize: "11.5px",
-                      fontWeight: 900,
-                      color: activeSummary.coberturaPct.fosforo > 25 ? "#ffffff" : "#0f172a",
-                      textShadow: activeSummary.coberturaPct.fosforo > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
-                    }}
-                  >
-                    {activeSummary.coberturaPct.fosforo}% cubierto {activeSummary.coberturaPct.fosforo >= 100 ? "✓ (Meta superada)" : ""}
-                  </span>
-                </div>
+                {(() => {
+                  const semCovP = evaluarCoberturaNutriente(activeSummary.coberturaPct.fosforo);
+                  return (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginBottom: "5px", flexWrap: "wrap", gap: "4px" }}>
+                        <strong style={{ color: "var(--slate-800)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                          <span>🌾 Fósforo (P)</span>
+                          <SemaforoBadge result={semCovP} customLabel={`${activeSummary.coberturaPct.fosforo}% cubierto`} size="sm" />
+                        </strong>
+                        <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
+                          Aporte: +{activeSummary.aportesPorHa.fosforoKgHa} kg P/ha · P Bray: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.fosforoBrayPpm : 22} ppm (Meta: {activeSummary.metaKgHa.fosforo} kg/ha)
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          position: "relative",
+                          background: "#e2e8f0",
+                          borderRadius: "8px",
+                          height: "26px",
+                          overflow: "hidden",
+                          display: "flex",
+                          alignItems: "center",
+                          border: `1px solid ${semCovP.borderColor}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: activeSummary.coberturaPct.fosforo >= 100 ? "#16a34a" : activeSummary.coberturaPct.fosforo >= 50 ? "#f59e0b" : "#dc2626",
+                            width: `${Math.min(100, activeSummary.coberturaPct.fosforo)}%`,
+                            height: "100%",
+                            transition: "width 0.4s ease",
+                          }}
+                        />
+                        <span
+                          style={{
+                            position: "absolute",
+                            left: "12px",
+                            fontSize: "11.5px",
+                            fontWeight: 900,
+                            color: activeSummary.coberturaPct.fosforo > 25 ? "#ffffff" : "#0f172a",
+                            textShadow: activeSummary.coberturaPct.fosforo > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                          }}
+                        >
+                          {semCovP.icon} {activeSummary.coberturaPct.fosforo}% cubierto {activeSummary.coberturaPct.fosforo >= 100 ? "✓ (Meta superada)" : ""}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Barra K */}
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginBottom: "5px", flexWrap: "wrap", gap: "4px" }}>
-                  <strong style={{ color: "#4338ca", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                    <span>🌽 Potasio (K)</span>
-                    <span style={{ background: "#e0e7ff", color: "#3730a3", padding: "1px 7px", borderRadius: "10px", fontSize: "11px", fontWeight: 800 }}>
-                      Llevamos {activeSummary.coberturaPct.potasio}%
-                    </span>
-                  </strong>
-                  <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
-                    Aporte: +{activeSummary.aportesPorHa.potasioKgHa} kg K/ha (Meta: {activeSummary.metaKgHa.potasio} kg/ha)
-                    {targetCrop.toLowerCase().includes("silo") || targetCrop.toLowerCase().includes("alfalfa") ? " · ⚠️ Alta extracción por biomasa" : ""}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    position: "relative",
-                    background: "#e2e8f0",
-                    borderRadius: "8px",
-                    height: "26px",
-                    overflow: "hidden",
-                    display: "flex",
-                    alignItems: "center",
-                    border: "1px solid #cbd5e1",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: activeSummary.coberturaPct.potasio >= 100 ? "#16a34a" : activeSummary.coberturaPct.potasio >= 70 ? "#f59e0b" : "#6366f1",
-                      width: `${Math.min(100, activeSummary.coberturaPct.potasio)}%`,
-                      height: "100%",
-                      transition: "width 0.4s ease",
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: "12px",
-                      fontSize: "11.5px",
-                      fontWeight: 900,
-                      color: activeSummary.coberturaPct.potasio > 25 ? "#ffffff" : "#0f172a",
-                      textShadow: activeSummary.coberturaPct.potasio > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
-                    }}
-                  >
-                    {activeSummary.coberturaPct.potasio}% cubierto {activeSummary.coberturaPct.potasio >= 100 ? "✓ (Meta superada)" : ""}
-                  </span>
-                </div>
+                {(() => {
+                  const semCovK = evaluarCoberturaNutriente(activeSummary.coberturaPct.potasio);
+                  return (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", marginBottom: "5px", flexWrap: "wrap", gap: "4px" }}>
+                        <strong style={{ color: "var(--slate-800)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                          <span>🌽 Potasio (K)</span>
+                          <SemaforoBadge result={semCovK} customLabel={`${activeSummary.coberturaPct.potasio}% cubierto`} size="sm" />
+                        </strong>
+                        <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
+                          Aporte: +{activeSummary.aportesPorHa.potasioKgHa} kg K/ha (Meta: {activeSummary.metaKgHa.potasio} kg/ha)
+                          {targetCrop.toLowerCase().includes("silo") || targetCrop.toLowerCase().includes("alfalfa") ? " · ⚠️ Alta extracción por biomasa" : ""}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          position: "relative",
+                          background: "#e2e8f0",
+                          borderRadius: "8px",
+                          height: "26px",
+                          overflow: "hidden",
+                          display: "flex",
+                          alignItems: "center",
+                          border: `1px solid ${semCovK.borderColor}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: activeSummary.coberturaPct.potasio >= 100 ? "#16a34a" : activeSummary.coberturaPct.potasio >= 50 ? "#f59e0b" : "#dc2626",
+                            width: `${Math.min(100, activeSummary.coberturaPct.potasio)}%`,
+                            height: "100%",
+                            transition: "width 0.4s ease",
+                          }}
+                        />
+                        <span
+                          style={{
+                            position: "absolute",
+                            left: "12px",
+                            fontSize: "11.5px",
+                            fontWeight: 900,
+                            color: activeSummary.coberturaPct.potasio > 25 ? "#ffffff" : "#0f172a",
+                            textShadow: activeSummary.coberturaPct.potasio > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                          }}
+                        >
+                          {semCovK.icon} {activeSummary.coberturaPct.potasio}% cubierto {activeSummary.coberturaPct.potasio >= 100 ? "✓ (Meta superada)" : ""}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -931,22 +959,36 @@ export default function SoilPanel({
               {/* Tarjeta 1: Agua útil total */}
               <div className="metricCard">
                 <span className="metricLabel">Agua Útil Total (0–200 cm)</span>
-                <span className="metricValue" style={{ fontSize: "20px", color: "#0284c7" }}>
-                  {activeSummary.perfilHumedad ? `${activeSummary.perfilHumedad.totalAguaUtilMm} mm` : "—"}
-                </span>
+                {activeSummary.perfilHumedad ? (
+                  <div style={{ marginTop: "4px" }}>
+                    <SemaforoBadge
+                      result={evaluarAguaUtilTotal(activeSummary.perfilHumedad.totalAguaUtilMm)}
+                      valor={`${activeSummary.perfilHumedad.totalAguaUtilMm} mm`}
+                    />
+                  </div>
+                ) : (
+                  <span className="metricValue" style={{ fontSize: "20px", color: "var(--muted)" }}>—</span>
+                )}
                 <small className="metricNote">
-                  {activeSummary.perfilHumedad && activeSummary.perfilHumedad.totalAguaUtilMm >= 280
-                    ? "🌊 Excelente recarga hídrica profunda"
-                    : "Muestreo de humedad Molisol"}
+                  {activeSummary.perfilHumedad
+                    ? evaluarAguaUtilTotal(activeSummary.perfilHumedad.totalAguaUtilMm).rangoReferencia
+                    : "Sin perfil cargado"}
                 </small>
               </div>
 
               {/* Tarjeta 2: Fósforo Bray */}
               <div className="metricCard">
                 <span className="metricLabel">Fósforo Bray (Suelo)</span>
-                <span className="metricValue" style={{ fontSize: "20px", color: "#0369a1" }}>
-                  {activeSummary.sueloPrevio ? `${activeSummary.sueloPrevio.fosforoBrayPpm} ppm` : "—"}
-                </span>
+                {activeSummary.sueloPrevio ? (
+                  <div style={{ marginTop: "4px" }}>
+                    <SemaforoBadge
+                      result={evaluarFosforoBray(activeSummary.sueloPrevio.fosforoBrayPpm)}
+                      valor={`${activeSummary.sueloPrevio.fosforoBrayPpm} ppm`}
+                    />
+                  </div>
+                ) : (
+                  <span className="metricValue" style={{ fontSize: "20px", color: "var(--muted)" }}>—</span>
+                )}
                 <small className="metricNote">
                   Meta del cultivo: {activeSummary.metaKgHa.fosforo} kg P/ha
                 </small>
@@ -955,9 +997,16 @@ export default function SoilPanel({
               {/* Tarjeta 3: Nitrógeno Disponible */}
               <div className="metricCard">
                 <span className="metricLabel">Nitrógeno Disponible (Suelo)</span>
-                <span className="metricValue" style={{ fontSize: "20px", color: "#15803d" }}>
-                  {activeSummary.sueloPrevio ? `${activeSummary.sueloPrevio.nDisponibleKgHa} kg N/ha` : "—"}
-                </span>
+                {activeSummary.sueloPrevio ? (
+                  <div style={{ marginTop: "4px" }}>
+                    <SemaforoBadge
+                      result={evaluarNitrogenoDisponible(activeSummary.sueloPrevio.nDisponibleKgHa)}
+                      valor={`${activeSummary.sueloPrevio.nDisponibleKgHa} kg N/ha`}
+                    />
+                  </div>
+                ) : (
+                  <span className="metricValue" style={{ fontSize: "20px", color: "var(--muted)" }}>—</span>
+                )}
                 <small className="metricNote">
                   Meta del cultivo: {activeSummary.metaKgHa.nitrogeno} kg N/ha
                 </small>
@@ -966,11 +1015,24 @@ export default function SoilPanel({
               {/* Tarjeta 4: Materia Orgánica & pH */}
               <div className="metricCard">
                 <span className="metricLabel">Materia Orgánica & pH</span>
-                <span className="metricValue" style={{ fontSize: "20px" }}>
-                  {activeSummary.sueloPrevio ? `${activeSummary.sueloPrevio.materiaOrganicaPct}%` : "—"}
-                </span>
+                {activeSummary.sueloPrevio ? (
+                  <div style={{ marginTop: "4px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                    <SemaforoBadge
+                      result={evaluarMateriaOrganica(activeSummary.sueloPrevio.materiaOrganicaPct)}
+                      valor={`${activeSummary.sueloPrevio.materiaOrganicaPct}%`}
+                      size="sm"
+                    />
+                    <SemaforoBadge
+                      result={evaluarPH(activeSummary.sueloPrevio.ph)}
+                      valor={`pH ${activeSummary.sueloPrevio.ph}`}
+                      size="sm"
+                    />
+                  </div>
+                ) : (
+                  <span className="metricValue" style={{ fontSize: "20px" }}>—</span>
+                )}
                 <small className="metricNote">
-                  pH: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.ph : "—"} · C.I.C: {activeSummary.sueloPrevio ? `${activeSummary.sueloPrevio.cicMeq} meq` : "—"}
+                  K: {activeSummary.sueloPrevio ? `${activeSummary.sueloPrevio.potasioPpm} ppm` : "—"} · C.I.C: {activeSummary.sueloPrevio ? `${activeSummary.sueloPrevio.cicMeq} meq` : "—"}
                 </small>
               </div>
             </div>
@@ -997,57 +1059,62 @@ export default function SoilPanel({
 
               {activeSummary.sueloPrevio ? (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
-                  <div className="soilParam">
-                    <span>Fósforo Bray</span>
-                    <strong style={{ fontSize: "15px" }}>{activeSummary.sueloPrevio.fosforoBrayPpm} ppm</strong>
-                    <small style={{ color: "var(--muted)", fontSize: "10.5px" }}>
-                      {activeSummary.sueloPrevio.fosforoBrayPpm >= 28 ? "Nivel muy alto" : "Nivel adecuado"}
-                    </small>
-                  </div>
-
-                  <div className="soilParam">
-                    <span>Nitrógeno Disponible</span>
-                    <strong style={{ fontSize: "15px" }}>{activeSummary.sueloPrevio.nDisponibleKgHa} kg/ha</strong>
-                    <small style={{ color: "var(--muted)", fontSize: "10.5px" }}>
-                      {activeSummary.sueloPrevio.nNo3Ppm} ppm N-NO₃
-                    </small>
-                  </div>
-
-                  <div className="soilParam">
-                    <span>Materia Orgánica</span>
-                    <strong style={{ fontSize: "15px" }}>{activeSummary.sueloPrevio.materiaOrganicaPct}%</strong>
-                    <small style={{ color: "var(--muted)", fontSize: "10.5px" }}>Excelente fertilidad física</small>
-                  </div>
-
-                  <div className="soilParam">
-                    <span>pH Actual</span>
-                    <strong style={{ fontSize: "15px" }}>{activeSummary.sueloPrevio.ph}</strong>
-                    <small style={{ color: "var(--muted)", fontSize: "10.5px" }}>Ligeramente ácido / Neutro</small>
-                  </div>
-
-                  <div className="soilParam">
-                    <span>Azufre (S)</span>
-                    <strong style={{ fontSize: "15px" }}>{activeSummary.sueloPrevio.azufrePpm} ppm</strong>
-                    <small style={{ color: "var(--muted)", fontSize: "10.5px" }}>Sulfatos solubles</small>
-                  </div>
-
-                  <div className="soilParam">
-                    <span>Potasio (K)</span>
-                    <strong style={{ fontSize: "15px" }}>{activeSummary.sueloPrevio.potasioPpm} ppm</strong>
-                    <small style={{ color: "var(--muted)", fontSize: "10.5px" }}>Muy bien provisto</small>
-                  </div>
-
-                  <div className="soilParam">
-                    <span>Zinc (Zn)</span>
-                    <strong style={{ fontSize: "15px" }}>{activeSummary.sueloPrevio.zincPpm} ppm</strong>
-                    <small style={{ color: "var(--muted)", fontSize: "10.5px" }}>Micronutriente crítico maíz</small>
-                  </div>
-
-                  <div className="soilParam">
-                    <span>C.I.C. y Sat. Bases</span>
-                    <strong style={{ fontSize: "15px" }}>{activeSummary.sueloPrevio.cicMeq} meq · {activeSummary.sueloPrevio.satBasesPct}%</strong>
-                    <small style={{ color: "var(--muted)", fontSize: "10.5px" }}>Ca: {activeSummary.sueloPrevio.calcioPpm} | Mg: {activeSummary.sueloPrevio.magnesioPpm}</small>
-                  </div>
+                  <SemaforoCell
+                    label="Potasio (K)"
+                    value={activeSummary.sueloPrevio.potasioPpm}
+                    unit="ppm"
+                    result={evaluarPotasio(activeSummary.sueloPrevio.potasioPpm)}
+                    compact
+                  />
+                  <SemaforoCell
+                    label="Fósforo Bray"
+                    value={activeSummary.sueloPrevio.fosforoBrayPpm}
+                    unit="ppm"
+                    result={evaluarFosforoBray(activeSummary.sueloPrevio.fosforoBrayPpm)}
+                    compact
+                  />
+                  <SemaforoCell
+                    label="Nitrógeno Disp."
+                    value={activeSummary.sueloPrevio.nDisponibleKgHa}
+                    unit="kg/ha"
+                    result={evaluarNitrogenoDisponible(activeSummary.sueloPrevio.nDisponibleKgHa)}
+                    compact
+                  />
+                  <SemaforoCell
+                    label="Materia Orgánica"
+                    value={activeSummary.sueloPrevio.materiaOrganicaPct}
+                    unit="%"
+                    result={evaluarMateriaOrganica(activeSummary.sueloPrevio.materiaOrganicaPct)}
+                    compact
+                  />
+                  <SemaforoCell
+                    label="pH Actual"
+                    value={activeSummary.sueloPrevio.ph}
+                    unit=""
+                    result={evaluarPH(activeSummary.sueloPrevio.ph)}
+                    compact
+                  />
+                  <SemaforoCell
+                    label="Azufre (S)"
+                    value={activeSummary.sueloPrevio.azufrePpm}
+                    unit="ppm"
+                    result={evaluarAzufre(activeSummary.sueloPrevio.azufrePpm)}
+                    compact
+                  />
+                  <SemaforoCell
+                    label="Zinc (Zn)"
+                    value={activeSummary.sueloPrevio.zincPpm}
+                    unit="ppm"
+                    result={evaluarZinc(activeSummary.sueloPrevio.zincPpm)}
+                    compact
+                  />
+                  <SemaforoCell
+                    label="Calcio (Ca)"
+                    value={activeSummary.sueloPrevio.calcioPpm}
+                    unit="ppm"
+                    result={evaluarCalcio(activeSummary.sueloPrevio.calcioPpm)}
+                    compact
+                  />
                 </div>
               ) : (
                 <div className="emptyState" style={{ padding: "20px" }}>
@@ -1072,23 +1139,32 @@ export default function SoilPanel({
                 </div>
 
                 <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: "10.5px", fontWeight: 700, color: "var(--muted)", display: "block" }}>TOTAL AGUA ÚTIL</span>
-                  <strong style={{ fontSize: "18px", color: "#0284c7" }}>
-                    {activeSummary.perfilHumedad ? `${activeSummary.perfilHumedad.totalAguaUtilMm} mm` : "—"}
-                  </strong>
+                  {activeSummary.perfilHumedad ? (
+                    <SemaforoBadge
+                      result={evaluarAguaUtilTotal(activeSummary.perfilHumedad.totalAguaUtilMm)}
+                      valor={`${activeSummary.perfilHumedad.totalAguaUtilMm} mm`}
+                    />
+                  ) : (
+                    <strong style={{ fontSize: "16px", color: "var(--muted)" }}>—</strong>
+                  )}
                 </div>
               </div>
 
               {activeSummary.perfilHumedad ? (
                 <div>
-                  <div style={{ marginBottom: "12px", background: "#f0f9ff", border: "1px solid #bae6fd", padding: "8px 12px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "12px", color: "#0369a1", fontWeight: 700 }}>
-                      Capacidad de almacenamiento del perfil:
-                    </span>
-                    <span style={{ fontSize: "12px", fontWeight: 800, color: "#0284c7" }}>
-                      {activeSummary.perfilHumedad.totalAguaUtilMm >= 280 ? "🌊 Excelente reserva hídrica (>280 mm)" : "💧 Buena recarga hídrica"}
-                    </span>
-                  </div>
+                  {(() => {
+                    const semA = evaluarAguaUtilTotal(activeSummary.perfilHumedad.totalAguaUtilMm);
+                    return (
+                      <div style={{ marginBottom: "12px", background: semA.bgColor, border: `1px solid ${semA.borderColor}`, padding: "8px 12px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: semA.textColor }}>
+                        <span style={{ fontWeight: 700 }}>
+                          {semA.icon} Capacidad de reserva: {semA.label}
+                        </span>
+                        <span style={{ fontSize: "11px", fontWeight: 600 }}>
+                          {semA.rangoReferencia}
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse" }}>
                     <thead>
@@ -1101,17 +1177,23 @@ export default function SoilPanel({
                       </tr>
                     </thead>
                     <tbody>
-                      {activeSummary.perfilHumedad.estratos.map((est, i) => (
-                        <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                          <td style={{ padding: "6px 4px", fontWeight: 700 }}>{est.profundidadCm} cm</td>
-                          <td style={{ padding: "6px 4px" }}>{est.humedadActualPct}%</td>
-                          <td style={{ padding: "6px 4px", color: "var(--muted)" }}>{est.pmpPct}%</td>
-                          <td style={{ padding: "6px 4px" }}>{est.aguaUtilPct}%</td>
-                          <td style={{ padding: "6px 4px", textAlign: "right", fontWeight: 800, color: "#0284c7" }}>
-                            {est.aguaUtilMm} mm
-                          </td>
-                        </tr>
-                      ))}
+                      {activeSummary.perfilHumedad.estratos.map((est, i) => {
+                        const pct = est.aguaUtilPct ?? 0;
+                        const colorEst = pct >= 60 ? "#15803d" : pct >= 35 ? "#b45309" : "#b91c1c";
+                        const iconEst = pct >= 60 ? "🟢" : pct >= 35 ? "🟡" : "🔴";
+                        return (
+                          <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "6px 4px", fontWeight: 700 }}>{est.profundidadCm} cm</td>
+                            <td style={{ padding: "6px 4px" }}>{est.humedadActualPct}%</td>
+                            <td style={{ padding: "6px 4px", color: "var(--muted)" }}>{est.pmpPct}%</td>
+                            <td style={{ padding: "6px 4px" }}>{est.aguaUtilPct}%</td>
+                            <td style={{ padding: "6px 4px", textAlign: "right", fontWeight: 800, color: colorEst }}>
+                              <span style={{ fontSize: "9px", marginRight: "3px" }}>{iconEst}</span>
+                              {est.aguaUtilMm} mm
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1219,12 +1301,33 @@ export default function SoilPanel({
                         <small style={{ color: "var(--muted)", fontWeight: 500, fontSize: "11px" }}>{s.cultivo}</small>
                       </td>
                       <td style={{ padding: "10px" }}>{s.superficieHa} ha</td>
-                      <td style={{ padding: "10px", fontWeight: 700, color: "#0284c7" }}>
-                        {s.perfilHumedad ? `${s.perfilHumedad.totalAguaUtilMm} mm` : "—"}
+                      <td style={{ padding: "10px" }}>
+                        {s.perfilHumedad ? (
+                          <span
+                            className={`pill ${evaluarAguaUtilTotal(s.perfilHumedad.totalAguaUtilMm).badgeClass}`}
+                            style={{ fontSize: "11px", fontWeight: 700 }}
+                          >
+                            {evaluarAguaUtilTotal(s.perfilHumedad.totalAguaUtilMm).icon} {s.perfilHumedad.totalAguaUtilMm} mm
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--muted)" }}>—</span>
+                        )}
                       </td>
                       <td style={{ padding: "10px" }}>
-                        <div>{s.sueloPrevio ? `${s.sueloPrevio.fosforoBrayPpm} ppm P` : "—"}</div>
-                        <small style={{ color: "var(--muted)", fontSize: "11px" }}>{s.sueloPrevio ? `${s.sueloPrevio.nDisponibleKgHa} kg N` : "—"}</small>
+                        {s.sueloPrevio ? (
+                          <div>
+                            <div>
+                              <strong style={{ color: evaluarFosforoBray(s.sueloPrevio.fosforoBrayPpm).textColor }}>
+                                {evaluarFosforoBray(s.sueloPrevio.fosforoBrayPpm).icon} {s.sueloPrevio.fosforoBrayPpm} ppm P
+                              </strong>
+                            </div>
+                            <small style={{ color: evaluarNitrogenoDisponible(s.sueloPrevio.nDisponibleKgHa).textColor, fontSize: "11px", fontWeight: 600 }}>
+                              {evaluarNitrogenoDisponible(s.sueloPrevio.nDisponibleKgHa).icon} {s.sueloPrevio.nDisponibleKgHa} kg N
+                            </small>
+                          </div>
+                        ) : (
+                          <span style={{ color: "var(--muted)" }}>—</span>
+                        )}
                       </td>
                       {isTambo ? (
                         <>
@@ -1266,9 +1369,21 @@ export default function SoilPanel({
                             )}
                           </td>
                           <td style={{ padding: "10px", fontSize: "11px" }}>
-                            <div><strong style={{ color: s.coberturaPct.nitrogeno >= 100 ? "#16a34a" : "#d97706" }}>N:</strong> {s.coberturaPct.nitrogeno}%</div>
-                            <div><strong style={{ color: s.coberturaPct.fosforo >= 100 ? "#16a34a" : "#0284c7" }}>P:</strong> {s.coberturaPct.fosforo}%</div>
-                            <div><strong style={{ color: s.coberturaPct.potasio >= 100 ? "#16a34a" : "#6366f1" }}>K:</strong> {s.coberturaPct.potasio}%</div>
+                            <div>
+                              <strong style={{ color: evaluarCoberturaNutriente(s.coberturaPct.nitrogeno).textColor }}>
+                                {evaluarCoberturaNutriente(s.coberturaPct.nitrogeno).icon} N: {s.coberturaPct.nitrogeno}%
+                              </strong>
+                            </div>
+                            <div>
+                              <strong style={{ color: evaluarCoberturaNutriente(s.coberturaPct.fosforo).textColor }}>
+                                {evaluarCoberturaNutriente(s.coberturaPct.fosforo).icon} P: {s.coberturaPct.fosforo}%
+                              </strong>
+                            </div>
+                            <div>
+                              <strong style={{ color: evaluarCoberturaNutriente(s.coberturaPct.potasio).textColor }}>
+                                {evaluarCoberturaNutriente(s.coberturaPct.potasio).icon} K: {s.coberturaPct.potasio}%
+                              </strong>
+                            </div>
                           </td>
                           <td style={{ padding: "10px" }}>
                             {s.nutrienteLimitante !== "Equilibrado" ? (
@@ -1306,14 +1421,31 @@ export default function SoilPanel({
                       ) : (
                         <>
                           <td style={{ padding: "10px" }}>
-                            {s.sueloPrevio ? `${s.sueloPrevio.materiaOrganicaPct}%` : "—"}
+                            {s.sueloPrevio ? (
+                              <span style={{ fontWeight: 700, color: evaluarMateriaOrganica(s.sueloPrevio.materiaOrganicaPct).textColor }}>
+                                {evaluarMateriaOrganica(s.sueloPrevio.materiaOrganicaPct).icon} {s.sueloPrevio.materiaOrganicaPct}%
+                              </span>
+                            ) : "—"}
                           </td>
                           <td style={{ padding: "10px" }}>
-                            {s.sueloPrevio ? s.sueloPrevio.ph : "—"}
+                            {s.sueloPrevio ? (
+                              <span style={{ fontWeight: 700, color: evaluarPH(s.sueloPrevio.ph).textColor }}>
+                                {evaluarPH(s.sueloPrevio.ph).icon} {s.sueloPrevio.ph}
+                              </span>
+                            ) : "—"}
                           </td>
                           <td style={{ padding: "10px" }}>
-                            <div>{s.sueloPrevio ? `${s.sueloPrevio.zincPpm} ppm Zn` : "—"}</div>
-                            <small style={{ color: "var(--muted)", fontSize: "11px" }}>{s.sueloPrevio ? `${s.sueloPrevio.azufrePpm} ppm S` : "—"}</small>
+                            {s.sueloPrevio ? (
+                              <div>
+                                <span style={{ color: evaluarZinc(s.sueloPrevio.zincPpm).textColor, fontWeight: 700 }}>
+                                  {evaluarZinc(s.sueloPrevio.zincPpm).icon} {s.sueloPrevio.zincPpm} ppm Zn
+                                </span>
+                                <br />
+                                <small style={{ color: evaluarAzufre(s.sueloPrevio.azufrePpm).textColor, fontWeight: 600 }}>
+                                  {evaluarAzufre(s.sueloPrevio.azufrePpm).icon} {s.sueloPrevio.azufrePpm} ppm S
+                                </small>
+                              </div>
+                            ) : "—"}
                           </td>
                           <td style={{ padding: "10px" }}>
                             {s.sueloPrevio ? `${s.sueloPrevio.cicMeq} meq` : "—"}

@@ -26,6 +26,20 @@ import {
   HJB_SOIL_SYNC_EVENT,
 } from "@/lib/soilManureData";
 import { agricultureData } from "@/lib/agricultureData";
+import {
+  evaluarPotasio,
+  evaluarFosforoBray,
+  evaluarNitrogenoDisponible,
+  evaluarMateriaOrganica,
+  evaluarPH,
+  evaluarAzufre,
+  evaluarZinc,
+  evaluarCalcio,
+  evaluarMagnesio,
+  evaluarAguaUtilTotal,
+  evaluarParametroLaboratorio,
+} from "@/lib/semaforoUtils";
+import { SemaforoCell, SemaforoBadge } from "@/components/SemaforoBadge";
 
 const CAMPOS_DISPONIBLES = ["Todos", "Tambo", "Racca", "Kitty", "Keuneke", "Aguilera"];
 
@@ -353,9 +367,62 @@ export default function SuelosPage() {
               </div>
             </div>
 
+            {/* Banner Informativo Modo Semáforo */}
+            <div
+              style={{
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: "10px",
+                padding: "10px 16px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "10px",
+                marginBottom: "16px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "16px" }}>🚦</span>
+                <div>
+                  <strong style={{ fontSize: "13px", color: "var(--slate-800)" }}>
+                    Diagnóstico Agronómico en Modo Semáforo:
+                  </strong>
+                  <span style={{ fontSize: "12px", color: "var(--slate-600)", marginLeft: "6px" }}>
+                    Cada parámetro se calibra automáticamente para indicar si los niveles son óptimos, medios o deficientes.
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "11px", fontWeight: 800 }}>
+                <span style={{ background: "#dcfce7", color: "#15803d", padding: "2px 8px", borderRadius: "6px", border: "1px solid #86efac", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  🟢 Óptimo / Suficiente
+                </span>
+                <span style={{ background: "#fef3c7", color: "#b45309", padding: "2px 8px", borderRadius: "6px", border: "1px solid #fcd34d", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  🟡 Medio / Alerta
+                </span>
+                <span style={{ background: "#fee2e2", color: "#b91c1c", padding: "2px 8px", borderRadius: "6px", border: "1px solid #fca5a5", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  🔴 Bajo / Crítico
+                </span>
+              </div>
+            </div>
+
             {/* Grilla de Tarjetas de Análisis Químicos */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "16px" }}>
               {filteredSoils.map((item) => {
+                const semK = evaluarPotasio(item.potasioPpm);
+                const semP = evaluarFosforoBray(item.fosforoBrayPpm);
+                const semN = evaluarNitrogenoDisponible(item.nDisponibleKgHa);
+                const semMO = evaluarMateriaOrganica(item.materiaOrganicaPct);
+                const semPH = evaluarPH(item.ph);
+                const semS = evaluarAzufre(item.azufrePpm);
+                const semZn = evaluarZinc(item.zincPpm);
+                const semCa = evaluarCalcio(item.calcioPpm);
+                const semMg = evaluarMagnesio(item.magnesioPpm);
+
+                const hasRed = [semK, semP, semN, semMO, semPH, semS, semZn, semCa, semMg].some((s) => s.level === "rojo");
+                const hasYellow = [semK, semP, semN, semMO, semPH, semS, semZn, semCa, semMg].some((s) => s.level === "amarillo");
+                const cardBorderLeft = hasRed ? "4px solid #ef4444" : hasYellow ? "4px solid #f59e0b" : "4px solid #10b981";
+
                 return (
                   <div
                     key={item.id}
@@ -365,6 +432,7 @@ export default function SuelosPage() {
                       background: "#ffffff",
                       borderRadius: "12px",
                       border: "1px solid var(--line)",
+                      borderLeft: cardBorderLeft,
                       boxShadow: "var(--shadow-sm)",
                       display: "flex",
                       flexDirection: "column",
@@ -387,76 +455,45 @@ export default function SuelosPage() {
                             🔬 {item.laboratorio} · Muestreo: {fmtDate(item.fecha)} · Prof: {item.profundidad}
                           </span>
                         </div>
+
+                        {/* Insignia global de fertilidad semáforo */}
+                        <span
+                          style={{
+                            background: hasRed ? "#fee2e2" : hasYellow ? "#fef3c7" : "#dcfce7",
+                            color: hasRed ? "#b91c1c" : hasYellow ? "#b45309" : "#15803d",
+                            border: `1px solid ${hasRed ? "#fca5a5" : hasYellow ? "#fcd34d" : "#86efac"}`,
+                            fontSize: "10.5px",
+                            fontWeight: 800,
+                            padding: "2px 8px",
+                            borderRadius: "999px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
+                          <span>{hasRed ? "🔴" : hasYellow ? "🟡" : "🟢"}</span>
+                          <span>{hasRed ? "Atención nutrientes" : hasYellow ? "Equilibrado" : "Excelente fertilidad"}</span>
+                        </span>
                       </div>
 
-                      {/* Parámetros Analíticos Clave */}
+                      {/* Parámetros Analíticos Clave con Modo Semáforo */}
                       <div
                         style={{
                           display: "grid",
                           gridTemplateColumns: "repeat(3, 1fr)",
                           gap: "8px",
-                          background: "var(--slate-50)",
-                          padding: "10px",
-                          borderRadius: "8px",
                           marginBottom: "12px",
                         }}
                       >
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>Fósforo Bray</span>
-                          <strong style={{ fontSize: "15px", color: item.fosforoBrayPpm >= 20 ? "#16a34a" : "#d97706" }}>
-                            {item.fosforoBrayPpm} ppm
-                          </strong>
-                        </div>
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>N Disponible</span>
-                          <strong style={{ fontSize: "15px", color: "var(--brand-700)" }}>
-                            {item.nDisponibleKgHa} kg/ha
-                          </strong>
-                        </div>
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>Mat. Orgánica</span>
-                          <strong style={{ fontSize: "15px", color: "var(--slate-800)" }}>
-                            {item.materiaOrganicaPct}%
-                          </strong>
-                        </div>
-
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>pH actual</span>
-                          <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
-                            {item.ph}
-                          </strong>
-                        </div>
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>Potasio (K)</span>
-                          <strong style={{ fontSize: "13.5px", color: "#0284c7" }}>
-                            {item.potasioPpm} ppm
-                          </strong>
-                        </div>
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>Calcio (Ca)</span>
-                          <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
-                            {item.calcioPpm} ppm
-                          </strong>
-                        </div>
-
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>Magnesio (Mg)</span>
-                          <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
-                            {item.magnesioPpm} ppm
-                          </strong>
-                        </div>
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>Azufre (S)</span>
-                          <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
-                            {item.azufrePpm} ppm
-                          </strong>
-                        </div>
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: "10.5px", color: "var(--muted)", display: "block" }}>Zinc (Zn)</span>
-                          <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
-                            {item.zincPpm} ppm
-                          </strong>
-                        </div>
+                        <SemaforoCell label="Potasio (K)" value={item.potasioPpm} unit="ppm" result={semK} />
+                        <SemaforoCell label="Fósforo Bray" value={item.fosforoBrayPpm} unit="ppm" result={semP} />
+                        <SemaforoCell label="N Disponible" value={item.nDisponibleKgHa} unit="kg/ha" result={semN} />
+                        <SemaforoCell label="Mat. Orgánica" value={item.materiaOrganicaPct} unit="%" result={semMO} />
+                        <SemaforoCell label="pH Actual" value={item.ph} unit="" result={semPH} />
+                        <SemaforoCell label="Azufre (S)" value={item.azufrePpm} unit="ppm" result={semS} />
+                        <SemaforoCell label="Zinc (Zn)" value={item.zincPpm} unit="ppm" result={semZn} />
+                        <SemaforoCell label="Calcio (Ca)" value={item.calcioPpm} unit="ppm" result={semCa} />
+                        <SemaforoCell label="Magnesio (Mg)" value={item.magnesioPpm} unit="ppm" result={semMg} />
                       </div>
 
                       {/* Observaciones o recomendación */}
@@ -674,48 +711,76 @@ export default function SuelosPage() {
         {activeTab === "humedad" && (
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))", gap: "16px" }}>
-              {filteredMoistures.map((m) => (
-                <div key={m.id} className="card" style={{ padding: "16px 20px", background: "#ffffff", borderRadius: "12px", border: "1px solid var(--line)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                    <div>
-                      <strong style={{ fontSize: "16px", color: "var(--slate-950)" }}>
-                        {m.campo} · {m.lote}
-                      </strong>
-                      <span style={{ fontSize: "12px", color: "var(--muted)", display: "block", marginTop: "2px" }}>
-                        🔬 {m.laboratorio} · Muestreo: {fmtDate(m.fecha)}
-                      </span>
+              {filteredMoistures.map((m) => {
+                const semAgua = evaluarAguaUtilTotal(m.totalAguaUtilMm);
+                return (
+                  <div
+                    key={m.id}
+                    className="card"
+                    style={{
+                      padding: "16px 20px",
+                      background: "#ffffff",
+                      borderRadius: "12px",
+                      border: "1px solid var(--line)",
+                      borderLeft: `5px solid ${semAgua.textColor}`,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ fontSize: "16px" }}>💧</span>
+                          <strong style={{ fontSize: "16px", color: "var(--slate-950)" }}>
+                            {m.campo} · {m.lote}
+                          </strong>
+                        </div>
+                        <span style={{ fontSize: "12px", color: "var(--muted)", display: "block", marginTop: "2px" }}>
+                          🔬 {m.laboratorio} · Muestreo: {fmtDate(m.fecha)}
+                        </span>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <span className={`pill ${semAgua.badgeClass}`} style={{ fontSize: "12.5px", fontWeight: 800 }}>
+                          {semAgua.icon} {m.totalAguaUtilMm} mm
+                        </span>
+                        <small style={{ display: "block", fontSize: "11px", fontWeight: 700, color: semAgua.textColor, marginTop: "3px" }}>
+                          {semAgua.label}
+                        </small>
+                      </div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span className="pill badgeBlue" style={{ fontSize: "13px", fontWeight: 700 }}>
-                        {m.totalAguaUtilMm} mm
-                      </span>
-                      <small style={{ display: "block", fontSize: "10.5px", color: "var(--muted)", marginTop: "2px" }}>Agua útil total</small>
-                    </div>
-                  </div>
 
-                  {/* Tabla de Estratos */}
-                  <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse", marginBottom: "12px" }}>
-                    <thead>
-                      <tr style={{ background: "var(--slate-50)", borderBottom: "1px solid var(--line)" }}>
-                        <th style={{ padding: "6px 8px", textAlign: "left" }}>Estrato</th>
-                        <th style={{ padding: "6px 8px", textAlign: "right" }}>Humedad</th>
-                        <th style={{ padding: "6px 8px", textAlign: "right" }}>PMP</th>
-                        <th style={{ padding: "6px 8px", textAlign: "right" }}>Agua Útil</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {m.estratos.map((est, idx) => (
-                        <tr key={idx} style={{ borderBottom: "1px solid var(--slate-100)" }}>
-                          <td style={{ padding: "6px 8px", fontWeight: 600 }}>{est.profundidadCm} cm</td>
-                          <td style={{ padding: "6px 8px", textAlign: "right" }}>{est.humedadActualPct}%</td>
-                          <td style={{ padding: "6px 8px", textAlign: "right", color: "var(--muted)" }}>{est.pmpPct}%</td>
-                          <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 700, color: "#0284c7" }}>
-                            {est.aguaUtilMm} mm ({est.aguaUtilPct}%)
-                          </td>
+                    <div style={{ background: semAgua.bgColor, border: `1px solid ${semAgua.borderColor}`, borderRadius: "8px", padding: "6px 10px", marginBottom: "12px", fontSize: "11.5px", color: semAgua.textColor }}>
+                      <strong>Estado del Perfil: </strong>{semAgua.explicacion}
+                      <div style={{ fontSize: "10px", opacity: 0.85, marginTop: "2px" }}>{semAgua.rangoReferencia}</div>
+                    </div>
+
+                    {/* Tabla de Estratos */}
+                    <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse", marginBottom: "12px" }}>
+                      <thead>
+                        <tr style={{ background: "var(--slate-50)", borderBottom: "1px solid var(--line)" }}>
+                          <th style={{ padding: "6px 8px", textAlign: "left" }}>Estrato</th>
+                          <th style={{ padding: "6px 8px", textAlign: "right" }}>Humedad</th>
+                          <th style={{ padding: "6px 8px", textAlign: "right" }}>PMP</th>
+                          <th style={{ padding: "6px 8px", textAlign: "right" }}>Agua Útil</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {m.estratos.map((est, idx) => {
+                          const pct = est.aguaUtilPct ?? 0;
+                          const colorEst = pct >= 60 ? "#15803d" : pct >= 35 ? "#b45309" : "#b91c1c";
+                          const iconEst = pct >= 60 ? "🟢" : pct >= 35 ? "🟡" : "🔴";
+                          return (
+                            <tr key={idx} style={{ borderBottom: "1px solid var(--slate-100)" }}>
+                              <td style={{ padding: "6px 8px", fontWeight: 600 }}>{est.profundidadCm} cm</td>
+                              <td style={{ padding: "6px 8px", textAlign: "right" }}>{est.humedadActualPct}%</td>
+                              <td style={{ padding: "6px 8px", textAlign: "right", color: "var(--muted)" }}>{est.pmpPct}%</td>
+                              <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 700, color: colorEst }}>
+                                <span style={{ fontSize: "10px", marginRight: "4px" }}>{iconEst}</span>
+                                {est.aguaUtilMm} mm ({est.aguaUtilPct}%)
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
 
                   {m.observaciones && (
                     <div style={{ fontSize: "11.5px", color: "var(--slate-600)", fontStyle: "italic", marginBottom: "12px" }}>
@@ -742,8 +807,9 @@ export default function SuelosPage() {
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
             {filteredMoistures.length === 0 && (
               <div style={{ padding: "48px 24px", textAlign: "center", background: "#ffffff", borderRadius: "12px", border: "1px solid var(--line)" }}>
@@ -789,14 +855,35 @@ export default function SuelosPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {item.parametros.map((p, idx) => (
-                        <tr key={idx} style={{ borderBottom: "1px solid var(--slate-100)" }}>
-                          <td style={{ padding: "5px 8px" }}>{p.nombre}</td>
-                          <td style={{ padding: "5px 8px", textAlign: "right", fontWeight: 700, color: "var(--slate-800)" }}>
-                            {p.valor} {p.unidad || ""}
-                          </td>
-                        </tr>
-                      ))}
+                      {item.parametros.map((p, idx) => {
+                        const numericVal = typeof p.valor === "number" ? p.valor : parseFloat(String(p.valor).replace(",", "."));
+                        const sem = !isNaN(numericVal) ? evaluarParametroLaboratorio(p.nombre, numericVal) : null;
+                        return (
+                          <tr key={idx} style={{ borderBottom: "1px solid var(--slate-100)" }}>
+                            <td style={{ padding: "6px 8px" }}>
+                              <div style={{ fontWeight: 600, color: "var(--slate-800)" }}>{p.nombre}</div>
+                              {sem && sem.explicacion && (
+                                <div style={{ fontSize: "10px", color: sem.textColor, marginTop: "1px" }}>
+                                  {sem.explicacion}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: "6px 8px", textAlign: "right", verticalAlign: "middle" }}>
+                              {sem ? (
+                                <SemaforoBadge
+                                  result={sem}
+                                  valor={`${p.valor} ${p.unidad || ""}`}
+                                  size="sm"
+                                />
+                              ) : (
+                                <strong style={{ color: "var(--slate-800)" }}>
+                                  {p.valor} {p.unidad || ""}
+                                </strong>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
 
