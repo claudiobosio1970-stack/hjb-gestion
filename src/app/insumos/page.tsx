@@ -18,6 +18,7 @@ import {
   registrarAjusteStock,
   eliminarAjusteStock,
   registrarCanjeGranoPellet,
+  trasladarStockPellet,
   calcularAutonomiaPelletTambo,
   getDietaTambo,
   saveDietaTambo,
@@ -113,6 +114,64 @@ export default function InsumosPage() {
     motivo: "Error de carga / Corrección de toneladas",
     ubicacion: "",
   });
+
+  // Modal Traslado de Pellet (de AFA Los Cardos a Tambo)
+  const [modalTrasladoPelletOpen, setModalTrasladoPelletOpen] = useState(false);
+  const [formTrasladoPellet, setFormTrasladoPellet] = useState<{
+    insumoId: string;
+    insumoNombre: string;
+    origen: string;
+    destino: string;
+    toneladas: number;
+    fecha: string;
+    remito: string;
+    observaciones: string;
+  }>({
+    insumoId: "pellet-soja",
+    insumoNombre: "Pellet de Soja Proteico (Harina)",
+    origen: "AFA Los Cardos",
+    destino: "Tambo",
+    toneladas: 5,
+    fecha: new Date().toISOString().split("T")[0],
+    remito: "",
+    observaciones: "",
+  });
+
+  function handleAbrirTrasladoPellet(item: InsumoStockItem, origen: string = "AFA Los Cardos", destino: string = "Tambo") {
+    const afaU = item.stockPorUbicacion?.find((u) => u.tipoLugar === "afa" || /afa|cardos/i.test(u.lugar));
+    const defTn = afaU && afaU.cantidad > 0 ? (afaU.cantidadTn || Number((afaU.cantidad / 1000).toFixed(2))) : 5;
+    setFormTrasladoPellet({
+      insumoId: item.id,
+      insumoNombre: item.nombre,
+      origen,
+      destino,
+      toneladas: defTn,
+      fecha: new Date().toISOString().split("T")[0],
+      remito: "",
+      observaciones: "",
+    });
+    setModalTrasladoPelletOpen(true);
+  }
+
+  function handleGuardarTrasladoPellet(e: React.FormEvent) {
+    e.preventDefault();
+    if (formTrasladoPellet.toneladas <= 0) {
+      alert("Por favor ingresá una cantidad en toneladas mayor a cero.");
+      return;
+    }
+    trasladarStockPellet({
+      pelletInsumoId: formTrasladoPellet.insumoId,
+      origen: formTrasladoPellet.origen,
+      destino: formTrasladoPellet.destino,
+      toneladas: formTrasladoPellet.toneladas,
+      fecha: formTrasladoPellet.fecha,
+      remito: formTrasladoPellet.remito.trim() || undefined,
+      observaciones: formTrasladoPellet.observaciones.trim() || undefined,
+    });
+    setModalTrasladoPelletOpen(false);
+    cargarDatos();
+    triggerFeedback(`✓ Traslado registrado: ${formTrasladoPellet.toneladas} Tn de ${formTrasladoPellet.insumoNombre} trasladadas de ${formTrasladoPellet.origen} a ${formTrasladoPellet.destino}.`);
+  }
 
   function cargarDatos() {
     setData(getStockActualInsumos());
@@ -414,14 +473,14 @@ export default function InsumosPage() {
       kgPellet,
       pelletInsumoId: formCanje.pelletInsumoId,
       pelletNombre: pelletItem?.nombre || "Pellet de Soja Proteico (Harina)",
-      destinoPellet: "Tambo", // ÚNICAMENTE Tambo
+      destinoPellet: formCanje.destinoPellet || "Tambo",
       comprobante: formCanje.comprobante.trim() || undefined,
       observaciones: formCanje.observaciones.trim() || undefined,
     });
 
     setModalCanjeOpen(false);
     cargarDatos();
-    triggerFeedback(`✓ Canje registrado y dieta actualizada (${formCanje.vacasEnOrdeñe} vacas @ ${formCanje.racionKgVacaDia} kg/día): +${tnPellet} Tn de ${pelletItem?.nombre || "Pellet"} (${diasAutonomia} días de alimentación en Tambo).`);
+    triggerFeedback(`✓ Canje registrado (${formCanje.destinoPellet === "AFA Los Cardos" ? "Stockeado en AFA Los Cardos" : "Destino Tambo"} · ${formCanje.vacasEnOrdeñe} vacas @ ${formCanje.racionKgVacaDia} kg/día): +${tnPellet} Tn de ${pelletItem?.nombre || "Pellet"} (${diasAutonomia} días de alimentación).`);
   }
 
   // Filtrado de la tabla de insumos
@@ -662,6 +721,7 @@ export default function InsumosPage() {
                   const hasUbicaciones = Boolean(
                     item.esCerealOGrano ||
                     item.esRollo ||
+                    item.id.includes("pellet") ||
                     (item.stockPorUbicacion && item.stockPorUbicacion.length > 0)
                   );
 
@@ -690,8 +750,16 @@ export default function InsumosPage() {
                               style={{
                                 fontSize: "10px",
                                 padding: "1px 6px",
-                                background: item.esCerealOGrano ? "rgba(217, 119, 6, 0.12)" : "rgba(37, 99, 235, 0.12)",
-                                color: item.esCerealOGrano ? "#92400e" : "#1e40af",
+                                background: item.esCerealOGrano
+                                  ? "rgba(217, 119, 6, 0.12)"
+                                  : item.id.includes("pellet")
+                                  ? "rgba(147, 51, 234, 0.12)"
+                                  : "rgba(37, 99, 235, 0.12)",
+                                color: item.esCerealOGrano
+                                  ? "#92400e"
+                                  : item.id.includes("pellet")
+                                  ? "#7e22ce"
+                                  : "#1e40af",
                                 fontWeight: 700,
                               }}
                             >
@@ -716,7 +784,12 @@ export default function InsumosPage() {
                                   border: u.cantidad > 0 ? "1px solid rgba(22, 163, 74, 0.25)" : "1px solid #e2e8f0",
                                 }}
                               >
-                                {u.icono} {u.lugar}: {item.esCerealOGrano ? `${(u.cantidadTn || 0).toLocaleString("es-AR")} Tn` : `${u.cantidad.toLocaleString("es-AR")} rollos`}
+                                {u.icono} {u.lugar}:{" "}
+                                {item.esCerealOGrano || item.id.includes("pellet")
+                                  ? `${(u.cantidadTn !== undefined ? u.cantidadTn : Number((u.cantidad / 1000).toFixed(2))).toLocaleString("es-AR")} Tn`
+                                  : item.esRollo
+                                  ? `${u.cantidad.toLocaleString("es-AR")} rollos`
+                                  : `${u.cantidad.toLocaleString("es-AR")} ${item.unidad}`}
                               </span>
                             ))}
                           </div>
@@ -747,10 +820,10 @@ export default function InsumosPage() {
                       </td>
 
                       <td style={{ textAlign: "right" }}>
-                        {item.esCerealOGrano ? (
+                        {item.esCerealOGrano || item.id.includes("pellet") ? (
                           <>
                             <div style={{ fontSize: "16px", fontWeight: 900, color: item.stockActual > 0 ? "#15803d" : "#64748b" }}>
-                              {(item.totalTn || 0).toLocaleString("es-AR")} Tn
+                              {(item.totalTn !== undefined ? item.totalTn : Number((item.stockActual / 1000).toFixed(2))).toLocaleString("es-AR")} Tn
                             </div>
                             <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
                               {item.stockActual.toLocaleString("es-AR")} kg netos
@@ -1018,9 +1091,10 @@ export default function InsumosPage() {
                 const isGrano =
                   (itemSel?.categoria === "Granos" || itemSel?.categoria === "Forrajes & Granos") &&
                   (itemSel?.id.includes("grano") || itemSel?.id === "silo-maiz");
+                const isPellet = Boolean(itemSel?.id.includes("pellet"));
                 return (
                   <>
-                    {/* SELECCIÓN DE LUGAR DE ACOPIO / DESTINO DEL GRANO */}
+                    {/* SELECCIÓN DE LUGAR DE ACOPIO / DESTINO DEL GRANO O PELLET */}
                     {isGrano ? (
                       <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "10px", padding: "12px 14px" }}>
                         <label style={{ display: "block", fontSize: "12.5px", fontWeight: 800, color: "#166534", marginBottom: "8px" }}>
@@ -1063,6 +1137,46 @@ export default function InsumosPage() {
                           })}
                         </div>
                       </div>
+                    ) : isPellet ? (
+                      <div style={{ background: "#faf5ff", border: "1.5px solid #d8b4fe", borderRadius: "10px", padding: "12px 14px" }}>
+                        <label style={{ display: "block", fontSize: "12.5px", fontWeight: 800, color: "#6b21a8", marginBottom: "8px" }}>
+                          📍 ¿A dónde va a quedar stockeado el pellet?:
+                        </label>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
+                          {[
+                            { id: "Tambo", tipo: "tambo", label: "🥛 Tambo (Galpón de Raciones)", icon: "🥛", desc: "Disponible en el campo para alimentar vacas" },
+                            { id: "AFA Los Cardos", tipo: "afa", label: "🌾 AFA Los Cardos (Planta)", icon: "🌾", desc: "Saldo / stock acopiado en planta AFA" },
+                          ].map((op) => {
+                            const isSelected = formIngreso.ubicacion === op.id || (!formIngreso.ubicacion && op.id === "Tambo");
+                            return (
+                              <button
+                                type="button"
+                                key={op.id}
+                                onClick={() => setFormIngreso({ ...formIngreso, ubicacion: op.id, tipoLugar: op.tipo as any })}
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "flex-start",
+                                  textAlign: "left",
+                                  padding: "8px 10px",
+                                  borderRadius: "8px",
+                                  border: isSelected ? "2px solid #9333ea" : "1px solid #cbd5e1",
+                                  background: isSelected ? "#ffffff" : "#f8fafc",
+                                  boxShadow: isSelected ? "0 2px 6px rgba(147, 51, 234, 0.15)" : "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, fontSize: "12.5px", color: isSelected ? "#7e22ce" : "#334155" }}>
+                                  <span>{op.icon}</span>
+                                  <span>{op.label}</span>
+                                  {isSelected && <span style={{ marginLeft: "auto", color: "#9333ea", fontSize: "13px" }}>✓</span>}
+                                </div>
+                                <span style={{ fontSize: "10.5px", color: "#64748b", marginTop: "2px" }}>{op.desc}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     ) : (
                       <div>
                         <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
@@ -1079,7 +1193,7 @@ export default function InsumosPage() {
                     )}
 
                     {/* CANTIDAD Y FECHA */}
-                    {isGrano ? (
+                    {isGrano || isPellet ? (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                         <div>
                           <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
@@ -1558,6 +1672,8 @@ export default function InsumosPage() {
                 <h4 style={{ fontSize: "13.5px", margin: "0 0 10px 0", color: "var(--slate-800)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                   {insumoUbicaciones.esCerealOGrano
                     ? "📍 Toneladas Disponibles por Lugar de Acopio"
+                    : insumoUbicaciones.id.includes("pellet")
+                    ? "📍 Stock de Pellet Disponible por Ubicación (Tambo / AFA)"
                     : "📍 Rollos Disponibles por Ubicación (Keuneke / Tambo)"}
                 </h4>
 
@@ -1598,11 +1714,11 @@ export default function InsumosPage() {
 
                       <div style={{ marginTop: "12px" }}>
                         <div style={{ fontSize: "20px", fontWeight: 900, color: ubic.cantidad > 0 ? "#166534" : "#94a3b8" }}>
-                          {insumoUbicaciones.esCerealOGrano
-                            ? `${(ubic.cantidadTn || 0).toLocaleString("es-AR")} Tn`
-                            : `${ubic.cantidad.toLocaleString("es-AR")} rollos`}
+                          {insumoUbicaciones.esCerealOGrano || insumoUbicaciones.id.includes("pellet")
+                            ? `${(ubic.cantidadTn !== undefined ? ubic.cantidadTn : Number((ubic.cantidad / 1000).toFixed(2))).toLocaleString("es-AR")} Tn`
+                            : `${ubic.cantidad.toLocaleString("es-AR")} ${insumoUbicaciones.unidad}`}
                         </div>
-                        {insumoUbicaciones.esCerealOGrano && (
+                        {(insumoUbicaciones.esCerealOGrano || insumoUbicaciones.id.includes("pellet")) && (
                           <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
                             {ubic.cantidad.toLocaleString("es-AR")} kg
                           </div>
@@ -1617,6 +1733,60 @@ export default function InsumosPage() {
                             }}
                           />
                         </div>
+
+                        {/* ACCIONES PARA PELLETS (TRASLADO A TAMBO Y AJUSTE) */}
+                        {insumoUbicaciones.id.includes("pellet") && (
+                          <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {(ubic.tipoLugar === "afa" || /afa|cardos/i.test(ubic.lugar)) && ubic.cantidad > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleAbrirTrasladoPellet(insumoUbicaciones, ubic.lugar, "Tambo");
+                                }}
+                                style={{
+                                  width: "100%",
+                                  padding: "6px 10px",
+                                  fontSize: "11.5px",
+                                  fontWeight: 700,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: "6px",
+                                  background: "#7e22ce",
+                                  color: "#ffffff",
+                                  borderRadius: "6px",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                                }}
+                              >
+                                🚚 Trasladar al Tambo
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const it = insumoUbicaciones;
+                                setInsumoUbicaciones(null);
+                                handleAbrirAjuste(it);
+                                setFormAjuste((prev) => ({ ...prev, ubicacion: ubic.lugar }));
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "5px 8px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                background: ubic.cantidad > 0 ? "rgba(126, 34, 206, 0.08)" : "#f8fafc",
+                                color: ubic.cantidad > 0 ? "#7e22ce" : "var(--slate-600)",
+                                borderRadius: "6px",
+                                border: "1px solid #cbd5e1",
+                                cursor: "pointer",
+                              }}
+                            >
+                              ⚖️ Ajustar stock en {ubic.lugar}
+                            </button>
+                          </div>
+                        )}
 
                         {insumoUbicaciones.esCerealOGrano && (
                           <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -2017,27 +2187,40 @@ export default function InsumosPage() {
 
                   <div>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>
-                      Destino del Subproducto:
+                      ¿Dónde queda stockeado el pellet?:
                     </label>
-                    <div
-                      style={{
-                        padding: "6px 10px",
-                        borderRadius: "6px",
-                        background: "#f8fafc",
-                        border: "1px solid #cbd5e1",
-                        fontSize: "13px",
-                        fontWeight: 700,
-                        color: "var(--slate-800)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        height: "35px",
-                      }}
-                    >
-                      <span>🥛 Tambo</span>
-                      <span className="pill badgeGreen" style={{ fontSize: "10px", padding: "1px 7px" }}>
-                        Exclusivo
-                      </span>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                      {[
+                        { id: "Tambo", label: "🥛 Tambo", sub: "Entrega física" },
+                        { id: "AFA Los Cardos", label: "🌾 AFA", sub: "Saldo en AFA" },
+                      ].map((d) => {
+                        const isSel = (formCanje.destinoPellet || "Tambo") === d.id;
+                        return (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => setFormCanje({ ...formCanje, destinoPellet: d.id })}
+                            style={{
+                              padding: "4px 8px",
+                              borderRadius: "6px",
+                              border: isSel ? "2px solid #16a34a" : "1px solid #cbd5e1",
+                              background: isSel ? "#f0fdf4" : "#ffffff",
+                              color: isSel ? "#166534" : "var(--slate-700)",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              textAlign: "left",
+                              height: "35px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span>{d.label}</span>
+                            {isSel && <span style={{ fontSize: "11px", color: "#16a34a" }}>✓</span>}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -2407,6 +2590,39 @@ export default function InsumosPage() {
                   1. Registrar Nuevo Ajuste de Inventario
                 </strong>
 
+                {/* Selección de Ubicación a Ajustar */}
+                {insumoAjuste.stockPorUbicacion && insumoAjuste.stockPorUbicacion.length > 0 && (
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "6px" }}>
+                      📍 Lugar / Depósito de stock a ajustar:
+                    </label>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      {insumoAjuste.stockPorUbicacion.map((u) => {
+                        const isSel = (formAjuste.ubicacion || insumoAjuste.stockPorUbicacion![0].lugar) === u.lugar;
+                        return (
+                          <button
+                            key={u.lugar}
+                            type="button"
+                            onClick={() => setFormAjuste({ ...formAjuste, ubicacion: u.lugar })}
+                            style={{
+                              padding: "6px 12px",
+                              borderRadius: "6px",
+                              border: isSel ? "2px solid #2563eb" : "1px solid #cbd5e1",
+                              background: isSel ? "#eff6ff" : "#ffffff",
+                              color: isSel ? "#1d4ed8" : "var(--slate-700)",
+                              fontWeight: isSel ? 800 : 600,
+                              fontSize: "12px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {u.icono} {u.lugar} ({(u.cantidadTn !== undefined ? `${u.cantidadTn} Tn` : `${u.cantidad.toLocaleString("es-AR")} ${insumoAjuste.unidad}`)})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Tipo de Ajuste */}
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "6px" }}>
@@ -2763,6 +2979,159 @@ export default function InsumosPage() {
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TRASLADO DE PELLET (DE AFA LOS CARDOS A TAMBO) */}
+      {modalTrasladoPelletOpen && (
+        <div className="modalOverlay" onClick={() => setModalTrasladoPelletOpen(false)}>
+          <div
+            className="modalContent"
+            style={{ maxWidth: "480px", width: "95%", borderRadius: "12px", overflow: "hidden", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "16px 20px",
+                borderBottom: "1px solid var(--line)",
+                background: "#faf5ff",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <span className="pill badgePurple" style={{ fontSize: "11px", marginBottom: "4px" }}>
+                  Movimiento entre Depósitos / Acopios
+                </span>
+                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#6b21a8" }}>
+                  🚚 Trasladar Pellet al Tambo
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalTrasladoPelletOpen(false)}
+                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--slate-400)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleGuardarTrasladoPellet} style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div style={{ background: "#f8fafc", padding: "10px 12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: "11px", color: "var(--slate-500)", fontWeight: 600 }}>Insumo a Trasladar:</div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--slate-900)" }}>
+                  🥣 {formTrasladoPellet.insumoNombre}
+                </div>
+              </div>
+
+              {/* Origen y Destino */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "8px" }}>
+                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "10px", borderRadius: "8px", textAlign: "center" }}>
+                  <div style={{ fontSize: "10.5px", color: "#1e40af", fontWeight: 700 }}>ORIGEN (Se descuenta)</div>
+                  <div style={{ fontSize: "13px", fontWeight: 800, color: "#1e3a8a", marginTop: "2px" }}>
+                    🌾 {formTrasladoPellet.origen}
+                  </div>
+                </div>
+                <div style={{ fontSize: "18px", color: "var(--slate-400)" }}>➔</div>
+                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "10px", borderRadius: "8px", textAlign: "center" }}>
+                  <div style={{ fontSize: "10.5px", color: "#166534", fontWeight: 700 }}>DESTINO (Ingresa)</div>
+                  <div style={{ fontSize: "13px", fontWeight: 800, color: "#14532d", marginTop: "2px" }}>
+                    🥛 {formTrasladoPellet.destino}
+                  </div>
+                </div>
+              </div>
+
+              {/* Toneladas y Kilos */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                    Cantidad a Trasladar (Tn):
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={formTrasladoPellet.toneladas}
+                      onChange={(e) => setFormTrasladoPellet({ ...formTrasladoPellet, toneladas: parseFloat(e.target.value) || 0 })}
+                      style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 800 }}
+                      required
+                    />
+                    <span style={{ fontWeight: 700, color: "var(--slate-600)" }}>Tn</span>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                    Equivalente en kilos (kg):
+                  </label>
+                  <div style={{ padding: "8px 10px", background: "#f1f5f9", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 800, color: "var(--slate-800)" }}>
+                    {Math.round(formTrasladoPellet.toneladas * 1000).toLocaleString("es-AR")} kg
+                  </div>
+                </div>
+              </div>
+
+              {/* Fecha y Remito */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                    Fecha del Traslado:
+                  </label>
+                  <input
+                    type="date"
+                    value={formTrasladoPellet.fecha}
+                    onChange={(e) => setFormTrasladoPellet({ ...formTrasladoPellet, fecha: e.target.value })}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                    Remito / Chofer / Guía:
+                  </label>
+                  <input
+                    type="text"
+                    value={formTrasladoPellet.remito}
+                    onChange={(e) => setFormTrasladoPellet({ ...formTrasladoPellet, remito: e.target.value })}
+                    placeholder="Ej: Remito AFA 004829"
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Observaciones adicionales:
+                </label>
+                <input
+                  type="text"
+                  value={formTrasladoPellet.observaciones}
+                  onChange={(e) => setFormTrasladoPellet({ ...formTrasladoPellet, observaciones: e.target.value })}
+                  placeholder="Ej: Retiro con camión propio / Chasis cerealero"
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
+                <button
+                  type="button"
+                  className="ghostButton"
+                  onClick={() => setModalTrasladoPelletOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="brandButton"
+                  style={{ background: "#7e22ce", borderColor: "#6b21a8" }}
+                >
+                  ✓ Confirmar Traslado
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

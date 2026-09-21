@@ -1057,15 +1057,21 @@ export function getStockActualInsumos(): {
       }
     } else if (catItem?.id.includes("pellet")) {
       lugar = lugar || "Tambo";
-      tipoLugar = "tambo";
-      icono = "🥛";
+      if (/afa|cardos/i.test(lugar)) {
+        tipoLugar = "afa";
+        icono = "🌾";
+      } else {
+        tipoLugar = "tambo";
+        icono = "🥛";
+      }
     } else {
       lugar = lugar || catItem?.ubicacion || "Depósito Central";
       tipoLugar = "galpon";
       icono = "🏢";
     }
 
-    const cantTn = isCerealOGrano ? Number((ing.cantidad / 1000).toFixed(2)) : undefined;
+    const isGranoOPellet = isCerealOGrano || Boolean(catItem?.id.includes("pellet"));
+    const cantTn = isGranoOPellet ? Number((ing.cantidad / 1000).toFixed(2)) : undefined;
 
     // Acreditar en desglose por ubicación
     addUbicacionStock(
@@ -1621,6 +1627,11 @@ export function getStockActualInsumos(): {
     );
 
     // Movimiento ingreso de pellet
+    const esAfaPellet = /afa|cardos/i.test(c.destinoPellet || "");
+    const lugarDestinoPellet = esAfaPellet ? "AFA Los Cardos" : (c.destinoPellet || "Tambo");
+    const tipoLugarDestinoPellet = esAfaPellet ? "afa" : "tambo";
+    const iconoDestinoPellet = esAfaPellet ? "🌾" : "🥛";
+
     movimientos.push({
       id: `mov-canje-pellet-${c.id}`,
       insumoId: c.pelletInsumoId,
@@ -1630,28 +1641,28 @@ export function getStockActualInsumos(): {
       cantidad: kgPellet,
       cantidadTn: c.toneladasPellet,
       unidad: "kg",
-      ubicacion: c.destinoPellet || "Tambo",
-      detalle: `Ingreso por canje en ${c.acopioOrigen}: +${c.toneladasPellet} Tn de pellet (de ${c.toneladasGrano} Tn de ${c.cerealNombre} al ${c.porcentajeCanje}%)${c.comprobante ? ` · Liq: ${c.comprobante}` : ""}`,
-      referencia: c.destinoPellet || "Tambo",
+      ubicacion: lugarDestinoPellet,
+      detalle: `Ingreso por canje en ${c.acopioOrigen} (Destino: ${lugarDestinoPellet}): +${c.toneladasPellet} Tn de pellet (de ${c.toneladasGrano} Tn de ${c.cerealNombre} al ${c.porcentajeCanje}%)${c.comprobante ? ` · Liq: ${c.comprobante}` : ""}`,
+      referencia: lugarDestinoPellet,
     });
 
-    // Agregar desglose por ubicación de Tambo para el pellet
+    // Agregar desglose por ubicación de Tambo o AFA para el pellet
     addUbicacionStock(
       c.pelletInsumoId,
-      c.destinoPellet || "Tambo",
-      "tambo",
-      "🥛",
+      lugarDestinoPellet,
+      tipoLugarDestinoPellet,
+      iconoDestinoPellet,
       kgPellet,
       {
         id: `sub-canje-pellet-${c.id}`,
         fecha: c.fecha,
-        tipo: "Ingreso Canje AFA",
-        campo: "Tambo",
+        tipo: esAfaPellet ? "Canje en AFA (Acopio)" : "Ingreso Canje AFA",
+        campo: lugarDestinoPellet,
         cantidad: kgPellet,
         cantidadTn: c.toneladasPellet,
         unidad: "kg",
         referencia: `${c.acopioOrigen} · Canje`,
-        detalle: `Ingreso de ${c.toneladasPellet} Tn de Pellet por canje de ${c.toneladasGrano} Tn de ${c.cerealNombre} (${c.porcentajeCanje}%)`,
+        detalle: `Ingreso de ${c.toneladasPellet} Tn de Pellet (${lugarDestinoPellet}) por canje de ${c.toneladasGrano} Tn de ${c.cerealNombre} (${c.porcentajeCanje}%)`,
       }
     );
   }
@@ -1682,7 +1693,8 @@ export function getStockActualInsumos(): {
 
     const isCerealOGrano = (base.categoria === "Granos" || base.categoria === "Forrajes & Granos") && (base.id.includes("grano") || base.id === "silo-maiz");
     const isRollo = base.id.includes("rollo");
-    const totalTn = isCerealOGrano ? Number((stockActual / 1000).toFixed(2)) : undefined;
+    const isPellet = base.id.includes("pellet");
+    const totalTn = (isCerealOGrano || isPellet) ? Number((stockActual / 1000).toFixed(2)) : undefined;
 
     // Calcular desglose de stock por ubicación (Silos, Cooperativa, Puerto, AFA Los Cardos, Keuneke, Tambo)
     let stockPorUbicacion: StockUbicacionBreakdown[] = [];
@@ -1693,7 +1705,7 @@ export function getStockActualInsumos(): {
       const sumList = list.reduce((acc, x) => acc + x.cantidad, 0);
 
       stockPorUbicacion = list.map((entry) => {
-        const cantidadTn = isCerealOGrano ? Number((entry.cantidad / 1000).toFixed(2)) : undefined;
+        const cantidadTn = (isCerealOGrano || isPellet) ? Number((entry.cantidad / 1000).toFixed(2)) : undefined;
         const pct = sumList > 0 ? Math.min(100, Math.round((entry.cantidad / sumList) * 100)) : 0;
         return {
           lugar: entry.lugar,
@@ -1701,7 +1713,7 @@ export function getStockActualInsumos(): {
           icono: entry.icono,
           cantidad: Math.round(entry.cantidad * 10) / 10,
           cantidadTn,
-          unidad: isCerealOGrano ? "Tn" : base.unidad,
+          unidad: (isCerealOGrano || isPellet) ? "Tn" : base.unidad,
           porcentaje: pct,
           movimientosCount: entry.detalles.length,
           detalles: entry.detalles,
@@ -1733,6 +1745,27 @@ export function getStockActualInsumos(): {
             });
           }
         }
+      } else if (isPellet) {
+        const defaultLocationsPellet: { lugar: string; tipoLugar: StockUbicacionBreakdown["tipoLugar"]; icono: string }[] = [
+          { lugar: "Tambo", tipoLugar: "tambo", icono: "🥛" },
+          { lugar: "AFA Los Cardos", tipoLugar: "afa", icono: "🌾" },
+        ];
+        for (const def of defaultLocationsPellet) {
+          const exists = stockPorUbicacion.some((u) => u.lugar === def.lugar || (def.tipoLugar === "afa" && u.tipoLugar === "afa") || (def.tipoLugar === "tambo" && u.tipoLugar === "tambo"));
+          if (!exists) {
+            stockPorUbicacion.push({
+              lugar: def.lugar,
+              tipoLugar: def.tipoLugar,
+              icono: def.icono,
+              cantidad: 0,
+              cantidadTn: 0,
+              unidad: "Tn",
+              porcentaje: 0,
+              movimientosCount: 0,
+              detalles: [],
+            });
+          }
+        }
       }
     } else {
       // Si aún no hay labores de cosecha registradas, inicializar las ubicaciones solicitadas en 0
@@ -1748,6 +1781,24 @@ export function getStockActualInsumos(): {
           { lugar: "Campo Keuneke", tipoLugar: "campo", icono: "🏠", cantidad: 0, unidad: "Rollos", porcentaje: 0, movimientosCount: 0, detalles: [] },
           { lugar: "Tambo", tipoLugar: "tambo", icono: "🥛", cantidad: 0, unidad: "Rollos", porcentaje: 0, movimientosCount: 0, detalles: [] },
         ];
+      } else if (isPellet) {
+        stockPorUbicacion = [
+          { lugar: "Tambo", tipoLugar: "tambo", icono: "🥛", cantidad: 0, cantidadTn: 0, unidad: "Tn", porcentaje: 0, movimientosCount: 0, detalles: [] },
+          { lugar: "AFA Los Cardos", tipoLugar: "afa", icono: "🌾", cantidad: 0, cantidadTn: 0, unidad: "Tn", porcentaje: 0, movimientosCount: 0, detalles: [] },
+        ];
+      }
+    }
+
+    // Si el pellet tiene stock físico registrado pero sus ubicaciones suman 0 (ej: stock inicial), asignarlo a Tambo
+    if (isPellet && stockActual > 0) {
+      const sumUbic = stockPorUbicacion.reduce((acc, u) => acc + u.cantidad, 0);
+      if (sumUbic === 0) {
+        const tamboU = stockPorUbicacion.find((u) => u.tipoLugar === "tambo" || /tambo/i.test(u.lugar));
+        if (tamboU) {
+          tamboU.cantidad = stockActual;
+          tamboU.cantidadTn = Number((stockActual / 1000).toFixed(2));
+          tamboU.porcentaje = 100;
+        }
       }
     }
 
@@ -1849,3 +1900,56 @@ export function getStockActualInsumos(): {
     insumosEnAlerta,
   };
 }
+
+/**
+ * Traslada stock de pellet entre ubicaciones (ej: de "AFA Los Cardos" al "Tambo")
+ * Registra dos movimientos de ajuste compensados para mantener el balance total exacto.
+ */
+export function trasladarStockPellet({
+  pelletInsumoId = "pellet-soja",
+  origen = "AFA Los Cardos",
+  destino = "Tambo",
+  toneladas,
+  fecha,
+  remito,
+  observaciones,
+}: {
+  pelletInsumoId?: string;
+  origen?: string;
+  destino?: string;
+  toneladas: number;
+  fecha?: string;
+  remito?: string;
+  observaciones?: string;
+}) {
+  const kg = Math.round(toneladas * 1000);
+  const f = fecha || new Date().toISOString().split("T")[0];
+  const catItem = INSUMOS_BASE_CATALOGO.find((x) => x.id === pelletInsumoId);
+
+  // 1. Restar de origen (ej: AFA Los Cardos)
+  registrarAjusteStock({
+    insumoId: pelletInsumoId,
+    fecha: f,
+    tipo: "restar",
+    cantidadDelta: -kg,
+    cantidadTn: -toneladas,
+    stockResultante: 0,
+    motivo: `Traslado a ${destino}${remito ? ` · Remito/Guía: ${remito}` : ""}${observaciones ? ` (${observaciones})` : ""}`,
+    ubicacion: origen,
+    tipoLugar: /afa|cardos/i.test(origen) ? "afa" : "tambo",
+  });
+
+  // 2. Sumar a destino (ej: Tambo)
+  registrarAjusteStock({
+    insumoId: pelletInsumoId,
+    fecha: f,
+    tipo: "sumar",
+    cantidadDelta: kg,
+    cantidadTn: toneladas,
+    stockResultante: 0,
+    motivo: `Recepción desde ${origen}${remito ? ` · Remito/Guía: ${remito}` : ""}${observaciones ? ` (${observaciones})` : ""}`,
+    ubicacion: destino,
+    tipoLugar: /tambo/i.test(destino) ? "tambo" : "afa",
+  });
+}
+
