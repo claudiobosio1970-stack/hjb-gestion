@@ -49,7 +49,7 @@ export default function InicioPage() {
   const [formParametros, setFormParametros] = useState({
     litrosPromedioVO: 27.0,
     precioLitroLecheArs: 548.0,
-    otrosCostosOperativosVODiaArs: 0,
+    costoOperativoLitrosVO: 10.0,
     precioNovilloGordoVivoArs: 4200,
   });
   const [feedbackParametros, setFeedbackParametros] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export default function InicioPage() {
     setFormParametros({
       litrosPromedioVO: d.litrosPromedioVO ?? 27.0,
       precioLitroLecheArs: d.precioLitroLecheArs ?? 548.0,
-      otrosCostosOperativosVODiaArs: d.otrosCostosOperativosVODiaArs ?? 0,
+      costoOperativoLitrosVO: d.costoOperativoLitrosVO ?? 10.0,
       precioNovilloGordoVivoArs: d.precioNovilloGordoVivoArs ?? 4200,
     });
   }
@@ -90,12 +90,17 @@ export default function InicioPage() {
 
   function handleGuardarParametros(e: React.FormEvent) {
     e.preventDefault();
+    const precioLecheNum = Number(formParametros.precioLitroLecheArs);
+    const ltsOpNum = Number(formParametros.costoOperativoLitrosVO);
+    const otrosCostosArs = Math.round(ltsOpNum * precioLecheNum);
+
     const updated = saveDietaTambo({
       litrosPromedioVO: Number(formParametros.litrosPromedioVO),
-      precioLitroLecheArs: Number(formParametros.precioLitroLecheArs),
-      otrosCostosOperativosVODiaArs: Number(formParametros.otrosCostosOperativosVODiaArs),
+      precioLitroLecheArs: precioLecheNum,
+      costoOperativoLitrosVO: ltsOpNum,
+      otrosCostosOperativosVODiaArs: otrosCostosArs,
       precioNovilloGordoVivoArs: Number(formParametros.precioNovilloGordoVivoArs),
-      actualizadoPor: "Tablero Inicio (Parámetros Reales)",
+      actualizadoPor: "Tablero Inicio (Parámetros Reales HJB)",
     });
     setDieta(updated);
     setFeedbackParametros("✓ Parámetros actualizados y sincronizados con éxito.");
@@ -114,7 +119,8 @@ export default function InicioPage() {
 
   const litrosPromedioVO = dieta.litrosPromedioVO ?? 27.0;
   const precioLitroLeche = dieta.precioLitroLecheArs ?? 548.0;
-  const otrosCostosOperativosVO = dieta.otrosCostosOperativosVODiaArs ?? 0;
+  const costoOperativoLitrosVO = dieta.costoOperativoLitrosVO ?? 10.0;
+  const otrosCostosOperativosVO = Math.round(costoOperativoLitrosVO * precioLitroLeche);
 
   const litrosTotalesDia = Math.round(vacasVO * litrosPromedioVO);
   const facturacionLecheDia = Math.round(litrosTotalesDia * precioLitroLeche);
@@ -753,12 +759,15 @@ export default function InicioPage() {
                 </div>
 
                 <div style={{ background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                  <div style={{ fontSize: "11px", color: "var(--slate-500)", fontWeight: 700 }}>3. [-] Otros Costos Tambo</div>
-                  <div style={{ fontSize: "18px", fontWeight: 900, color: "var(--slate-700)" }}>
+                  <div style={{ fontSize: "11px", color: "#1e40af", fontWeight: 700 }}>3. [-] Costo Operativo Tambo</div>
+                  <div style={{ fontSize: "18px", fontWeight: 900, color: "#1e40af" }}>
                     -${otrosCostosOperativosVO.toLocaleString("es-AR")} <span style={{ fontSize: "12px", fontWeight: 500 }}>/ d</span>
                   </div>
-                  <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
-                    Personal, energía, sanidad
+                  <div style={{ fontSize: "11px", color: "#1e40af", fontWeight: 700, marginTop: "2px" }}>
+                    {costoOperativoLitrosVO} lts/VO (@ ${precioLitroLeche}/lt)
+                  </div>
+                  <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>
+                    Sueldos, luz, gasoil, sanidad, fletes
                   </div>
                 </div>
 
@@ -1444,18 +1453,18 @@ export default function InicioPage() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Otros Costos Tambo ($/VO/d):
+                    Costo Operativo Tambo (Litros/VO/d):
                   </label>
                   <input
                     type="number"
-                    step="10"
+                    step="0.5"
                     min="0"
-                    value={formParametros.otrosCostosOperativosVODiaArs}
-                    onChange={(e) => setFormParametros({ ...formParametros, otrosCostosOperativosVODiaArs: Number(e.target.value) })}
+                    value={formParametros.costoOperativoLitrosVO}
+                    onChange={(e) => setFormParametros({ ...formParametros, costoOperativoLitrosVO: Number(e.target.value) })}
                     style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--line)", fontSize: "14px" }}
                   />
                   <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
-                    Sueldos, luz, gasoil, sanidad (0 si no aplica)
+                    Estándar HJB: 10 lts/VO (~${Math.round(formParametros.costoOperativoLitrosVO * formParametros.precioLitroLecheArs).toLocaleString("es-AR")}/VO/d)
                   </div>
                 </div>
 

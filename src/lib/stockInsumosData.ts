@@ -586,7 +586,8 @@ export interface DietaTamboConfig {
   vacasPreparto?: number;
   litrosPromedioVO?: number; // Lts/VO/día de control lechero o tanque
   precioLitroLecheArs?: number; // $/lt liquidación leche
-  otrosCostosOperativosVODiaArs?: number; // $/VO/d otros costos del tambo (personal, energía, sanidad, flete)
+  costoOperativoLitrosVO?: number; // Litros/VO/día de costo operativo del tambo (estándar HJB: 10 lts)
+  otrosCostosOperativosVODiaArs?: number; // $/VO/d otros costos en pesos (calculado o manual)
   precioNovilloGordoVivoArs?: number; // $/kg vivo novillo terminado faena
   racionesKgDia: {
     "pellet-soja": number;
@@ -604,7 +605,8 @@ export const DIETA_TAMBO_HJB_DEFAULT: DietaTamboConfig = {
   vacasPreparto: 25, // Lote de vacas secas / transición preparto
   litrosPromedioVO: 27.0, // Promedio histórico de control lechero HJB
   precioLitroLecheArs: 548.0, // $/lt cobrado
-  otrosCostosOperativosVODiaArs: 0, // $/VO/d otros costos operativos (personal, luz, sanidad)
+  costoOperativoLitrosVO: 10.0, // 10 litros/VO/día de costo operativo real HJB
+  otrosCostosOperativosVODiaArs: 5480.0, // 10 lts × $548 = $5.480 / VO / día
   precioNovilloGordoVivoArs: 4200, // $/kg vivo novillo pesado faena
   racionesKgDia: {
     "pellet-soja": 2.5, // 2.5 kg/VO/día de Pellet de Soja Proteico (Harina)
@@ -630,12 +632,19 @@ export function getDietaTambo(): DietaTamboConfig {
     const raw = localStorage.getItem(STORAGE_DIETA_TAMBO);
     if (!raw) return { ...DIETA_TAMBO_HJB_DEFAULT };
     const parsed = JSON.parse(raw);
+    const precioLeche = parsed.precioLitroLecheArs !== undefined ? Number(parsed.precioLitroLecheArs) : DIETA_TAMBO_HJB_DEFAULT.precioLitroLecheArs;
+    const ltsOp = parsed.costoOperativoLitrosVO !== undefined ? Number(parsed.costoOperativoLitrosVO) : (DIETA_TAMBO_HJB_DEFAULT.costoOperativoLitrosVO ?? 10.0);
+    const otrosCostosArs = parsed.otrosCostosOperativosVODiaArs !== undefined && parsed.otrosCostosOperativosVODiaArs > 0
+      ? Number(parsed.otrosCostosOperativosVODiaArs)
+      : Math.round(ltsOp * (precioLeche ?? 548));
+
     return {
       vacasEnOrdeñe: parsed.vacasEnOrdeñe || DIETA_TAMBO_HJB_DEFAULT.vacasEnOrdeñe,
       vacasPreparto: parsed.vacasPreparto || DIETA_TAMBO_HJB_DEFAULT.vacasPreparto,
       litrosPromedioVO: parsed.litrosPromedioVO !== undefined ? Number(parsed.litrosPromedioVO) : DIETA_TAMBO_HJB_DEFAULT.litrosPromedioVO,
-      precioLitroLecheArs: parsed.precioLitroLecheArs !== undefined ? Number(parsed.precioLitroLecheArs) : DIETA_TAMBO_HJB_DEFAULT.precioLitroLecheArs,
-      otrosCostosOperativosVODiaArs: parsed.otrosCostosOperativosVODiaArs !== undefined ? Number(parsed.otrosCostosOperativosVODiaArs) : DIETA_TAMBO_HJB_DEFAULT.otrosCostosOperativosVODiaArs,
+      precioLitroLecheArs: precioLeche,
+      costoOperativoLitrosVO: ltsOp,
+      otrosCostosOperativosVODiaArs: otrosCostosArs,
       precioNovilloGordoVivoArs: parsed.precioNovilloGordoVivoArs !== undefined ? Number(parsed.precioNovilloGordoVivoArs) : DIETA_TAMBO_HJB_DEFAULT.precioNovilloGordoVivoArs,
       racionesKgDia: {
         ...DIETA_TAMBO_HJB_DEFAULT.racionesKgDia,
@@ -652,12 +661,19 @@ export function getDietaTambo(): DietaTamboConfig {
 export function saveDietaTambo(nueva: Partial<DietaTamboConfig>): DietaTamboConfig {
   if (typeof window === "undefined") return { ...DIETA_TAMBO_HJB_DEFAULT };
   const current = getDietaTambo();
+  const precioLeche = nueva.precioLitroLecheArs !== undefined ? Number(nueva.precioLitroLecheArs) : (current.precioLitroLecheArs ?? 548.0);
+  const ltsOp = nueva.costoOperativoLitrosVO !== undefined ? Number(nueva.costoOperativoLitrosVO) : (current.costoOperativoLitrosVO ?? 10.0);
+  const otrosCostos = nueva.otrosCostosOperativosVODiaArs !== undefined
+    ? Number(nueva.otrosCostosOperativosVODiaArs)
+    : Math.round(ltsOp * precioLeche);
+
   const updated: DietaTamboConfig = {
     vacasEnOrdeñe: nueva.vacasEnOrdeñe !== undefined ? Math.max(1, nueva.vacasEnOrdeñe) : current.vacasEnOrdeñe,
     vacasPreparto: nueva.vacasPreparto !== undefined ? Math.max(0, nueva.vacasPreparto) : current.vacasPreparto,
     litrosPromedioVO: nueva.litrosPromedioVO !== undefined ? Number(nueva.litrosPromedioVO) : (current.litrosPromedioVO ?? 27.0),
-    precioLitroLecheArs: nueva.precioLitroLecheArs !== undefined ? Number(nueva.precioLitroLecheArs) : (current.precioLitroLecheArs ?? 548.0),
-    otrosCostosOperativosVODiaArs: nueva.otrosCostosOperativosVODiaArs !== undefined ? Number(nueva.otrosCostosOperativosVODiaArs) : (current.otrosCostosOperativosVODiaArs ?? 0),
+    precioLitroLecheArs: precioLeche,
+    costoOperativoLitrosVO: ltsOp,
+    otrosCostosOperativosVODiaArs: otrosCostos,
     precioNovilloGordoVivoArs: nueva.precioNovilloGordoVivoArs !== undefined ? Number(nueva.precioNovilloGordoVivoArs) : (current.precioNovilloGordoVivoArs ?? 4200),
     racionesKgDia: {
       ...current.racionesKgDia,
