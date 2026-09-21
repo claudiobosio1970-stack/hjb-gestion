@@ -166,6 +166,96 @@ export const DEFAULT_LIQUID_MANURE_ANALYSIS: LiquidManureAnalysis = {
   observaciones: "Muestreo representativo de fosa de efluentes líquidos previa homogenización. Calibración operativa de tanque a 11.000 L (11 m³).",
 };
 
+export interface NutrientReleaseCurve {
+  ano1Pct: number;      // e.g. 0.25 (25%)
+  ano2Pct: number;      // e.g. 0.12 (12%)
+  ano3Pct: number;      // e.g. 0.05 (5%)
+  mas3AnosPct: number;  // e.g. 0.02 (2%)
+  descripcion: string;
+}
+
+export interface ManureBioavailabilityConfig {
+  solido: {
+    protocolo: string; // "Clover E326"
+    n: NutrientReleaseCurve;
+    p: NutrientReleaseCurve;
+    k: NutrientReleaseCurve;
+    s: NutrientReleaseCurve;
+  };
+  liquido: {
+    protocolo: string; // "Purín Tambo"
+    n: NutrientReleaseCurve;
+    p: NutrientReleaseCurve;
+    k: NutrientReleaseCurve;
+    s: NutrientReleaseCurve;
+  };
+}
+
+export const DEFAULT_BIOAVAILABILITY_CONFIG: ManureBioavailabilityConfig = {
+  solido: {
+    protocolo: "Clover E326",
+    n: {
+      ano1Pct: 0.25,
+      ano2Pct: 0.12,
+      ano3Pct: 0.05,
+      mas3AnosPct: 0.02,
+      descripcion: "N: liberación gradual y residualidad moderada",
+    },
+    p: {
+      ano1Pct: 0.60,
+      ano2Pct: 0.20,
+      ano3Pct: 0.10,
+      mas3AnosPct: 0.05,
+      descripcion: "P: residualidad moderada",
+    },
+    k: {
+      ano1Pct: 0.70,
+      ano2Pct: 0.20,
+      ano3Pct: 0.08,
+      mas3AnosPct: 0.02,
+      descripcion: "K: aporte mayormente inmediato",
+    },
+    s: {
+      ano1Pct: 0.35,
+      ano2Pct: 0.20,
+      ano3Pct: 0.10,
+      mas3AnosPct: 0.05,
+      descripcion: "S: disponibilidad intermedia",
+    },
+  },
+  liquido: {
+    protocolo: "Purín Laguna HJB",
+    n: {
+      ano1Pct: 0.55,
+      ano2Pct: 0.15,
+      ano3Pct: 0.05,
+      mas3AnosPct: 0.02,
+      descripcion: "N: rápida disponibilidad amoniacal en solución",
+    },
+    p: {
+      ano1Pct: 0.75,
+      ano2Pct: 0.15,
+      ano3Pct: 0.05,
+      mas3AnosPct: 0.02,
+      descripcion: "P: alta disponibilidad soluble",
+    },
+    k: {
+      ano1Pct: 0.95,
+      ano2Pct: 0.05,
+      ano3Pct: 0.00,
+      mas3AnosPct: 0.00,
+      descripcion: "K: disponibilidad inmediata total (ion K⁺ disuelto)",
+    },
+    s: {
+      ano1Pct: 0.50,
+      ano2Pct: 0.25,
+      ano3Pct: 0.10,
+      mas3AnosPct: 0.05,
+      descripcion: "S: disponibilidad intermedia en solución",
+    },
+  },
+};
+
 export const DEFAULT_OTHER_ANALYSES: OtherLabAnalysis[] = [
   {
     id: "other-lab-silo-maiz-2026",
@@ -539,6 +629,7 @@ const MOISTURE_STORAGE_KEY = "hjb_moisture_profiles_v1";
 const MANURE_STORAGE_KEY = "hjb_manure_analysis_v1";
 const LIQUID_MANURE_STORAGE_KEY = "hjb_liquid_manure_analysis_v1";
 const OTHER_ANALYSES_STORAGE_KEY = "hjb_other_analyses_v1";
+const BIOAVAILABILITY_STORAGE_KEY = "hjb_manure_bioavailability_v1";
 export const HJB_SOIL_SYNC_EVENT = "hjb_soil_sync";
 
 export function notifySoilSync() {
@@ -677,6 +768,47 @@ export function saveLiquidManureAnalysis(record: LiquidManureAnalysis) {
     }, { merge: true }).catch(console.error);
   }
   recalculateBiofertilizationActivities(record.m3PorTanque);
+}
+
+export function getBioavailabilityConfig(): ManureBioavailabilityConfig {
+  if (typeof window === "undefined") return DEFAULT_BIOAVAILABILITY_CONFIG;
+  try {
+    const raw = localStorage.getItem(BIOAVAILABILITY_STORAGE_KEY);
+    if (!raw) return DEFAULT_BIOAVAILABILITY_CONFIG;
+    const parsed = JSON.parse(raw);
+    return {
+      solido: {
+        ...DEFAULT_BIOAVAILABILITY_CONFIG.solido,
+        ...(parsed.solido || {}),
+        n: { ...DEFAULT_BIOAVAILABILITY_CONFIG.solido.n, ...(parsed.solido?.n || {}) },
+        p: { ...DEFAULT_BIOAVAILABILITY_CONFIG.solido.p, ...(parsed.solido?.p || {}) },
+        k: { ...DEFAULT_BIOAVAILABILITY_CONFIG.solido.k, ...(parsed.solido?.k || {}) },
+        s: { ...DEFAULT_BIOAVAILABILITY_CONFIG.solido.s, ...(parsed.solido?.s || {}) },
+      },
+      liquido: {
+        ...DEFAULT_BIOAVAILABILITY_CONFIG.liquido,
+        ...(parsed.liquido || {}),
+        n: { ...DEFAULT_BIOAVAILABILITY_CONFIG.liquido.n, ...(parsed.liquido?.n || {}) },
+        p: { ...DEFAULT_BIOAVAILABILITY_CONFIG.liquido.p, ...(parsed.liquido?.p || {}) },
+        k: { ...DEFAULT_BIOAVAILABILITY_CONFIG.liquido.k, ...(parsed.liquido?.k || {}) },
+        s: { ...DEFAULT_BIOAVAILABILITY_CONFIG.liquido.s, ...(parsed.liquido?.s || {}) },
+      },
+    };
+  } catch {
+    return DEFAULT_BIOAVAILABILITY_CONFIG;
+  }
+}
+
+export function saveBioavailabilityConfig(record: ManureBioavailabilityConfig) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(BIOAVAILABILITY_STORAGE_KEY, JSON.stringify(record));
+  notifySoilSync();
+  if (db) {
+    setDoc(doc(db, "config", "soil_manure_data"), {
+      bioavailability_config: record,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch(console.error);
+  }
 }
 
 let isRecalculatingBiofert = false;
@@ -876,6 +1008,9 @@ export function initSoilFirestoreSync() {
           if (data.liquid_manure_analysis && typeof data.liquid_manure_analysis === "object") {
             localStorage.setItem(LIQUID_MANURE_STORAGE_KEY, JSON.stringify(data.liquid_manure_analysis));
           }
+          if (data.bioavailability_config && typeof data.bioavailability_config === "object") {
+            localStorage.setItem(BIOAVAILABILITY_STORAGE_KEY, JSON.stringify(data.bioavailability_config));
+          }
           if (Array.isArray(data.other_analyses)) {
             localStorage.setItem(OTHER_ANALYSES_STORAGE_KEY, JSON.stringify(data.other_analyses));
           }
@@ -887,6 +1022,7 @@ export function initSoilFirestoreSync() {
             moisture_profiles: DEFAULT_MOISTURE_PROFILES,
             manure_analysis: DEFAULT_MANURE_ANALYSIS,
             liquid_manure_analysis: DEFAULT_LIQUID_MANURE_ANALYSIS,
+            bioavailability_config: DEFAULT_BIOAVAILABILITY_CONFIG,
             other_analyses: DEFAULT_OTHER_ANALYSES,
             updatedAt: new Date().toISOString(),
           }).catch(console.error);
@@ -911,6 +1047,36 @@ if (typeof window !== "undefined") {
 // CALCULADOR Y RECOMENDADOR NUTRICIONAL AVANZADO (N-P-K Y CARROS/TANQUES INTERCAMBIABLES)
 // =========================================================================
 
+export interface NutrientTimeframeValues {
+  nKgHa: number;
+  pKgHa: number;
+  kKgHa: number;
+  sKgHa: number;
+  p2o5KgHa: number;
+  k2oKgHa: number;
+}
+
+export interface UnitNutrientBreakdown {
+  n: number;
+  p: number;
+  k: number;
+  s: number;
+  p2o5: number;
+  k2o: number;
+}
+
+export interface UnitReleaseSchedule {
+  bruto: UnitNutrientBreakdown;
+  ano1: UnitNutrientBreakdown;
+  ano2: UnitNutrientBreakdown;
+  ano3: UnitNutrientBreakdown;
+  mas3Anos: UnitNutrientBreakdown;
+  descripcionN: string;
+  descripcionP: string;
+  descripcionK: string;
+  descripcionS: string;
+}
+
 export interface LoteNutrientSummary {
   campo: string;
   lote: string;
@@ -933,7 +1099,7 @@ export interface LoteNutrientSummary {
     azufreKg: number;
     materiaOrganicaKg: number;
   };
-  // Nutrientes por hectárea
+  // Nutrientes por hectárea (según el modo activo: biodisponible año 1 o bruto)
   aportesPorHa: {
     nitrogenoKgHa: number;
     fosforoKgHa: number;
@@ -941,6 +1107,33 @@ export interface LoteNutrientSummary {
     azufreKgHa: number;
     materiaOrganicaTnHa: number;
   };
+  // Modo de biodisponibilidad y balances comparados
+  modoBiodisponibilidad: "ano1" | "bruto";
+  aportesBrutosPorHa: {
+    nitrogenoKgHa: number;
+    fosforoKgHa: number;
+    potasioKgHa: number;
+    azufreKgHa: number;
+    materiaOrganicaTnHa: number;
+  };
+  aportesBiodisponiblesAno1PorHa: {
+    nitrogenoKgHa: number;
+    fosforoKgHa: number;
+    potasioKgHa: number;
+    azufreKgHa: number;
+    materiaOrganicaTnHa: number;
+  };
+  // Curva de mineralización plurianual acumulada en el lote
+  residualidadMultianual: {
+    ano1: NutrientTimeframeValues;
+    ano2: NutrientTimeframeValues;
+    ano3: NutrientTimeframeValues;
+    mas3Anos: NutrientTimeframeValues;
+    totalBruto: NutrientTimeframeValues;
+  };
+  // Aporte unitario detallado por equipo
+  aportePorCarroSolido: UnitReleaseSchedule;
+  aportePorTanqueLiquido: UnitReleaseSchedule;
   // Metas agronómicas recomendadas N-P-K (kg/ha)
   metaKgHa: {
     nitrogeno: number;
@@ -998,7 +1191,8 @@ export function computeLoteNutrientSummary(
   cultivo: string = "Maíz Silo",
   campana: string = "2026/27",
   simulatedCarros?: number,
-  simulatedTanques?: number
+  simulatedTanques?: number,
+  modoBiodisponibilidad: "ano1" | "bruto" = "ano1"
 ): LoteNutrientSummary {
   const cClean = campo.toLowerCase();
   const lClean = loteNombre.toLowerCase().replace(/lote\s*/g, "").trim();
@@ -1008,6 +1202,7 @@ export function computeLoteNutrientSummary(
   const moistures = listMoistureProfiles();
   const manure = getManureAnalysis();
   const liquidManure = getLiquidManureAnalysis();
+  const bioCfg = getBioavailabilityConfig();
 
   const sueloPrevio = soils.find((s) => {
     if (s.campo.toLowerCase() !== cClean) return false;
@@ -1070,32 +1265,181 @@ export function computeLoteNutrientSummary(
   const carrosSolido = Math.round(totalTnSolido / tnCarro);
   const tanquesLiquido = Math.round(totalM3Liquido / m3Tanque);
 
-  // 3. Aportes de nutrientes del estiércol sólido (Clover E326)
-  const nSolido = totalTnSolido * (manure.nitrogenoTotalPct * 10);
-  const pSolido = totalTnSolido * (manure.fosforoTotalPct * 10);
-  const kSolido = totalTnSolido * (manure.potasioTotalPct * 10);
-  const sSolido = totalTnSolido * (manure.azufreTotalPct * 10);
-  const moSolido = totalTnSolido * (manure.materiaOrganicaPct * 10);
+  // Factores agronómicos de conversión
+  const P2O5_FACTOR = 2.291;
+  const K2O_FACTOR = 1.2046;
 
-  // Aportes de efluente líquido
-  const nLiquido = totalM3Liquido * (liquidManure.nitrogenoKgM3 || 1.8);
-  const pLiquido = totalM3Liquido * (liquidManure.fosforoKgM3 || 0.6);
-  const kLiquido = totalM3Liquido * (liquidManure.potasioKgM3 || 2.2);
-  const sLiquido = totalM3Liquido * (liquidManure.azufreKgM3 || 0.2);
-  const moLiquido = totalM3Liquido * (liquidManure.materiaOrganicaKgM3 || 15);
+  // 3. Aportes brutos unitarios por carro y tanque
+  const nBrutoCarro = tnCarro * (manure.nitrogenoTotalPct * 10);
+  const pBrutoCarro = tnCarro * (manure.fosforoTotalPct * 10);
+  const kBrutoCarro = tnCarro * (manure.potasioTotalPct * 10);
+  const sBrutoCarro = tnCarro * (manure.azufreTotalPct * 10);
 
-  const totalN = Math.round(nSolido + nLiquido);
-  const totalP = Math.round(pSolido + pLiquido);
-  const totalK = Math.round(kSolido + kLiquido);
-  const totalS = Math.round(sSolido + sLiquido);
-  const totalMO = Math.round(moSolido + moLiquido);
+  const nBrutoTanque = m3Tanque * (liquidManure.nitrogenoKgM3 || 1.8);
+  const pBrutoTanque = m3Tanque * (liquidManure.fosforoKgM3 || 0.6);
+  const kBrutoTanque = m3Tanque * (liquidManure.potasioKgM3 || 2.2);
+  const sBrutoTanque = m3Tanque * (liquidManure.azufreKgM3 || 0.2);
+
+  // Esquema unitario de liberación para Carro Sólido
+  const aportePorCarroSolido: UnitReleaseSchedule = {
+    bruto: {
+      n: Number(nBrutoCarro.toFixed(1)),
+      p: Number(pBrutoCarro.toFixed(1)),
+      k: Number(kBrutoCarro.toFixed(1)),
+      s: Number(sBrutoCarro.toFixed(1)),
+      p2o5: Number((pBrutoCarro * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoCarro * K2O_FACTOR).toFixed(1)),
+    },
+    ano1: {
+      n: Number((nBrutoCarro * bioCfg.solido.n.ano1Pct).toFixed(1)),
+      p: Number((pBrutoCarro * bioCfg.solido.p.ano1Pct).toFixed(1)),
+      k: Number((kBrutoCarro * bioCfg.solido.k.ano1Pct).toFixed(1)),
+      s: Number((sBrutoCarro * bioCfg.solido.s.ano1Pct).toFixed(1)),
+      p2o5: Number((pBrutoCarro * bioCfg.solido.p.ano1Pct * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoCarro * bioCfg.solido.k.ano1Pct * K2O_FACTOR).toFixed(1)),
+    },
+    ano2: {
+      n: Number((nBrutoCarro * bioCfg.solido.n.ano2Pct).toFixed(1)),
+      p: Number((pBrutoCarro * bioCfg.solido.p.ano2Pct).toFixed(1)),
+      k: Number((kBrutoCarro * bioCfg.solido.k.ano2Pct).toFixed(1)),
+      s: Number((sBrutoCarro * bioCfg.solido.s.ano2Pct).toFixed(1)),
+      p2o5: Number((pBrutoCarro * bioCfg.solido.p.ano2Pct * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoCarro * bioCfg.solido.k.ano2Pct * K2O_FACTOR).toFixed(1)),
+    },
+    ano3: {
+      n: Number((nBrutoCarro * bioCfg.solido.n.ano3Pct).toFixed(1)),
+      p: Number((pBrutoCarro * bioCfg.solido.p.ano3Pct).toFixed(1)),
+      k: Number((kBrutoCarro * bioCfg.solido.k.ano3Pct).toFixed(1)),
+      s: Number((sBrutoCarro * bioCfg.solido.s.ano3Pct).toFixed(1)),
+      p2o5: Number((pBrutoCarro * bioCfg.solido.p.ano3Pct * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoCarro * bioCfg.solido.k.ano3Pct * K2O_FACTOR).toFixed(1)),
+    },
+    mas3Anos: {
+      n: Number((nBrutoCarro * bioCfg.solido.n.mas3AnosPct).toFixed(1)),
+      p: Number((pBrutoCarro * bioCfg.solido.p.mas3AnosPct).toFixed(1)),
+      k: Number((kBrutoCarro * bioCfg.solido.k.mas3AnosPct).toFixed(1)),
+      s: Number((sBrutoCarro * bioCfg.solido.s.mas3AnosPct).toFixed(1)),
+      p2o5: Number((pBrutoCarro * bioCfg.solido.p.mas3AnosPct * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoCarro * bioCfg.solido.k.mas3AnosPct * K2O_FACTOR).toFixed(1)),
+    },
+    descripcionN: bioCfg.solido.n.descripcion,
+    descripcionP: bioCfg.solido.p.descripcion,
+    descripcionK: bioCfg.solido.k.descripcion,
+    descripcionS: bioCfg.solido.s.descripcion,
+  };
+
+  // Esquema unitario de liberación para Tanque Líquido
+  const aportePorTanqueLiquido: UnitReleaseSchedule = {
+    bruto: {
+      n: Number(nBrutoTanque.toFixed(1)),
+      p: Number(pBrutoTanque.toFixed(1)),
+      k: Number(kBrutoTanque.toFixed(1)),
+      s: Number(sBrutoTanque.toFixed(1)),
+      p2o5: Number((pBrutoTanque * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoTanque * K2O_FACTOR).toFixed(1)),
+    },
+    ano1: {
+      n: Number((nBrutoTanque * bioCfg.liquido.n.ano1Pct).toFixed(1)),
+      p: Number((pBrutoTanque * bioCfg.liquido.p.ano1Pct).toFixed(1)),
+      k: Number((kBrutoTanque * bioCfg.liquido.k.ano1Pct).toFixed(1)),
+      s: Number((sBrutoTanque * bioCfg.liquido.s.ano1Pct).toFixed(1)),
+      p2o5: Number((pBrutoTanque * bioCfg.liquido.p.ano1Pct * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoTanque * bioCfg.liquido.k.ano1Pct * K2O_FACTOR).toFixed(1)),
+    },
+    ano2: {
+      n: Number((nBrutoTanque * bioCfg.liquido.n.ano2Pct).toFixed(1)),
+      p: Number((pBrutoTanque * bioCfg.liquido.p.ano2Pct).toFixed(1)),
+      k: Number((kBrutoTanque * bioCfg.liquido.k.ano2Pct).toFixed(1)),
+      s: Number((sBrutoTanque * bioCfg.liquido.s.ano2Pct).toFixed(1)),
+      p2o5: Number((pBrutoTanque * bioCfg.liquido.p.ano2Pct * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoTanque * bioCfg.liquido.k.ano2Pct * K2O_FACTOR).toFixed(1)),
+    },
+    ano3: {
+      n: Number((nBrutoTanque * bioCfg.liquido.n.ano3Pct).toFixed(1)),
+      p: Number((pBrutoTanque * bioCfg.liquido.p.ano3Pct).toFixed(1)),
+      k: Number((kBrutoTanque * bioCfg.liquido.k.ano3Pct).toFixed(1)),
+      s: Number((sBrutoTanque * bioCfg.liquido.s.ano3Pct).toFixed(1)),
+      p2o5: Number((pBrutoTanque * bioCfg.liquido.p.ano3Pct * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoTanque * bioCfg.liquido.k.ano3Pct * K2O_FACTOR).toFixed(1)),
+    },
+    mas3Anos: {
+      n: Number((nBrutoTanque * bioCfg.liquido.n.mas3AnosPct).toFixed(1)),
+      p: Number((pBrutoTanque * bioCfg.liquido.p.mas3AnosPct).toFixed(1)),
+      k: Number((kBrutoTanque * bioCfg.liquido.k.mas3AnosPct).toFixed(1)),
+      s: Number((sBrutoTanque * bioCfg.liquido.s.mas3AnosPct).toFixed(1)),
+      p2o5: Number((pBrutoTanque * bioCfg.liquido.p.mas3AnosPct * P2O5_FACTOR).toFixed(1)),
+      k2o: Number((kBrutoTanque * bioCfg.liquido.k.mas3AnosPct * K2O_FACTOR).toFixed(1)),
+    },
+    descripcionN: bioCfg.liquido.n.descripcion,
+    descripcionP: bioCfg.liquido.p.descripcion,
+    descripcionK: bioCfg.liquido.k.descripcion,
+    descripcionS: bioCfg.liquido.s.descripcion,
+  };
 
   const sup = superficieHa > 0 ? superficieHa : 1;
-  const nPorHa = Math.round(totalN / sup);
-  const pPorHa = Math.round(totalP / sup);
-  const kPorHa = Math.round(totalK / sup);
-  const sPorHa = Number((totalS / sup).toFixed(1));
-  const moTnPorHa = Number((totalMO / 1000 / sup).toFixed(2));
+
+  // Curva de mineralización plurianual acumulada en el lote
+  const calcTimeframeValues = (key: "ano1Pct" | "ano2Pct" | "ano3Pct" | "mas3AnosPct"): NutrientTimeframeValues => {
+    const n = ((totalTnSolido * (manure.nitrogenoTotalPct * 10) * bioCfg.solido.n[key]) + (totalM3Liquido * (liquidManure.nitrogenoKgM3 || 1.8) * bioCfg.liquido.n[key])) / sup;
+    const p = ((totalTnSolido * (manure.fosforoTotalPct * 10) * bioCfg.solido.p[key]) + (totalM3Liquido * (liquidManure.fosforoKgM3 || 0.6) * bioCfg.liquido.p[key])) / sup;
+    const k = ((totalTnSolido * (manure.potasioTotalPct * 10) * bioCfg.solido.k[key]) + (totalM3Liquido * (liquidManure.potasioKgM3 || 2.2) * bioCfg.liquido.k[key])) / sup;
+    const s = ((totalTnSolido * (manure.azufreTotalPct * 10) * bioCfg.solido.s[key]) + (totalM3Liquido * (liquidManure.azufreKgM3 || 0.2) * bioCfg.liquido.s[key])) / sup;
+    return {
+      nKgHa: Number(n.toFixed(1)),
+      pKgHa: Number(p.toFixed(1)),
+      kKgHa: Number(k.toFixed(1)),
+      sKgHa: Number(s.toFixed(1)),
+      p2o5KgHa: Number((p * P2O5_FACTOR).toFixed(1)),
+      k2oKgHa: Number((k * K2O_FACTOR).toFixed(1)),
+    };
+  };
+
+  const residualidadMultianual = {
+    ano1: calcTimeframeValues("ano1Pct"),
+    ano2: calcTimeframeValues("ano2Pct"),
+    ano3: calcTimeframeValues("ano3Pct"),
+    mas3Anos: calcTimeframeValues("mas3AnosPct"),
+    totalBruto: {
+      nKgHa: Number((((totalTnSolido * (manure.nitrogenoTotalPct * 10)) + (totalM3Liquido * (liquidManure.nitrogenoKgM3 || 1.8))) / sup).toFixed(1)),
+      pKgHa: Number((((totalTnSolido * (manure.fosforoTotalPct * 10)) + (totalM3Liquido * (liquidManure.fosforoKgM3 || 0.6))) / sup).toFixed(1)),
+      kKgHa: Number((((totalTnSolido * (manure.potasioTotalPct * 10)) + (totalM3Liquido * (liquidManure.potasioKgM3 || 2.2))) / sup).toFixed(1)),
+      sKgHa: Number((((totalTnSolido * (manure.azufreTotalPct * 10)) + (totalM3Liquido * (liquidManure.azufreKgM3 || 0.2))) / sup).toFixed(1)),
+      p2o5KgHa: Number(((((totalTnSolido * (manure.fosforoTotalPct * 10)) + (totalM3Liquido * (liquidManure.fosforoKgM3 || 0.6))) / sup) * P2O5_FACTOR).toFixed(1)),
+      k2oKgHa: Number(((((totalTnSolido * (manure.potasioTotalPct * 10)) + (totalM3Liquido * (liquidManure.potasioKgM3 || 2.2))) / sup) * K2O_FACTOR).toFixed(1)),
+    },
+  };
+
+  const moBruta = (totalTnSolido * (manure.materiaOrganicaPct * 10)) + (totalM3Liquido * (liquidManure.materiaOrganicaKgM3 || 15));
+  const moTnPorHa = Number((moBruta / 1000 / sup).toFixed(2));
+
+  const aportesBrutosPorHa = {
+    nitrogenoKgHa: Math.round(residualidadMultianual.totalBruto.nKgHa),
+    fosforoKgHa: Math.round(residualidadMultianual.totalBruto.pKgHa),
+    potasioKgHa: Math.round(residualidadMultianual.totalBruto.kKgHa),
+    azufreKgHa: Number(residualidadMultianual.totalBruto.sKgHa.toFixed(1)),
+    materiaOrganicaTnHa: moTnPorHa,
+  };
+
+  const aportesBiodisponiblesAno1PorHa = {
+    nitrogenoKgHa: Math.round(residualidadMultianual.ano1.nKgHa),
+    fosforoKgHa: Math.round(residualidadMultianual.ano1.pKgHa),
+    potasioKgHa: Math.round(residualidadMultianual.ano1.kKgHa),
+    azufreKgHa: Number(residualidadMultianual.ano1.sKgHa.toFixed(1)),
+    materiaOrganicaTnHa: moTnPorHa,
+  };
+
+  // Selección de aportes a computar para el balance según modo seleccionado
+  const activeAportes = modoBiodisponibilidad === "ano1" ? aportesBiodisponiblesAno1PorHa : aportesBrutosPorHa;
+  const nPorHa = activeAportes.nitrogenoKgHa;
+  const pPorHa = activeAportes.fosforoKgHa;
+  const kPorHa = activeAportes.potasioKgHa;
+  const sPorHa = activeAportes.azufreKgHa;
+
+  const totalN = Math.round(nPorHa * sup);
+  const totalP = Math.round(pPorHa * sup);
+  const totalK = Math.round(kPorHa * sup);
+  const totalS = Math.round(sPorHa * sup);
+  const totalMO = Math.round(moBruta);
 
   // 4. Metas agronómicas N-P-K por tipo de cultivo
   const demand = getCropDemand(cultivo);
@@ -1119,14 +1463,14 @@ export function computeLoteNutrientSummary(
   const defPTotal = defPKgHa * sup;
   const defKTotal = defKKgHa * sup;
 
-  // Aportes unitarios dinámicos según capacidad de carro y tanque configuradas
-  const N_POR_CARRO = tnCarro * (manure.nitrogenoTotalPct * 10);
-  const P_POR_CARRO = tnCarro * (manure.fosforoTotalPct * 10);
-  const K_POR_CARRO = tnCarro * (manure.potasioTotalPct * 10);
+  // Aportes unitarios dinámicos según modo activo
+  const N_POR_CARRO = modoBiodisponibilidad === "ano1" ? aportePorCarroSolido.ano1.n : aportePorCarroSolido.bruto.n;
+  const P_POR_CARRO = modoBiodisponibilidad === "ano1" ? aportePorCarroSolido.ano1.p : aportePorCarroSolido.bruto.p;
+  const K_POR_CARRO = modoBiodisponibilidad === "ano1" ? aportePorCarroSolido.ano1.k : aportePorCarroSolido.bruto.k;
 
-  const N_POR_TANQUE = m3Tanque * (liquidManure.nitrogenoKgM3 || 1.8);
-  const P_POR_TANQUE = m3Tanque * (liquidManure.fosforoKgM3 || 0.6);
-  const K_POR_TANQUE = m3Tanque * (liquidManure.potasioKgM3 || 2.2);
+  const N_POR_TANQUE = modoBiodisponibilidad === "ano1" ? aportePorTanqueLiquido.ano1.n : aportePorTanqueLiquido.bruto.n;
+  const P_POR_TANQUE = modoBiodisponibilidad === "ano1" ? aportePorTanqueLiquido.ano1.p : aportePorTanqueLiquido.bruto.p;
+  const K_POR_TANQUE = modoBiodisponibilidad === "ano1" ? aportePorTanqueLiquido.ano1.k : aportePorTanqueLiquido.bruto.k;
 
   // OPCIÓN 100% SÓLIDO (Carros de tnCarro)
   const cReqN = defNTotal > 0 ? Math.ceil(defNTotal / Math.max(0.1, N_POR_CARRO)) : 0;
@@ -1176,15 +1520,17 @@ export function computeLoteNutrientSummary(
   let estadoBalance: "Cubierto con holgura" | "Recomendado aplicar" | "Déficit pendiente" = "Cubierto con holgura";
   let mensajeDiagnostico = "";
 
+  const labelModo = modoBiodisponibilidad === "ano1" ? "Biodisponible Año 1" : "Stock Bruto Total";
+
   if (soloCarros === 0 && soloTanques === 0) {
     estadoBalance = "Cubierto con holgura";
-    mensajeDiagnostico = `¡Nutrición N-P-K cubierta con creces para toda la campaña! Se aplicaron ${carrosSolido} carros (${Math.round(totalTnSolido / sup)} t/ha) y ${tanquesLiquido} tanques. Cobertura: N ${covN}%, P ${covP}%, K ${covK}%. Aporte total: ${nPorHa} kg N, ${pPorHa} kg P y ${kPorHa} kg K/ha.`;
+    mensajeDiagnostico = `¡Nutrición N-P-K cubierta con creces (${labelModo})! Se aplicaron ${carrosSolido} carros y ${tanquesLiquido} tanques. Cobertura: N ${covN}%, P ${covP}%, K ${covK}%. Aporte inmediato: ${nPorHa} kg N, ${pPorHa} kg P y ${kPorHa} kg K/ha.`;
   } else if (totalTnSolido === 0 && totalM3Liquido === 0) {
     estadoBalance = "Déficit pendiente";
-    mensajeDiagnostico = `Lote sin enmiendas en esta campaña. Requerimiento para ${demand.nombreNormalizado}: ${metaN} kg N, ${metaP} kg P, ${metaK} kg K/ha. Podés cubrir el óptimo tirando: ${soloCarros} carros sólidos Ó bien ${soloTanques} tanques líquidos (o una mezcla de ${mixtaCarros} carros + ${mixtaTanques} tanques).`;
+    mensajeDiagnostico = `Lote sin enmiendas en esta campaña. Requerimiento para ${demand.nombreNormalizado}: ${metaN} kg N, ${metaP} kg P, ${metaK} kg K/ha. Podés cubrir el óptimo (${labelModo}) con: ${soloCarros} carros sólidos Ó bien ${soloTanques} tanques líquidos (o mezcla de ${mixtaCarros} carros + ${mixtaTanques} tanques).`;
   } else {
     estadoBalance = "Recomendado aplicar";
-    mensajeDiagnostico = `Se aplicaron ${carrosSolido} carros y ${tanquesLiquido} tanques. Cobertura: N ${covN}%, P ${covP}%, K ${covK}%. Resta para el óptimo: ${soloCarros} carros sólidos más Ó bien ${soloTanques} tanques líquidos más.`;
+    mensajeDiagnostico = `Se aplicaron ${carrosSolido} carros y ${tanquesLiquido} tanques. Cobertura (${labelModo}): N ${covN}%, P ${covP}%, K ${covK}%. Resta para el óptimo: ${soloCarros} carros sólidos más Ó bien ${soloTanques} tanques líquidos más.`;
   }
 
   return {
@@ -1213,6 +1559,12 @@ export function computeLoteNutrientSummary(
       azufreKgHa: sPorHa,
       materiaOrganicaTnHa: moTnPorHa,
     },
+    modoBiodisponibilidad,
+    aportesBrutosPorHa,
+    aportesBiodisponiblesAno1PorHa,
+    residualidadMultianual,
+    aportePorCarroSolido,
+    aportePorTanqueLiquido,
     metaKgHa: {
       nitrogeno: metaN,
       fosforo: metaP,

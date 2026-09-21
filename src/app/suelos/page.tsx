@@ -23,6 +23,7 @@ import {
   listOtherAnalyses,
   saveOtherAnalysis,
   deleteOtherAnalysis,
+  getBioavailabilityConfig,
   HJB_SOIL_SYNC_EVENT,
 } from "@/lib/soilManureData";
 import { agricultureData } from "@/lib/agricultureData";
@@ -143,20 +144,51 @@ export default function SuelosPage() {
   // Cálculos dinámicos de aportes unitarios y equivalencias según protocolos vigentes
   const tnCarro = solidManure.toneladasPorCarro || 5;
   const m3Tanque = liquidManure.m3PorTanque || 11;
+  const bioConfig = getBioavailabilityConfig();
 
+  // Stock Bruto Total
   const solidoNeto = useMemo(() => ({
     n: Math.round(tnCarro * solidManure.nitrogenoTotalPct * 10),
     p: Math.round(tnCarro * solidManure.fosforoTotalPct * 10),
     k: Number((tnCarro * solidManure.potasioTotalPct * 10).toFixed(1)),
+    s: Number((tnCarro * (solidManure.azufreTotalPct || 0.22) * 10).toFixed(1)),
     mo: Math.round(tnCarro * solidManure.materiaOrganicaPct * 10),
   }), [tnCarro, solidManure]);
+
+  // Biodisponible Año 1 (Efectivo Inmediato)
+  const solidoAno1 = useMemo(() => {
+    const c = bioConfig.solido;
+    return {
+      n: Number((solidoNeto.n * c.n.ano1Pct).toFixed(1)),
+      p: Number((solidoNeto.p * c.p.ano1Pct).toFixed(1)),
+      k: Number((solidoNeto.k * c.k.ano1Pct).toFixed(1)),
+      s: Number((solidoNeto.s * c.s.ano1Pct).toFixed(1)),
+    };
+  }, [solidoNeto, bioConfig]);
 
   const liquidoNeto = useMemo(() => ({
     n: Number((m3Tanque * (liquidManure.nitrogenoKgM3 || 1.8)).toFixed(1)),
     p: Number((m3Tanque * (liquidManure.fosforoKgM3 || 0.6)).toFixed(1)),
     k: Number((m3Tanque * (liquidManure.potasioKgM3 || 2.2)).toFixed(1)),
+    s: Number((m3Tanque * (liquidManure.azufreKgM3 || 0.2)).toFixed(1)),
     mo: Math.round(m3Tanque * (liquidManure.materiaOrganicaKgM3 || 15)),
   }), [m3Tanque, liquidManure]);
+
+  const liquidoAno1 = useMemo(() => {
+    const c = bioConfig.liquido;
+    return {
+      n: Number((liquidoNeto.n * c.n.ano1Pct).toFixed(1)),
+      p: Number((liquidoNeto.p * c.p.ano1Pct).toFixed(1)),
+      k: Number((liquidoNeto.k * c.k.ano1Pct).toFixed(1)),
+      s: Number((liquidoNeto.s * c.s.ano1Pct).toFixed(1)),
+    };
+  }, [liquidoNeto, bioConfig]);
+
+  const equivTanquesAno1 = useMemo(() => {
+    const ratioN = solidoAno1.n / Math.max(0.1, liquidoAno1.n);
+    const ratioP = solidoAno1.p / Math.max(0.1, liquidoAno1.p);
+    return ((ratioN + ratioP) / 2).toFixed(1);
+  }, [solidoAno1, liquidoAno1]);
 
   const equivTanques = useMemo(() => {
     const ratioN = solidoNeto.n / Math.max(0.1, liquidoNeto.n);
@@ -241,12 +273,12 @@ export default function SuelosPage() {
           <MetricCard
             label="Estiércol Sólido (Clover E326)"
             value={`${solidManure.toneladasPorCarro || 5} tn / carro`}
-            note={`${Math.round((solidManure.toneladasPorCarro || 5) * solidManure.nitrogenoTotalPct * 10)} kg N · ${Math.round((solidManure.toneladasPorCarro || 5) * solidManure.fosforoTotalPct * 10)} kg P · ${((solidManure.toneladasPorCarro || 5) * solidManure.potasioTotalPct * 10).toFixed(1)} kg K por carro`}
+            note={`Año 1: ${solidoAno1.n} kg N · ${solidoAno1.p} kg P · ${solidoAno1.k} kg K (Bruto: ${solidoNeto.n} N · ${solidoNeto.p} P · ${solidoNeto.k} K)`}
           />
           <MetricCard
             label="Efluente Líquido (Tambo)"
             value={`${liquidManure.m3PorTanque || 11} m³ / tanque`}
-            note={`${((liquidManure.m3PorTanque || 11) * (liquidManure.nitrogenoKgM3 || 1.8)).toFixed(1)} kg N · ${((liquidManure.m3PorTanque || 11) * (liquidManure.fosforoKgM3 || 0.6)).toFixed(1)} kg P · ${((liquidManure.m3PorTanque || 11) * (liquidManure.potasioKgM3 || 2.2)).toFixed(1)} kg K por tanque`}
+            note={`Año 1: ${liquidoAno1.n} kg N · ${liquidoAno1.p} kg P · ${liquidoAno1.k} kg K (Bruto: ${liquidoNeto.n} N · ${liquidoNeto.p} P · ${liquidoNeto.k} K)`}
           />
           <MetricCard
             label="Perfiles Hídricos (0-200 cm)"
@@ -635,16 +667,59 @@ export default function SuelosPage() {
                   </div>
                 </div>
 
-                <div style={{ background: "var(--slate-900)", color: "#ffffff", padding: "12px 16px", borderRadius: "8px" }}>
-                  <span style={{ fontSize: "12px", color: "var(--slate-300)", display: "block", marginBottom: "4px" }}>
-                    Aporte Neto por Cada Carro Aplicado ({tnCarro} tn netas):
-                  </span>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#86efac" }}>{solidoNeto.n} kg N</span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#93c5fd" }}>{solidoNeto.p} kg P</span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#fcd34d" }}>{solidoNeto.k} kg K</span>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#cbd5e1" }}>{solidoNeto.mo.toLocaleString("es-AR")} kg MO</span>
+                {/* Disponibilidad Inmediata Año 1 */}
+                <div style={{ background: "#f0fdf4", border: "1px solid #86efac", padding: "12px 14px", borderRadius: "8px", marginBottom: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 800, color: "#166534", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                      🌱 Disponibilidad Efectiva Inmediata (Año 1)
+                    </span>
+                    <span className="pill badgeGreen" style={{ fontSize: "10.5px", padding: "2px 6px" }}>
+                      Recomendado Campaña
+                    </span>
                   </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", textAlign: "center" }}>
+                    <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>N (25%)</span>
+                      <strong style={{ fontSize: "13px", color: "#166534" }}>{solidoAno1.n} kg N</strong>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>P (60%)</span>
+                      <strong style={{ fontSize: "13px", color: "#1d4ed8" }}>{solidoAno1.p} kg P</strong>
+                      <span style={{ fontSize: "9.5px", color: "#2563eb", display: "block" }}>{(solidoAno1.p * 2.291).toFixed(1)} P₂O₅</span>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>K (70%)</span>
+                      <strong style={{ fontSize: "13px", color: "#b45309" }}>{solidoAno1.k} kg K</strong>
+                      <span style={{ fontSize: "9.5px", color: "#d97706", display: "block" }}>{(solidoAno1.k * 1.2046).toFixed(1)} K₂O</span>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>S (35%)</span>
+                      <strong style={{ fontSize: "13px", color: "#7c3aed" }}>{solidoAno1.s} kg S</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stock Bruto Total */}
+                <div style={{ background: "var(--slate-900)", color: "#ffffff", padding: "12px 14px", borderRadius: "8px", marginBottom: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "11.5px", color: "var(--slate-300)" }}>
+                      Stock Bruto Total por Carro ({tnCarro} tn netas):
+                    </span>
+                    <span style={{ fontSize: "10.5px", color: "var(--slate-400)" }}>Mineralización multianual</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "6px" }}>
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#86efac" }}>{solidoNeto.n} kg N</span>
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#93c5fd" }}>{solidoNeto.p} kg P <small style={{ fontWeight: 400, opacity: 0.8 }}>({(solidoNeto.p * 2.291).toFixed(1)} P₂O₅)</small></span>
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#fcd34d" }}>{solidoNeto.k} kg K <small style={{ fontWeight: 400, opacity: 0.8 }}>({(solidoNeto.k * 1.2046).toFixed(1)} K₂O)</small></span>
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#d8b4fe" }}>{solidoNeto.s} kg S</span>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#cbd5e1" }}>{solidoNeto.mo.toLocaleString("es-AR")} kg MO</span>
+                  </div>
+                </div>
+
+                {/* Dinámica Clover E326 */}
+                <div style={{ background: "var(--slate-50)", border: "1px solid var(--line)", padding: "8px 12px", borderRadius: "6px", fontSize: "11px", color: "var(--slate-600)" }}>
+                  <strong style={{ color: "var(--slate-800)" }}>Curva Clover E326 (kg/carro): </strong>
+                  <span>N: Año 1 (15 kg), Año 2 (7.2 kg), Año 3 (3 kg), &gt;3a (1.2 kg) · P: Año 1 (30 kg), Año 2 (10 kg), Año 3 (5 kg), &gt;3a (2.5 kg).</span>
                 </div>
               </div>
 
@@ -700,16 +775,59 @@ export default function SuelosPage() {
                   </div>
                 </div>
 
-                <div style={{ background: "var(--slate-900)", color: "#ffffff", padding: "12px 16px", borderRadius: "8px" }}>
-                  <span style={{ fontSize: "12px", color: "var(--slate-300)", display: "block", marginBottom: "4px" }}>
-                    Aporte Neto por Cada Tanque Aplicado ({(m3Tanque * 1000).toLocaleString("es-AR")} L / {m3Tanque} m³):
-                  </span>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "6px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#86efac" }}>{liquidoNeto.n} kg N</span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#93c5fd" }}>{liquidoNeto.p} kg P</span>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#fcd34d" }}>{liquidoNeto.k} kg K</span>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#cbd5e1" }}>{liquidoNeto.mo.toLocaleString("es-AR")} kg MO</span>
+                {/* Disponibilidad Inmediata Año 1 */}
+                <div style={{ background: "#f0fdf4", border: "1px solid #86efac", padding: "12px 14px", borderRadius: "8px", marginBottom: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 800, color: "#166534", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                      🌱 Disponibilidad Efectiva Inmediata (Año 1)
+                    </span>
+                    <span className="pill badgeGreen" style={{ fontSize: "10.5px", padding: "2px 6px" }}>
+                      Recomendado Campaña
+                    </span>
                   </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", textAlign: "center" }}>
+                    <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>N (55%)</span>
+                      <strong style={{ fontSize: "13px", color: "#166534" }}>{liquidoAno1.n} kg N</strong>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>P (70%)</span>
+                      <strong style={{ fontSize: "13px", color: "#1d4ed8" }}>{liquidoAno1.p} kg P</strong>
+                      <span style={{ fontSize: "9.5px", color: "#2563eb", display: "block" }}>{(liquidoAno1.p * 2.291).toFixed(1)} P₂O₅</span>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>K (80%)</span>
+                      <strong style={{ fontSize: "13px", color: "#b45309" }}>{liquidoAno1.k} kg K</strong>
+                      <span style={{ fontSize: "9.5px", color: "#d97706", display: "block" }}>{(liquidoAno1.k * 1.2046).toFixed(1)} K₂O</span>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>S (50%)</span>
+                      <strong style={{ fontSize: "13px", color: "#7c3aed" }}>{liquidoAno1.s} kg S</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stock Bruto Total */}
+                <div style={{ background: "var(--slate-900)", color: "#ffffff", padding: "12px 14px", borderRadius: "8px", marginBottom: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "11.5px", color: "var(--slate-300)" }}>
+                      Stock Bruto Total por Tanque ({(m3Tanque * 1000).toLocaleString("es-AR")} L / {m3Tanque} m³):
+                    </span>
+                    <span style={{ fontSize: "10.5px", color: "var(--slate-400)" }}>Mineralización multianual</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "6px" }}>
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#86efac" }}>{liquidoNeto.n} kg N</span>
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#93c5fd" }}>{liquidoNeto.p} kg P <small style={{ fontWeight: 400, opacity: 0.8 }}>({(liquidoNeto.p * 2.291).toFixed(1)} P₂O₅)</small></span>
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#fcd34d" }}>{liquidoNeto.k} kg K <small style={{ fontWeight: 400, opacity: 0.8 }}>({(liquidoNeto.k * 1.2046).toFixed(1)} K₂O)</small></span>
+                    <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#d8b4fe" }}>{liquidoNeto.s} kg S</span>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#cbd5e1" }}>{liquidoNeto.mo.toLocaleString("es-AR")} kg MO</span>
+                  </div>
+                </div>
+
+                {/* Dinámica Líquido Tambo */}
+                <div style={{ background: "var(--slate-50)", border: "1px solid var(--line)", padding: "8px 12px", borderRadius: "6px", fontSize: "11px", color: "var(--slate-600)" }}>
+                  <strong style={{ color: "var(--slate-800)" }}>Curva Efluente Líquido (kg/tanque): </strong>
+                  <span>N: Año 1 (10.9 kg), Año 2 (3 kg), Año 3 (1 kg), &gt;3a (0.4 kg) · P: Año 1 (4.6 kg), Año 2 (1.3 kg), Año 3 (0.7 kg), &gt;3a (0.3 kg).</span>
                 </div>
               </div>
             </div>
@@ -720,7 +838,7 @@ export default function SuelosPage() {
                 ⚖️ Criterio de Equivalencia e Intercambiabilidad Operativa
               </h3>
               <p style={{ margin: "0 0 12px", fontSize: "13.5px", color: "var(--slate-600)", lineHeight: 1.5 }}>
-                En base a los ensayos de laboratorio y la calibración operativa ({m3Tanque} m³ por tanque y {tnCarro} tn por carro), <strong>1 carro de estiércol sólido ({tnCarro} tn) aporta el equivalente agronómico promedio a {equivTanques} tanques de efluente líquido ({m3Tanque} m³ / {(m3Tanque * 1000).toLocaleString("es-AR")} L)</strong>. El sistema utiliza estos coeficientes dinámicos para calcular automáticamente las dosis restantes necesarias en cada lote según el cultivo planificado.
+                En base a los ensayos de laboratorio y la calibración operativa ({m3Tanque} m³ por tanque y {tnCarro} tn por carro), <strong>1 carro de estiércol sólido ({tnCarro} tn) aporta el equivalente agronómico a {equivTanquesAno1} tanques de efluente líquido ({m3Tanque} m³ / {(m3Tanque * 1000).toLocaleString("es-AR")} L) en disponibilidad efectiva inmediata (Año 1)</strong>, o <strong>{equivTanques} tanques en stock mineral total bruto</strong>. El sistema utiliza el modo de biodisponibilidad para evitar la subfertilización de los cultivos en la campaña en curso.
               </p>
               <div style={{ display: "flex", gap: "10px" }}>
                 <Link href="/agricultura/tambo" className="primaryButton" style={{ fontSize: "13px" }}>

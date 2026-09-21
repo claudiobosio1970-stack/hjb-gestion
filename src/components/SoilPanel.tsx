@@ -70,6 +70,8 @@ export default function SoilPanel({
   // Estados para simulación interactiva en vivo
   const [simCarros, setSimCarros] = useState<number | null>(null);
   const [simTanques, setSimTanques] = useState<number | null>(null);
+  const [modoBiodisp, setModoBiodisp] = useState<"ano1" | "bruto">("ano1");
+  const [equipoCurvaSeleccionado, setEquipoCurvaSeleccionado] = useState<"solido" | "liquido">("solido");
 
   // Modal para agregar análisis manual
   const [openAddModal, setOpenAddModal] = useState<boolean>(false);
@@ -170,10 +172,13 @@ export default function SoilPanel({
         lote.nombre,
         lote.superficieHa || 5,
         lote.cultivoActual || targetCrop,
-        campana
+        campana,
+        undefined,
+        undefined,
+        modoBiodisp
       )
     );
-  }, [lotesDelCampo, campoNombre, targetCrop, campana, soils, moistures, manure, liquidManure]);
+  }, [lotesDelCampo, campoNombre, targetCrop, campana, soils, moistures, manure, liquidManure, modoBiodisp]);
 
   // Resumen base real (sin simulación) del lote seleccionado
   const baselineSummary: LoteNutrientSummary | null = useMemo(() => {
@@ -183,9 +188,12 @@ export default function SoilPanel({
       activeLote.nombre,
       activeLote.superficieHa || 5,
       targetCrop,
-      campana
+      campana,
+      undefined,
+      undefined,
+      modoBiodisp
     );
-  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure, liquidManure]);
+  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure, liquidManure, modoBiodisp]);
 
   const isSimulating = simCarros !== null || simTanques !== null;
   const currentSimCarros = simCarros !== null ? simCarros : (baselineSummary?.carrosSolido ?? 0);
@@ -201,9 +209,10 @@ export default function SoilPanel({
       targetCrop,
       campana,
       isSimulating ? currentSimCarros : undefined,
-      isSimulating ? currentSimTanques : undefined
+      isSimulating ? currentSimTanques : undefined,
+      modoBiodisp
     );
-  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure, liquidManure, isSimulating, currentSimCarros, currentSimTanques]);
+  }, [activeLote, campoNombre, targetCrop, campana, soils, moistures, manure, liquidManure, isSimulating, currentSimCarros, currentSimTanques, modoBiodisp]);
 
   // Parámetros de capacidad y equivalencia agronómica dinámica
   const tnCarro = manure.toneladasPorCarro || 5;
@@ -543,6 +552,54 @@ export default function SoilPanel({
               <small style={{ display: "block", color: "var(--muted)", fontSize: "11px", marginTop: "5px" }}>
                 🔒 Balance y carros restantes calculados exclusivamente para la <strong>Campaña {campana}</strong>. Equivalencia agronómica: <strong>1 carro sólido ({tnCarro} tn) ≈ {equivTanques} tanques líquidos ({m3Tanque} m³ / {(m3Tanque * 1000).toLocaleString("es-AR")} L)</strong>.
               </small>
+
+              {/* Selector de modo de biodisponibilidad */}
+              <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-700)" }}>
+                  Criterio de Cálculo:
+                </span>
+                <div style={{ display: "inline-flex", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "2px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setModoBiodisp("ano1")}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "11px",
+                      fontWeight: 800,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: modoBiodisp === "ano1" ? "#15803d" : "transparent",
+                      color: modoBiodisp === "ano1" ? "#ffffff" : "var(--slate-600)",
+                      boxShadow: modoBiodisp === "ano1" ? "0 1px 2px rgba(0,0,0,0.15)" : "none",
+                    }}
+                  >
+                    ✓ Biodisponible Año 1 (Recomendado)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModoBiodisp("bruto")}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "11px",
+                      fontWeight: 800,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: modoBiodisp === "bruto" ? "#334155" : "transparent",
+                      color: modoBiodisp === "bruto" ? "#ffffff" : "var(--slate-600)",
+                      boxShadow: modoBiodisp === "bruto" ? "0 1px 2px rgba(0,0,0,0.15)" : "none",
+                    }}
+                  >
+                    Stock Bruto Total
+                  </button>
+                </div>
+                <span style={{ fontSize: "11px", color: modoBiodisp === "ano1" ? "#166534" : "#475569", fontStyle: "italic" }}>
+                  {modoBiodisp === "ano1"
+                    ? "Toma la fracción aprovechable inmediata para el cultivo (N 25% sólido / 55% líquido). Nitrógeno como N elemental."
+                    : "Toma el 100% analítico incorporado al perfil edáfico sin descontar el tiempo de mineralización."}
+                </span>
+              </div>
             </div>
 
             <div
@@ -758,7 +815,7 @@ export default function SoilPanel({
                           <SemaforoBadge result={semCovN} customLabel={`${activeSummary.coberturaPct.nitrogeno}% cubierto`} size="sm" />
                         </strong>
                         <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
-                          Disponible: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.nDisponibleKgHa + activeSummary.aportesPorHa.nitrogenoKgHa : activeSummary.aportesPorHa.nitrogenoKgHa} kg/ha (Meta: {activeSummary.metaKgHa.nitrogeno} kg/ha)
+                          Disponible: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.nDisponibleKgHa + activeSummary.aportesPorHa.nitrogenoKgHa : activeSummary.aportesPorHa.nitrogenoKgHa} kg N/ha (Meta: {activeSummary.metaKgHa.nitrogeno} kg N/ha) · Aporte: +{activeSummary.aportesPorHa.nitrogenoKgHa} kg N/ha {modoBiodisp === "ano1" ? `(Año 1 | Bruto: +${activeSummary.aportesBrutosPorHa.nitrogenoKgHa} kg N)` : "(Bruto)"}
                         </span>
                       </div>
                       <div
@@ -791,7 +848,7 @@ export default function SoilPanel({
                             textShadow: activeSummary.coberturaPct.nitrogeno > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
                           }}
                         >
-                          {semCovN.icon} {activeSummary.coberturaPct.nitrogeno}% cubierto {activeSummary.coberturaPct.nitrogeno >= 100 ? "✓ (Meta superada)" : ""}
+                          {activeSummary.coberturaPct.nitrogeno}% cubierto {activeSummary.coberturaPct.nitrogeno >= 100 ? "✓ (Meta superada)" : ""}
                         </span>
                       </div>
                     </>
@@ -811,7 +868,7 @@ export default function SoilPanel({
                           <SemaforoBadge result={semCovP} customLabel={`${activeSummary.coberturaPct.fosforo}% cubierto`} size="sm" />
                         </strong>
                         <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
-                          Aporte: +{activeSummary.aportesPorHa.fosforoKgHa} kg P/ha · P Bray: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.fosforoBrayPpm : 22} ppm (Meta: {activeSummary.metaKgHa.fosforo} kg/ha)
+                          Aporte: +{activeSummary.aportesPorHa.fosforoKgHa} kg P/ha (~{Math.round(activeSummary.aportesPorHa.fosforoKgHa * 2.291)} kg P₂O₅) · P Bray: {activeSummary.sueloPrevio ? activeSummary.sueloPrevio.fosforoBrayPpm : 22} ppm (Meta: {activeSummary.metaKgHa.fosforo} kg P/ha)
                         </span>
                       </div>
                       <div
@@ -844,7 +901,7 @@ export default function SoilPanel({
                             textShadow: activeSummary.coberturaPct.fosforo > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
                           }}
                         >
-                          {semCovP.icon} {activeSummary.coberturaPct.fosforo}% cubierto {activeSummary.coberturaPct.fosforo >= 100 ? "✓ (Meta superada)" : ""}
+                          {activeSummary.coberturaPct.fosforo}% cubierto {activeSummary.coberturaPct.fosforo >= 100 ? "✓ (Meta superada)" : ""}
                         </span>
                       </div>
                     </>
@@ -864,7 +921,7 @@ export default function SoilPanel({
                           <SemaforoBadge result={semCovK} customLabel={`${activeSummary.coberturaPct.potasio}% cubierto`} size="sm" />
                         </strong>
                         <span style={{ color: "var(--slate-600)", fontSize: "11.5px" }}>
-                          Aporte: +{activeSummary.aportesPorHa.potasioKgHa} kg K/ha (Meta: {activeSummary.metaKgHa.potasio} kg/ha)
+                          Aporte: +{activeSummary.aportesPorHa.potasioKgHa} kg K/ha (~{Math.round(activeSummary.aportesPorHa.potasioKgHa * 1.2046)} kg K₂O) (Meta: {activeSummary.metaKgHa.potasio} kg K/ha)
                           {targetCrop.toLowerCase().includes("silo") || targetCrop.toLowerCase().includes("alfalfa") ? " · ⚠️ Alta extracción por biomasa" : ""}
                         </span>
                       </div>
@@ -898,7 +955,7 @@ export default function SoilPanel({
                             textShadow: activeSummary.coberturaPct.potasio > 25 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
                           }}
                         >
-                          {semCovK.icon} {activeSummary.coberturaPct.potasio}% cubierto {activeSummary.coberturaPct.potasio >= 100 ? "✓ (Meta superada)" : ""}
+                          {activeSummary.coberturaPct.potasio}% cubierto {activeSummary.coberturaPct.potasio >= 100 ? "✓ (Meta superada)" : ""}
                         </span>
                       </div>
                     </>
@@ -1049,6 +1106,496 @@ export default function SoilPanel({
               </div>
             </div>
           )}
+
+          {/* SECCIÓN DE BIODISPONIBILIDAD Y MINERALIZACIÓN MULTIANUAL (HJB) */}
+          <div
+            className="card"
+            style={{
+              padding: "20px 22px",
+              background: "#ffffff",
+              borderRadius: "14px",
+              border: "1.5px solid var(--border)",
+              boxShadow: "var(--shadow-sm)",
+            }}
+          >
+            {/* Cabecera con título y toggle de equipo */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "12px",
+                marginBottom: "16px",
+                paddingBottom: "12px",
+                borderBottom: "1px solid var(--line)",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "18px" }}>📊</span>
+                  <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 900, color: "var(--slate-950)" }}>
+                    Biodisponibilidad de Nutrientes Principales y Mineralización Plurianual
+                  </h3>
+                </div>
+                <p style={{ margin: "3px 0 0 0", fontSize: "12px", color: "var(--muted)" }}>
+                  Curva de liberación gradual y residualidad en el tiempo (Año 1, Año 2, Año 3 y &gt;3 años) para dimensionar fertilización inmediata vs. fondo de reserva fértil.
+                </p>
+              </div>
+
+              {/* Selector de matriz / equipo */}
+              <div style={{ display: "inline-flex", background: "var(--slate-100)", padding: "3px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <button
+                  type="button"
+                  onClick={() => setEquipoCurvaSeleccionado("solido")}
+                  style={{
+                    padding: "5px 12px",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    borderRadius: "6px",
+                    border: "none",
+                    cursor: "pointer",
+                    background: equipoCurvaSeleccionado === "solido" ? "#ffffff" : "transparent",
+                    color: equipoCurvaSeleccionado === "solido" ? "var(--slate-900)" : "var(--slate-600)",
+                    boxShadow: equipoCurvaSeleccionado === "solido" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                >
+                  <span>🚜</span>
+                  <span>Carro Bosta Sólida ({tnCarro} tn - Clover E326)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEquipoCurvaSeleccionado("liquido")}
+                  style={{
+                    padding: "5px 12px",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    borderRadius: "6px",
+                    border: "none",
+                    cursor: "pointer",
+                    background: equipoCurvaSeleccionado === "liquido" ? "#ffffff" : "transparent",
+                    color: equipoCurvaSeleccionado === "liquido" ? "var(--slate-900)" : "var(--slate-600)",
+                    boxShadow: equipoCurvaSeleccionado === "liquido" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                >
+                  <span>💧</span>
+                  <span>Tanque Purín Líquido ({m3Tanque} m³ / {(m3Tanque * 1000).toLocaleString("es-AR")} L)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Grilla con los 4 paneles de nutrientes (N, P, K, S) idéntica a la infografía */}
+            {(() => {
+              const cur = equipoCurvaSeleccionado === "solido" ? activeSummary.aportePorCarroSolido : activeSummary.aportePorTanqueLiquido;
+              const u = equipoCurvaSeleccionado === "solido" ? "kg/carro" : "kg/tanque";
+              const periods = [
+                { label: "Año 1", key: "ano1" as const },
+                { label: "Año 2", key: "ano2" as const },
+                { label: "Año 3", key: "ano3" as const },
+                { label: ">3 años", key: "mas3Anos" as const },
+              ];
+
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px" }}>
+                  {/* PANEL N */}
+                  <div
+                    style={{
+                      border: "1.5px solid #bae6fd",
+                      borderRadius: "10px",
+                      background: "#f0f9ff",
+                      padding: "12px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "999px",
+                              background: "#0284c7",
+                              color: "#ffffff",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 900,
+                              fontSize: "14px",
+                            }}
+                          >
+                            N
+                          </span>
+                          <div>
+                            <strong style={{ fontSize: "13.5px", color: "#0369a1", display: "block" }}>
+                              Nitrógeno Disponible ({u})
+                            </strong>
+                            <span style={{ fontSize: "10.5px", color: "var(--muted)" }}>
+                              Reportado como N elemental
+                            </span>
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            background: "#e0f2fe",
+                            border: "1px solid #7dd3fc",
+                            borderRadius: "6px",
+                            padding: "3px 7px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            color: "#0369a1",
+                            maxWidth: "120px",
+                            textAlign: "right",
+                          }}
+                        >
+                          {cur.descripcionN}
+                        </div>
+                      </div>
+
+                      {/* Gráfico de barras para N */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", alignItems: "flex-end", height: "95px", marginTop: "10px", padding: "0 4px" }}>
+                        {periods.map((p) => {
+                          const val = cur[p.key].n;
+                          const maxN = Math.max(cur.ano1.n, 1);
+                          const barH = Math.max(12, Math.round((val / maxN) * 65));
+                          return (
+                            <div key={p.key} style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                              <strong style={{ fontSize: "12px", fontWeight: 800, color: "#0369a1", marginBottom: "3px" }}>
+                                {val.toLocaleString("es-AR")}
+                              </strong>
+                              <div
+                                style={{
+                                  width: "100%",
+                                  maxWidth: "38px",
+                                  height: `${barH}px`,
+                                  background: "#0284c7",
+                                  borderRadius: "4px 4px 0 0",
+                                  transition: "height 0.3s ease",
+                                }}
+                              />
+                              <span style={{ fontSize: "10px", color: "var(--slate-600)", fontWeight: 700, marginTop: "4px", whiteSpace: "nowrap" }}>
+                                {p.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: "10px", paddingTop: "6px", borderTop: "1px dashed #bae6fd", fontSize: "10.5px", color: "#0369a1", display: "flex", justifyContent: "space-between" }}>
+                      <span>Total bruto: <strong>{cur.bruto.n} kg N</strong></span>
+                      <span>Año 1: <strong>{cur.ano1.n} kg N</strong></span>
+                    </div>
+                  </div>
+
+                  {/* PANEL P */}
+                  <div
+                    style={{
+                      border: "1.5px solid #bbf7d0",
+                      borderRadius: "10px",
+                      background: "#f0fdf4",
+                      padding: "12px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "999px",
+                              background: "#16a34a",
+                              color: "#ffffff",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 900,
+                              fontSize: "14px",
+                            }}
+                          >
+                            P
+                          </span>
+                          <div>
+                            <strong style={{ fontSize: "13.5px", color: "#15803d", display: "block" }}>
+                              Fósforo Disponible ({u})
+                            </strong>
+                            <span style={{ fontSize: "10.5px", color: "var(--muted)" }}>
+                              Equivalente P₂O₅
+                            </span>
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            background: "#dcfce7",
+                            border: "1px solid #86efac",
+                            borderRadius: "6px",
+                            padding: "3px 7px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            color: "#15803d",
+                            maxWidth: "120px",
+                            textAlign: "right",
+                          }}
+                        >
+                          {cur.descripcionP}
+                        </div>
+                      </div>
+
+                      {/* Gráfico de barras para P */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", alignItems: "flex-end", height: "95px", marginTop: "10px", padding: "0 4px" }}>
+                        {periods.map((p) => {
+                          const valP2O5 = cur[p.key].p2o5;
+                          const maxP = Math.max(cur.ano1.p2o5, 1);
+                          const barH = Math.max(12, Math.round((valP2O5 / maxP) * 65));
+                          return (
+                            <div key={p.key} style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                              <strong style={{ fontSize: "12px", fontWeight: 800, color: "#15803d", marginBottom: "1px" }}>
+                                {valP2O5.toLocaleString("es-AR")}
+                              </strong>
+                              <span style={{ fontSize: "9.5px", color: "var(--slate-500)", marginBottom: "3px" }}>
+                                {cur[p.key].p} kg P
+                              </span>
+                              <div
+                                style={{
+                                  width: "100%",
+                                  maxWidth: "38px",
+                                  height: `${barH}px`,
+                                  background: "#16a34a",
+                                  borderRadius: "4px 4px 0 0",
+                                  transition: "height 0.3s ease",
+                                }}
+                              />
+                              <span style={{ fontSize: "10px", color: "var(--slate-600)", fontWeight: 700, marginTop: "4px", whiteSpace: "nowrap" }}>
+                                {p.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: "10px", paddingTop: "6px", borderTop: "1px dashed #bbf7d0", fontSize: "10.5px", color: "#15803d", display: "flex", justifyContent: "space-between" }}>
+                      <span>Total bruto: <strong>{cur.bruto.p} kg P ({cur.bruto.p2o5} kg P₂O₅)</strong></span>
+                      <span>Año 1: <strong>{cur.ano1.p} kg P</strong></span>
+                    </div>
+                  </div>
+
+                  {/* PANEL K */}
+                  <div
+                    style={{
+                      border: "1.5px solid #fed7aa",
+                      borderRadius: "10px",
+                      background: "#fff7ed",
+                      padding: "12px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "999px",
+                              background: "#ea580c",
+                              color: "#ffffff",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 900,
+                              fontSize: "14px",
+                            }}
+                          >
+                            K
+                          </span>
+                          <div>
+                            <strong style={{ fontSize: "13.5px", color: "#c2410c", display: "block" }}>
+                              Potasio Disponible ({u})
+                            </strong>
+                            <span style={{ fontSize: "10.5px", color: "var(--muted)" }}>
+                              Equivalente K₂O
+                            </span>
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            background: "#ffedd5",
+                            border: "1px solid #fdba74",
+                            borderRadius: "6px",
+                            padding: "3px 7px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            color: "#c2410c",
+                            maxWidth: "120px",
+                            textAlign: "right",
+                          }}
+                        >
+                          {cur.descripcionK}
+                        </div>
+                      </div>
+
+                      {/* Gráfico de barras para K */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", alignItems: "flex-end", height: "95px", marginTop: "10px", padding: "0 4px" }}>
+                        {periods.map((p) => {
+                          const valK2O = cur[p.key].k2o;
+                          const maxK = Math.max(cur.ano1.k2o, 1);
+                          const barH = Math.max(12, Math.round((valK2O / maxK) * 65));
+                          return (
+                            <div key={p.key} style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                              <strong style={{ fontSize: "12px", fontWeight: 800, color: "#c2410c", marginBottom: "1px" }}>
+                                {valK2O.toLocaleString("es-AR")}
+                              </strong>
+                              <span style={{ fontSize: "9.5px", color: "var(--slate-500)", marginBottom: "3px" }}>
+                                {cur[p.key].k} kg K
+                              </span>
+                              <div
+                                style={{
+                                  width: "100%",
+                                  maxWidth: "38px",
+                                  height: `${barH}px`,
+                                  background: "#ea580c",
+                                  borderRadius: "4px 4px 0 0",
+                                  transition: "height 0.3s ease",
+                                }}
+                              />
+                              <span style={{ fontSize: "10px", color: "var(--slate-600)", fontWeight: 700, marginTop: "4px", whiteSpace: "nowrap" }}>
+                                {p.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: "10px", paddingTop: "6px", borderTop: "1px dashed #fed7aa", fontSize: "10.5px", color: "#c2410c", display: "flex", justifyContent: "space-between" }}>
+                      <span>Total bruto: <strong>{cur.bruto.k} kg K ({cur.bruto.k2o} kg K₂O)</strong></span>
+                      <span>Año 1: <strong>{cur.ano1.k} kg K</strong></span>
+                    </div>
+                  </div>
+
+                  {/* PANEL S */}
+                  <div
+                    style={{
+                      border: "1.5px solid #fde047",
+                      borderRadius: "10px",
+                      background: "#fefce8",
+                      padding: "12px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "999px",
+                              background: "#ca8a04",
+                              color: "#ffffff",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 900,
+                              fontSize: "14px",
+                            }}
+                          >
+                            S
+                          </span>
+                          <div>
+                            <strong style={{ fontSize: "13.5px", color: "#a16207", display: "block" }}>
+                              Azufre Total ({u})
+                            </strong>
+                            <span style={{ fontSize: "10.5px", color: "var(--muted)" }}>
+                              Nutriente elemental S
+                            </span>
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            background: "#fef9c3",
+                            border: "1px solid #facc15",
+                            borderRadius: "6px",
+                            padding: "3px 7px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            color: "#a16207",
+                            maxWidth: "120px",
+                            textAlign: "right",
+                          }}
+                        >
+                          {cur.descripcionS}
+                        </div>
+                      </div>
+
+                      {/* Gráfico de barras para S */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", alignItems: "flex-end", height: "95px", marginTop: "10px", padding: "0 4px" }}>
+                        {periods.map((p) => {
+                          const valS = cur[p.key].s;
+                          const maxS = Math.max(cur.ano1.s, 1);
+                          const barH = Math.max(12, Math.round((valS / maxS) * 65));
+                          return (
+                            <div key={p.key} style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                              <strong style={{ fontSize: "12px", fontWeight: 800, color: "#a16207", marginBottom: "3px" }}>
+                                {valS.toLocaleString("es-AR")}
+                              </strong>
+                              <div
+                                style={{
+                                  width: "100%",
+                                  maxWidth: "38px",
+                                  height: `${barH}px`,
+                                  background: "#eab308",
+                                  borderRadius: "4px 4px 0 0",
+                                  transition: "height 0.3s ease",
+                                }}
+                              />
+                              <span style={{ fontSize: "10px", color: "var(--slate-600)", fontWeight: 700, marginTop: "4px", whiteSpace: "nowrap" }}>
+                                {p.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: "10px", paddingTop: "6px", borderTop: "1px dashed #fde047", fontSize: "10.5px", color: "#a16207", display: "flex", justifyContent: "space-between" }}>
+                      <span>Total bruto: <strong>{cur.bruto.s} kg S</strong></span>
+                      <span>Año 1: <strong>{cur.ano1.s} kg S</strong></span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Pie de página con supuestos analíticos */}
+            <div
+              style={{
+                marginTop: "14px",
+                padding: "8px 12px",
+                background: "var(--slate-50)",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+                fontSize: "11px",
+                color: "var(--slate-600)",
+                lineHeight: "1.4",
+              }}
+            >
+              <strong>Valores orientativos de trabajo para HJB:</strong> Base analítica sólida: N=1,2%; P=1,0%; K=2,47%; S=0,22% en efluente sólido homogéneo (Clover E326, carro 5.000 kg). Base analítica líquida: purín homogeneizado ({m3Tanque} m³/tanque). Supuestos de biodisponibilidad: N 25%-12%-5%-2%; P 60%-20%-10%-5%; K 70%-20%-8%-2%; S 35%-20%-10%-5%. <em>Nitrógeno reportado estrictamente en base a Nitrógeno elemental (N).</em>
+            </div>
+          </div>
 
           {/* GRID DE ANÁLISIS DE SUELO Y PERFIL DE HUMEDAD */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "16px" }}>
