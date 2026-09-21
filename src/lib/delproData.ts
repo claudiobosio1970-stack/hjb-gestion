@@ -200,3 +200,90 @@ export function aplicarSincronizacionDelPro(payload: Partial<DelProSyncPayload>)
 
   return updatedConfig;
 }
+
+/**
+ * Importa y aplica un archivo delpro_sync.json extraído mediante Microsoft SQL Server
+ */
+export function importarPayloadDesdeJson(jsonString: string): { success: boolean; mensaje: string; config?: DelProConfig } {
+  try {
+    const parsed = JSON.parse(jsonString);
+    if (!parsed || typeof parsed !== "object") {
+      return { success: false, mensaje: "El archivo no contiene un objeto JSON válido." };
+    }
+
+    const payload: Partial<DelProSyncPayload> = {
+      fechaSincronizacion: parsed.fechaSincronizacion || new Date().toISOString(),
+      litrosTotalesDia: Number(parsed.litrosTotalesDia) || 0,
+      vacasEnOrdeñe: Number(parsed.vacasEnOrdeñe) || 0,
+      vacasSecasPreparto: Number(parsed.vacasSecasPreparto) || 0,
+      litrosPromedioVO: Number(parsed.litrosPromedioVO) || (parsed.vacasEnOrdeñe > 0 ? Number((parsed.litrosTotalesDia / parsed.vacasEnOrdeñe).toFixed(2)) : 27.0),
+      dietaAsignada: parsed.dietaAsignada,
+      hembrasEnReposicionTambo: parsed.hembrasEnReposicionTambo,
+      machosEnRecriaEngorde: parsed.machosEnRecriaEngorde,
+      partosRecientes: Array.isArray(parsed.partosRecientes) ? parsed.partosRecientes : [],
+    };
+
+    const host = parsed.servidorHost || parsed.origenExtraccion || "SQL Server Local";
+    const base = parsed.baseDatosSql || "DelProFarmManager";
+
+    const config = saveDelProConfig({
+      estadoConexion: "conectado",
+      tipoConexion: "sql_server",
+      servidorHost: host,
+      baseDatosSql: base,
+      mensajeEstado: `Datos extraídos de SQL Server (${new Date().toLocaleTimeString("es-AR")})`,
+      datosSincronizados: {
+        ...getDelProConfig().datosSincronizados,
+        ...payload,
+      },
+    });
+
+    // Sincronizar también con la dieta del tambo
+    saveDietaTambo({
+      vacasEnOrdeñe: payload.vacasEnOrdeñe || 187,
+      vacasPreparto: payload.vacasSecasPreparto || 25,
+      litrosPromedioVO: payload.litrosPromedioVO || 27.0,
+      actualizadoPor: `Extracción SQL Server (${host})`,
+    });
+
+    return {
+      success: true,
+      mensaje: `✓ Sincronización exitosa: ${payload.vacasEnOrdeñe} VO, ${payload.litrosTotalesDia?.toLocaleString("es-AR")} lts/día, ${payload.partosRecientes?.length || 0} partos procesados.`,
+      config,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      mensaje: `Error al procesar archivo JSON: ${err?.message || "Formato no válido"}`,
+    };
+  }
+}
+
+export const DELPRO_SQL_QUERIES_SAMPLE = `-- =========================================================================================
+-- CONSULTAS SQL OFICIALES DE EXTRACCIÓN - DELAVAL DELPRO FARMMANAGER (HJB)
+-- =========================================================================================
+
+-- 1. PRODUCCIÓN DIARIA Y VACAS EN ORDEÑE (VO)
+SELECT 
+    COUNT(DISTINCT dm.AnimalOID) AS VacasEnOrdeñe,
+    ROUND(SUM(dm.TotalYield), 1) AS LitrosTotalesDia,
+    ROUND(AVG(dm.TotalYield), 2) AS LitrosPromedioVO
+FROM DailyMilkYield dm WITH (NOLOCK)
+WHERE dm.YieldDate >= CAST(DATEADD(day, -1, GETDATE()) AS DATE);
+
+-- 2. PARTOS RECIENTES Y SEGREGACIÓN HJB (HEMBRAS A REPOSICIÓN / MACHOS A FAENA)
+SELECT TOP 20
+    c.OID AS PartoId,
+    CONVERT(VARCHAR(10), c.EventDate, 103) AS FechaParto,
+    m.VisualID AS RPMadre,
+    k.VisualID AS RPCria,
+    CASE WHEN k.Sex = 1 THEN 'Macho' ELSE 'Hembra' END AS Sexo,
+    ROUND(ISNULL(k.BirthWeight, 38.0), 1) AS PesoKg,
+    CASE 
+        WHEN k.Sex = 1 THEN 'Engorde / Novillo (Venta Comercial)'
+        ELSE 'Tambo (Vaquillona de Reposición)'
+    END AS DestinoHJB
+FROM Calving c WITH (NOLOCK)
+JOIN Animal m WITH (NOLOCK) ON c.MotherAnimalOID = m.OID
+LEFT JOIN Animal k WITH (NOLOCK) ON c.CalfAnimalOID = k.OID
+ORDER BY c.EventDate DESC;`;

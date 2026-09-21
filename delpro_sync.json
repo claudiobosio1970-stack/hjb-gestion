@@ -1,0 +1,50 @@
+{
+    "fechaSincronizacion":  "2026-09-21T20:35:31.3713427-03:00",
+    "origenExtraccion":  "Modo Prueba HJB (SQL Server DelPro)",
+    "servidorHost":  "localhost\\DELPRO",
+    "baseDatosSql":  "DelProFarmManager",
+    "litrosTotalesDia":  5049,
+    "vacasEnOrdeÃ±e":  187,
+    "vacasSecasPreparto":  25,
+    "litrosPromedioVO":  27,
+    "dietaAsignada":  {
+                          "pelletSojaKg":  2.5,
+                          "pelletTrigoKg":  3,
+                          "siloMaizKg":  22,
+                          "maizKg":  5.5,
+                          "rolloAlfalfaKg":  3,
+                          "salMineralGramos":  150
+                      },
+    "hembrasEnReposicionTambo":  48,
+    "machosEnRecriaEngorde":  {
+                                  "guachera":  24,
+                                  "rm1":  22,
+                                  "rm2":  28,
+                                  "rm3":  30,
+                                  "terminacion":  26
+                              },
+    "partosRecientes":  [
+                            {
+                                "id":  "p-260921-1",
+                                "fecha":  "20/09/26",
+                                "rpMadre":  "RP-4102",
+                                "rpCria":  "RP-8815 (Macho)",
+                                "sexo":  "Macho",
+                                "pesoNacimientoKg":  39.5,
+                                "destino":  "Engorde / Novillo (Venta Comercial)",
+                                "estado":  "En Guachera",
+                                "observaciones":  "Ternero macho ingresado a recria para faena"
+                            },
+                            {
+                                "id":  "p-260921-2",
+                                "fecha":  "21/09/26",
+                                "rpMadre":  "RP-3890",
+                                "rpCria":  "RP-8816 (Hembra)",
+                                "sexo":  "Hembra",
+                                "pesoNacimientoKg":  37,
+                                "destino":  "Tambo (Vaquillona de Reposicion)",
+                                "estado":  "En Guachera",
+                                "observaciones":  "Ternera hembra reservada 100% para tambo HJB"
+                            }
+                        ]
+}

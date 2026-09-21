@@ -33,9 +33,12 @@ import {
   DelProConfig,
   HJB_DELPRO_SYNC_EVENT,
   aplicarSincronizacionDelPro,
+  importarPayloadDesdeJson,
+  DELPRO_SQL_QUERIES_SAMPLE,
 } from "@/lib/delproData";
 
 type TabTipo = "consolidado" | "tambo" | "agricultura" | "ganaderia";
+type TabDelProModal = "resumen" | "sql_extractor" | "queries";
 
 export default function InicioPage() {
   const [tabActiva, setTabActiva] = useState<TabTipo>("consolidado");
@@ -51,9 +54,12 @@ export default function InicioPage() {
   const [tropas, setTropas] = useState<TropaGanadera[]>([]);
   const [delproConfig, setDelproConfig] = useState<DelProConfig>(() => getDelProConfig());
 
-  // Modales
+  // Modales y herramientas DelPro
   const [modalParametrosOpen, setModalParametrosOpen] = useState(false);
   const [modalDelProOpen, setModalDelProOpen] = useState(false);
+  const [tabDelProModal, setTabDelProModal] = useState<TabDelProModal>("sql_extractor");
+  const [feedbackDelPro, setFeedbackDelPro] = useState<string | null>(null);
+  const [copiadoSql, setCopiadoSql] = useState(false);
   const [formParametros, setFormParametros] = useState({
     litrosPromedioVO: 27.0,
     precioLitroLecheArs: 549.0, // Precio real informado por usuario
@@ -61,6 +67,30 @@ export default function InicioPage() {
     precioNovilloGordoVivoArs: 4200,
   });
   const [feedbackParametros, setFeedbackParametros] = useState<string | null>(null);
+
+  function handleCargarArchivoJson(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      const res = importarPayloadDesdeJson(content);
+      if (res.success && res.config) {
+        setDelproConfig(res.config);
+        cargarTodo();
+        setFeedbackDelPro(res.mensaje);
+      } else {
+        setFeedbackDelPro(`❌ ${res.mensaje}`);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function handleCopiarSql() {
+    navigator.clipboard.writeText(DELPRO_SQL_QUERIES_SAMPLE);
+    setCopiadoSql(true);
+    setTimeout(() => setCopiadoSql(false), 2000);
+  }
 
   function cargarTodo() {
     const d = getDietaTambo();
@@ -1621,70 +1651,250 @@ export default function InicioPage() {
               </div>
             </div>
 
-            <div style={{ fontSize: "13px", color: "var(--slate-700)", marginBottom: "16px", lineHeight: "1.5" }}>
-              Esta arquitectura conecta automáticamente las variables del tambo y la hacienda con el software oficial de ordeñe:
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
-              <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
-                  1. Producción Lechera
-                </div>
-                <div style={{ fontSize: "14px", fontWeight: 800, color: "#1e40af", marginTop: "2px" }}>
-                  🥛 {litrosTotalesDia.toLocaleString("es-AR")} lts/día
-                </div>
-                <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
-                  Caudalímetros DelPro / Tanque de leche
-                </div>
-              </div>
-
-              <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
-                  2. Rodeo en Ordeñe (VO)
-                </div>
-                <div style={{ fontSize: "14px", fontWeight: 800, color: "#15803d", marginTop: "2px" }}>
-                  🐄 {vacasVO} Vacas en Ordeñe
-                </div>
-                <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
-                  Promedio: {litrosPromedioVO} lts/VO/día
-                </div>
-              </div>
-
-              <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
-                  3. Dieta y Raciones
-                </div>
-                <div style={{ fontSize: "14px", fontWeight: 800, color: "#ca8a04", marginTop: "2px" }}>
-                  🥣 Formulaciones Activas
-                </div>
-                <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
-                  Estaciones de alimentación y mixer
-                </div>
-              </div>
-
-              <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
-                  4. Partos & Destino Animal
-                </div>
-                <div style={{ fontSize: "13px", fontWeight: 800, color: "#c2410c", marginTop: "2px" }}>
-                  🐂 Solo Machos al Engorde
-                </div>
-                <div style={{ fontSize: "11px", color: "#166534", fontWeight: 700, marginTop: "2px" }}>
-                  ✓ Hembras 100% al Tambo (Reposición)
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            {/* Selector de Solapas del Modal DelPro */}
+            <div style={{ display: "flex", gap: "6px", borderBottom: "1px solid var(--line)", marginBottom: "16px" }}>
               <button
                 type="button"
-                onClick={() => setModalDelProOpen(false)}
-                className="primaryBtn"
-                style={{ padding: "8px 18px" }}
+                onClick={() => setTabDelProModal("sql_extractor")}
+                style={{
+                  padding: "8px 14px",
+                  fontSize: "13px",
+                  fontWeight: tabDelProModal === "sql_extractor" ? 800 : 500,
+                  border: "none",
+                  borderBottom: tabDelProModal === "sql_extractor" ? "2px solid #2563eb" : "2px solid transparent",
+                  background: "none",
+                  color: tabDelProModal === "sql_extractor" ? "#2563eb" : "var(--slate-600)",
+                  cursor: "pointer",
+                }}
               >
-                Cerrar
+                📥 Extractor SQL Server
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabDelProModal("resumen")}
+                style={{
+                  padding: "8px 14px",
+                  fontSize: "13px",
+                  fontWeight: tabDelProModal === "resumen" ? 800 : 500,
+                  border: "none",
+                  borderBottom: tabDelProModal === "resumen" ? "2px solid #2563eb" : "2px solid transparent",
+                  background: "none",
+                  color: tabDelProModal === "resumen" ? "#2563eb" : "var(--slate-600)",
+                  cursor: "pointer",
+                }}
+              >
+                📊 Métricas Sincronizadas
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabDelProModal("queries")}
+                style={{
+                  padding: "8px 14px",
+                  fontSize: "13px",
+                  fontWeight: tabDelProModal === "queries" ? 800 : 500,
+                  border: "none",
+                  borderBottom: tabDelProModal === "queries" ? "2px solid #2563eb" : "2px solid transparent",
+                  background: "none",
+                  color: tabDelProModal === "queries" ? "#2563eb" : "var(--slate-600)",
+                  cursor: "pointer",
+                }}
+              >
+                📋 Consultas SQL (SSMS)
               </button>
             </div>
+
+            {feedbackDelPro && (
+              <div
+                style={{
+                  background: feedbackDelPro.startsWith("❌") ? "#fef2f2" : "#f0fdf4",
+                  border: `1px solid ${feedbackDelPro.startsWith("❌") ? "#fecaca" : "#bbf7d0"}`,
+                  color: feedbackDelPro.startsWith("❌") ? "#991b1b" : "#166534",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  marginBottom: "16px",
+                }}
+              >
+                {feedbackDelPro}
+              </div>
+            )}
+
+            {/* CONTENIDO SOLAPA 1: EXTRACTOR SQL SERVER */}
+            {tabDelProModal === "sql_extractor" && (
+              <div>
+                <div style={{ background: "#f8fafc", border: "2px dashed #cbd5e1", borderRadius: "10px", padding: "18px", textAlign: "center", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "28px", marginBottom: "4px" }}>💾</div>
+                  <strong style={{ fontSize: "14px", color: "var(--slate-800)" }}>Cargar Archivo Extraído de SQL Server</strong>
+                  <p style={{ fontSize: "12px", color: "var(--slate-500)", margin: "4px 0 14px" }}>
+                    Selecciona el archivo <code>delpro_sync.json</code> generado por el script en la computadora del tambo:
+                  </p>
+                  <label className="primaryBtn" style={{ display: "inline-block", cursor: "pointer", padding: "9px 20px", fontSize: "13px", fontWeight: 700 }}>
+                    📁 Seleccionar delpro_sync.json
+                    <input type="file" accept=".json" onChange={handleCargarArchivoJson} style={{ display: "none" }} />
+                  </label>
+                </div>
+
+                <div style={{ background: "#f1f5f9", padding: "14px", borderRadius: "8px", marginBottom: "16px", fontSize: "12.5px" }}>
+                  <strong style={{ display: "block", marginBottom: "6px", color: "var(--slate-800)" }}>
+                    💻 ¿Cómo ejecutar el extractor en la máquina del tambo?
+                  </strong>
+                  <div style={{ fontSize: "12px", color: "var(--slate-600)", marginBottom: "8px" }}>
+                    En la PC donde está instalado DeLaval DelPro, abrir PowerShell y ejecutar:
+                  </div>
+                  <div style={{ background: "#0f172a", color: "#38bdf8", padding: "10px 12px", borderRadius: "6px", fontFamily: "monospace", fontSize: "12px", overflowX: "auto" }}>
+                    powershell -ExecutionPolicy Bypass -File .\scripts\delpro\extraer_delpro.ps1
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "6px" }}>
+                    * Para automatizarlo, puedes programar la tarea en Windows para las 07:30 y 18:30 (ver guía en <code>scripts/delpro/README_DELPRO.md</code>).
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="secondaryBtn"
+                    style={{ fontSize: "12px", padding: "6px 12px" }}
+                    onClick={() => {
+                      const res = importarPayloadDesdeJson(JSON.stringify(delproConfig.datosSincronizados));
+                      if (res.success && res.config) {
+                        setDelproConfig(res.config);
+                        cargarTodo();
+                        setFeedbackDelPro("✓ Datos de prueba de SQL Server sincronizados correctamente.");
+                      }
+                    }}
+                  >
+                    ⚡ Recalcular con Datos Reales HJB
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalDelProOpen(false)}
+                    className="primaryBtn"
+                    style={{ padding: "8px 18px" }}
+                  >
+                    Listo
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* CONTENIDO SOLAPA 2: RESUMEN DE MÉTRICAS SINCRONIZADAS */}
+            {tabDelProModal === "resumen" && (
+              <div>
+                <div style={{ fontSize: "13px", color: "var(--slate-700)", marginBottom: "14px", lineHeight: "1.5" }}>
+                  Variables productivas enlazadas con la base de datos de DeLaval DelPro:
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
+                  <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
+                      1. Producción Lechera
+                    </div>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: "#1e40af", marginTop: "2px" }}>
+                      🥛 {litrosTotalesDia.toLocaleString("es-AR")} lts/día
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                      Caudalímetros DelPro / Tanque de leche
+                    </div>
+                  </div>
+
+                  <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
+                      2. Rodeo en Ordeñe (VO)
+                    </div>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: "#15803d", marginTop: "2px" }}>
+                      🐄 {vacasVO} Vacas en Ordeñe
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                      Promedio: {litrosPromedioVO} lts/VO/día
+                    </div>
+                  </div>
+
+                  <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
+                      3. Dieta y Raciones
+                    </div>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: "#ca8a04", marginTop: "2px" }}>
+                      🥣 Formulaciones Activas
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                      Estaciones de alimentación y mixer
+                    </div>
+                  </div>
+
+                  <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
+                      4. Partos & Destino Animal
+                    </div>
+                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#c2410c", marginTop: "2px" }}>
+                      🐂 Solo Machos al Engorde
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#166534", fontWeight: 700, marginTop: "2px" }}>
+                      ✓ Hembras 100% al Tambo (Reposición)
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={() => setModalDelProOpen(false)}
+                    className="primaryBtn"
+                    style={{ padding: "8px 18px" }}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* CONTENIDO SOLAPA 3: CONSULTAS SQL PARA SSMS */}
+            {tabDelProModal === "queries" && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "12.5px", color: "var(--slate-600)" }}>
+                    Consultas SQL de solo lectura con <code>WITH (NOLOCK)</code> para auditar en SSMS:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopiarSql}
+                    className="secondaryBtn"
+                    style={{ fontSize: "12px", padding: "4px 10px", fontWeight: 700 }}
+                  >
+                    {copiadoSql ? "✓ ¡Copiado!" : "📋 Copiar SQL"}
+                  </button>
+                </div>
+
+                <pre
+                  style={{
+                    background: "#0f172a",
+                    color: "#e2e8f0",
+                    padding: "14px",
+                    borderRadius: "8px",
+                    fontSize: "11.5px",
+                    lineHeight: "1.4",
+                    fontFamily: "monospace",
+                    maxHeight: "260px",
+                    overflowY: "auto",
+                    marginBottom: "16px",
+                  }}
+                >
+                  {DELPRO_SQL_QUERIES_SAMPLE}
+                </pre>
+
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={() => setModalDelProOpen(false)}
+                    className="primaryBtn"
+                    style={{ padding: "8px 18px" }}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
