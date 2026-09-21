@@ -12,6 +12,7 @@ import {
   HJB_DIETA_SYNC_EVENT,
   HJB_STOCK_SYNC_EVENT,
 } from "@/lib/stockInsumosData";
+import { getPrecioReferencia } from "@/lib/valoresMovilesData";
 
 export default function TamboPage() {
   const [dieta, setDieta] = useState<DietaTamboConfig>(getDietaTambo());
@@ -104,6 +105,20 @@ export default function TamboPage() {
 
   const consumoDiaSilo = Math.round(formDieta.vacasEnOrdeñe * formDieta.siloMaiz * 10) / 10;
   const diasSilo = consumoDiaSilo > 0 ? Math.floor(stockSiloKg / consumoDiaSilo) : 0;
+
+  // Costos de alimentación por vaca en ordeño (VO) y totales de rodeo
+  const precioKgSoja = (getPrecioReferencia("pellet-soja", "ARS") || 295200) / 1000;
+  const precioKgTrigo = (getPrecioReferencia("pellet-trigo", "ARS") || 221800) / 1000;
+  const precioKgSilo = getPrecioReferencia("silo-maiz", "ARS") || 80;
+  const precioKgMaiz = (getPrecioReferencia("maiz", "ARS") || 210000) / 1000;
+
+  const costoDiaVOSoja = Number((formDieta.pelletSoja * precioKgSoja).toFixed(2));
+  const costoDiaVOTrigo = Number((formDieta.pelletTrigo * precioKgTrigo).toFixed(2));
+  const costoDiaVOSilo = Number((formDieta.siloMaiz * precioKgSilo).toFixed(2));
+  const costoDiaVOMaiz = Number((formDieta.maiz * precioKgMaiz).toFixed(2));
+
+  const costoTotalDiaVO = Number((costoDiaVOSoja + costoDiaVOTrigo + costoDiaVOSilo + costoDiaVOMaiz).toFixed(2));
+  const costoTotalRodeoDia = Math.round(costoTotalDiaVO * formDieta.vacasEnOrdeñe);
 
   return (
     <AppShell active="Tambo">
@@ -229,6 +244,12 @@ export default function TamboPage() {
               <p className="muted" style={{ fontSize: "12.5px", margin: "4px 0 0 0" }}>
                 Cualquier cambio aquí recalcula automáticamente la duración del stock de forrajes y el panel de <strong>Canje de Pellet en AFA</strong>.
               </p>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(22, 163, 74, 0.1)", border: "1px solid rgba(22, 163, 74, 0.3)", padding: "4px 10px", borderRadius: "6px", color: "#166534", marginTop: "6px" }}>
+                <span style={{ fontSize: "13px" }}>💵</span>
+                <span style={{ fontSize: "12px", fontWeight: 800 }}>
+                  Costo Diario Alimentación: ${costoTotalDiaVO.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / VO / día (${costoTotalRodeoDia.toLocaleString("es-AR")}/d rodeo)
+                </span>
+              </div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "#f8fafc", padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--line)" }}>
@@ -262,10 +283,11 @@ export default function TamboPage() {
               <thead>
                 <tr>
                   <th style={{ minWidth: "220px" }}>Alimento / Subproducto</th>
-                  <th style={{ width: "160px", textAlign: "right" }}>Ración kg/VO/día</th>
-                  <th style={{ width: "170px", textAlign: "right" }}>Consumo Rodeo / Día</th>
-                  <th style={{ width: "160px", textAlign: "right" }}>Stock en Tambo</th>
-                  <th style={{ width: "170px", textAlign: "center" }}>Autonomía Restante</th>
+                  <th style={{ width: "150px", textAlign: "right" }}>Ración kg/VO/día</th>
+                  <th style={{ width: "160px", textAlign: "right" }}>Consumo Rodeo / Día</th>
+                  <th style={{ width: "150px", textAlign: "right", color: "#166534" }}>Costo / VO / Día</th>
+                  <th style={{ width: "150px", textAlign: "right" }}>Stock en Tambo</th>
+                  <th style={{ width: "160px", textAlign: "center" }}>Autonomía Restante</th>
                   <th style={{ width: "130px", textAlign: "center" }}>Acción</th>
                 </tr>
               </thead>
@@ -311,6 +333,14 @@ export default function TamboPage() {
                     <strong style={{ fontSize: "13.5px" }}>{consumoDiaSoja.toLocaleString("es-AR")} kg/día</strong>
                     <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
                       {(consumoDiaSoja / 1000).toFixed(2)} Tn/día
+                    </div>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <strong style={{ color: "#166534", fontSize: "13.5px" }}>
+                      ${costoDiaVOSoja.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                    <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>
+                      ${precioKgSoja.toLocaleString("es-AR", { minimumFractionDigits: 1 })}/kg · ${(Math.round(costoDiaVOSoja * formDieta.vacasEnOrdeñe)).toLocaleString("es-AR")}/d rodeo
                     </div>
                   </td>
                   <td style={{ textAlign: "right" }}>
@@ -388,6 +418,14 @@ export default function TamboPage() {
                     </div>
                   </td>
                   <td style={{ textAlign: "right" }}>
+                    <strong style={{ color: "#166534", fontSize: "13.5px" }}>
+                      ${costoDiaVOTrigo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                    <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>
+                      ${precioKgTrigo.toLocaleString("es-AR", { minimumFractionDigits: 1 })}/kg · ${(Math.round(costoDiaVOTrigo * formDieta.vacasEnOrdeñe)).toLocaleString("es-AR")}/d rodeo
+                    </div>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
                     <div style={{ fontSize: "14px", fontWeight: 800, color: stockPelletTrigoKg > 0 ? "#15803d" : "#64748b" }}>
                       {stockPelletTrigoKg.toLocaleString("es-AR")} kg
                     </div>
@@ -458,6 +496,14 @@ export default function TamboPage() {
                     <strong style={{ fontSize: "13.5px" }}>{consumoDiaSilo.toLocaleString("es-AR")} kg/día</strong>
                     <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
                       {(consumoDiaSilo / 1000).toFixed(2)} Tn/día
+                    </div>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <strong style={{ color: "#166534", fontSize: "13.5px" }}>
+                      ${costoDiaVOSilo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                    <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>
+                      ${precioKgSilo.toLocaleString("es-AR", { minimumFractionDigits: 1 })}/kg · ${(Math.round(costoDiaVOSilo * formDieta.vacasEnOrdeñe)).toLocaleString("es-AR")}/d rodeo
                     </div>
                   </td>
                   <td style={{ textAlign: "right" }}>
@@ -532,6 +578,14 @@ export default function TamboPage() {
                     </div>
                   </td>
                   <td style={{ textAlign: "right" }}>
+                    <strong style={{ color: "#166534", fontSize: "13.5px" }}>
+                      ${costoDiaVOMaiz.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                    <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>
+                      ${precioKgMaiz.toLocaleString("es-AR", { minimumFractionDigits: 1 })}/kg · ${(Math.round(costoDiaVOMaiz * formDieta.vacasEnOrdeñe)).toLocaleString("es-AR")}/d rodeo
+                    </div>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
                     <div style={{ fontSize: "13px", color: "var(--slate-600)" }}>
                       Acopio propio / AFA
                     </div>
@@ -548,6 +602,24 @@ export default function TamboPage() {
                   </td>
                 </tr>
               </tbody>
+              <tfoot>
+                <tr style={{ background: "#f8fafc", fontWeight: 700 }}>
+                  <td>TOTALES RACIÓN RODEO</td>
+                  <td style={{ textAlign: "right" }}>
+                    {(formDieta.pelletSoja + formDieta.pelletTrigo + formDieta.siloMaiz + formDieta.maiz).toFixed(1)} kg/VO
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    {((formDieta.pelletSoja + formDieta.pelletTrigo + formDieta.siloMaiz + formDieta.maiz) * formDieta.vacasEnOrdeñe / 1000).toFixed(2)} Tn/d
+                  </td>
+                  <td style={{ textAlign: "right", color: "#166534", fontSize: "14px", fontWeight: 900 }}>
+                    ${costoTotalDiaVO.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <div style={{ fontSize: "10.5px", color: "var(--slate-600)", fontWeight: 600 }}>/ VO / día</div>
+                  </td>
+                  <td style={{ textAlign: "right" }}>—</td>
+                  <td style={{ textAlign: "center" }}>—</td>
+                  <td style={{ textAlign: "center" }}>—</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 

@@ -1200,8 +1200,16 @@ export default function GanaderiaPage() {
                       <span>Ración Diaria y Orden de Carga para Mixer</span>
                     </h3>
                     <p className="muted" style={{ fontSize: "12px", margin: "2px 0 0 0" }}>
-                      Cantidades individuales y carga total a preparar en comedero para <strong>${cabezasModal} cabezas</strong>.
+                      Cantidades individuales y carga total a preparar en comedero para <strong>{cabezasModal} cabezas</strong>.
                     </p>
+                    {cabezasModal > 0 && (
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(22, 163, 74, 0.1)", border: "1px solid rgba(22, 163, 74, 0.3)", padding: "3px 8px", borderRadius: "6px", marginTop: "4px", color: "#166534" }}>
+                        <span style={{ fontSize: "12px" }}>💵</span>
+                        <span style={{ fontSize: "12px", fontWeight: 800 }}>
+                          Costo Diario: ${(costoTotalCorralDiaModal / cabezasModal).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / cab. / día
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -1246,8 +1254,9 @@ export default function GanaderiaPage() {
                       <tr>
                         <th>Ingrediente</th>
                         <th style={{ textAlign: "right" }}>Ración / Cabeza</th>
-                        <th style={{ textAlign: "right" }}>Carga Total Mixer (${cabezasModal} cab.)</th>
+                        <th style={{ textAlign: "right" }}>Carga Total Mixer ({cabezasModal} cab.)</th>
                         <th style={{ textAlign: "right" }}>Precio Insumo (Móvil)</th>
+                        <th style={{ textAlign: "right", color: "#166534" }}>Costo / Cab. / Día</th>
                         <th style={{ textAlign: "right" }}>Costo Total Día</th>
                         <th style={{ textAlign: "right" }}>% Ración</th>
                       </tr>
@@ -1257,6 +1266,7 @@ export default function GanaderiaPage() {
                         const precioUnit = getCostoInsumoDieta(d.insumoId);
                         const totalKgCorral = Number((d.cantidadKgDia * cabezasModal).toFixed(1));
                         const costoInsumoDia = Math.round(totalKgCorral * precioUnit);
+                        const costoInsumoDiaCab = Number((d.cantidadKgDia * precioUnit).toFixed(2));
                         const incidenciaPct = costoTotalCorralDiaModal > 0 ? Math.round((costoInsumoDia / costoTotalCorralDiaModal) * 100) : 0;
 
                         return (
@@ -1301,6 +1311,12 @@ export default function GanaderiaPage() {
                               ${precioUnit.toLocaleString("es-AR")} / {d.unidad}
                             </td>
                             <td style={{ textAlign: "right" }}>
+                              <strong style={{ color: "#166534", fontSize: "13px" }}>
+                                ${costoInsumoDiaCab.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </strong>
+                              <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>/ cab. / día</div>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
                               <strong style={{ color: "#166534" }}>${costoInsumoDia.toLocaleString("es-AR")}</strong>
                             </td>
                             <td style={{ textAlign: "right" }}>
@@ -1320,6 +1336,10 @@ export default function GanaderiaPage() {
                           {(corralModalSeleccionado.dietaBase.reduce((acc, d) => acc + d.cantidadKgDia, 0) * cabezasModal).toFixed(1)} kg/Lts
                         </td>
                         <td style={{ textAlign: "right" }}>—</td>
+                        <td style={{ textAlign: "right", color: "#166534", fontSize: "13.5px" }}>
+                          ${(costoTotalCorralDiaModal / (cabezasModal || 1)).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <div style={{ fontSize: "10.5px", color: "var(--slate-600)", fontWeight: 500 }}>/ cab. / día</div>
+                        </td>
                         <td style={{ textAlign: "right", color: "#166534", fontSize: "13.5px" }}>
                           ${costoTotalCorralDiaModal.toLocaleString("es-AR")}
                         </td>

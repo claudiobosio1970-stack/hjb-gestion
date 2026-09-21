@@ -41,10 +41,10 @@ const CATEGORIAS: { id: CategoriaValor; label: string; icon: string; desc: strin
     desc: "Rollos henificados de reserva forrajera con peso promedio de referencia.",
   },
   {
-    id: "Pellets & Concentrados",
-    label: "Pellets & Concentrados",
+    id: "Pellets & Sales",
+    label: "Pellets & Sales",
     icon: "🥣",
-    desc: "Suplementos proteicos y subproductos agroindustriales para dietas de tambo.",
+    desc: "Pellets proteicos, afrechillos y sales minerales/aniónicas para dietas de tambo.",
   },
   {
     id: "Líquidos de Fumigación",
@@ -136,7 +136,7 @@ export default function MercadosPage() {
     { id: "Granos", label: "🌾 Granos" },
     { id: "Ensilajes & Pasturas", label: "🌿 Ensilajes & Pasturas" },
     { id: "Rollos Forrajeros", label: "🚜 Rollos Forrajeros" },
-    { id: "Pellets & Concentrados", label: "🥣 Pellets & Concentrados" },
+    { id: "Pellets & Sales", label: "🥣 Pellets & Sales" },
     { id: "Líquidos de Fumigación", label: "🧪 Líquidos de Fumigación" },
   ];
 

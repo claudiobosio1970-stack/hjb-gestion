@@ -5,7 +5,7 @@ export type CategoriaValor =
   | "Granos"
   | "Ensilajes & Pasturas"
   | "Rollos Forrajeros"
-  | "Pellets & Concentrados"
+  | "Pellets & Sales"
   | "Líquidos de Fumigación";
 
 export type FuenteValor =
@@ -270,12 +270,12 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   },
 
   // ==========================================
-  // 5. PELLETS & CONCENTRADOS (Manual HJB)
+  // 5. PELLETS & SALES (Manual HJB)
   // ==========================================
   {
     id: "pellet-soja",
     nombre: "Pellet de soja",
-    categoria: "Pellets & Concentrados",
+    categoria: "Pellets & Sales",
     valorArs: 489700,
     valorUsd: 320.07,
     unidadArs: "$/Tn",
@@ -289,7 +289,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   {
     id: "pellet-trigo",
     nombre: "Pellet de trigo",
-    categoria: "Pellets & Concentrados",
+    categoria: "Pellets & Sales",
     valorArs: 235400,
     valorUsd: 153.86,
     unidadArs: "$/Tn",
@@ -303,7 +303,7 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
   {
     id: "semilla-algodon",
     nombre: "Semilla de algodón",
-    categoria: "Pellets & Concentrados",
+    categoria: "Pellets & Sales",
     valorArs: 345000,
     valorUsd: 225.49,
     unidadArs: "$/Tn",
@@ -313,6 +313,34 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     fletePct: 8,
     nota: "Suplemento graso y proteico tambo con flete (Equiv. $345,00 / kg)",
     fechaActualizacion: "15/9/26",
+  },
+  {
+    id: "sal-mineral",
+    nombre: "Sal Mineral V.O. (MZM con Levadura)",
+    categoria: "Pellets & Sales",
+    valorArs: 1289.88,
+    valorUsd: 0.843,
+    unidadArs: "$/kg",
+    unidadUsd: "USD/kg",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    fletePct: 0,
+    nota: "Premezcla mineral y vitamínica para vacas en ordeñe ($1.289,88/kg o $1.289.880/Tn)",
+    fechaActualizacion: "18/8/26",
+  },
+  {
+    id: "sal-anionica",
+    nombre: "Sal Aniónica Preparto",
+    categoria: "Pellets & Sales",
+    valorArs: 1450.00,
+    valorUsd: 0.948,
+    unidadArs: "$/kg",
+    unidadUsd: "USD/kg",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    fletePct: 0,
+    nota: "Sales aniónicas para prevención de hipocalcemia en lote preparto ($1.450,00/kg)",
+    fechaActualizacion: "18/8/26",
   },
 
   // ==========================================

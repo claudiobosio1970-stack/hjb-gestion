@@ -75,6 +75,7 @@ export interface InsumoStockItem {
   produccionPropia: number;
   canjeIngresos?: number;
   canjeSalidas?: number;
+  ajustesInventario?: number;
   precioUnitarioArs: number;
   precioUnitarioUsd: number;
   valorTotalArs: number;
@@ -117,9 +118,13 @@ export interface IngresoStockManual {
   insumoId: string;
   fecha: string;
   cantidad: number;
+  cantidadTn?: number;
   remitoProveedor: string;
   costoUnitarioArs?: number;
   observaciones?: string;
+  ubicacion?: string; // ej: "AFA Los Cardos", "Silos", "Cooperativa", "Puerto (San Lorenzo)", "Depósito de Químicos - Aguilera", etc.
+  tipoLugar?: StockUbicacionBreakdown["tipoLugar"];
+  deleted?: boolean;
 }
 
 // =========================================================================
@@ -131,6 +136,9 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   | "consumoAgricola"
   | "ingresosCompras"
   | "produccionPropia"
+  | "canjeIngresos"
+  | "canjeSalidas"
+  | "ajustesInventario"
   | "precioUnitarioArs"
   | "precioUnitarioUsd"
   | "valorTotalArs"
@@ -415,6 +423,28 @@ export const INSUMOS_BASE_CATALOGO: Omit<
     valorMovilId: "balanceado-iniciador",
     aliasLabores: ["balanceado", "iniciador", "balanceado terneros"],
   },
+  {
+    id: "sal-mineral",
+    nombre: "Sal Mineral V.O. (MZM con Levadura)",
+    categoria: "Forrajes",
+    unidad: "kg",
+    stockInicial: 0,
+    stockMinimoAlerta: 500,
+    ubicacion: "Galpón de Raciones - Tambo",
+    valorMovilId: "sal-mineral",
+    aliasLabores: ["sal", "sales", "sal mineral", "sales minerales", "mzm", "sal con levadura"],
+  },
+  {
+    id: "sal-anionica",
+    nombre: "Sal Aniónica Preparto",
+    categoria: "Forrajes",
+    unidad: "kg",
+    stockInicial: 0,
+    stockMinimoAlerta: 300,
+    ubicacion: "Galpón de Raciones - Tambo",
+    valorMovilId: "sal-anionica",
+    aliasLabores: ["sal aniónica", "sales aniónicas", "anionica", "preparto"],
+  },
 
   // 6. COMBUSTIBLES
   {
@@ -458,6 +488,78 @@ export function getIngresosManuales(): IngresoStockManual[] {
 export function saveIngresosManuales(ingresos: IngresoStockManual[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_INGRESOS_STOCK, JSON.stringify(ingresos));
+}
+
+// =========================================================================
+// MÉTODOS DE PERSISTENCIA Y RECUPERACIÓN DE AJUSTES MANUALES DE STOCK
+// (Corrección por error de carga, mermas, restas de toneladas)
+// =========================================================================
+export interface AjusteStockManual {
+  id: string;
+  insumoId: string;
+  fecha: string;
+  tipo: "restar" | "sumar" | "fijar";
+  cantidadDelta: number; // negativo si resta, positivo si suma (en unidad base)
+  cantidadTn?: number;
+  stockResultante?: number;
+  motivo: string;
+  ubicacion?: string;
+  tipoLugar?: StockUbicacionBreakdown["tipoLugar"];
+  deleted?: boolean;
+  createdAt: string;
+}
+
+const STORAGE_AJUSTES_STOCK = "hjb_stock_ajustes_manuales_v01";
+
+export function getAjustesStock(): AjusteStockManual[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_AJUSTES_STOCK);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveAjustesStock(ajustes: AjusteStockManual[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_AJUSTES_STOCK, JSON.stringify(ajustes));
+}
+
+export function registrarAjusteStock(nuevo: Omit<AjusteStockManual, "id" | "createdAt">): AjusteStockManual {
+  const all = getAjustesStock();
+  const id = `ajuste-${Date.now()}`;
+  const item: AjusteStockManual = {
+    ...nuevo,
+    id,
+    createdAt: new Date().toISOString(),
+  };
+  all.unshift(item);
+  saveAjustesStock(all);
+  notifyStockSync();
+
+  if (typeof window !== "undefined" && db) {
+    setDoc(doc(db, "stock_ajustes", item.id), sanitizeForFirestore(item)).catch((err) => {
+      console.error("Error al guardar ajuste de stock en Firestore:", err);
+    });
+  }
+
+  return item;
+}
+
+export function eliminarAjusteStock(id: string): boolean {
+  const all = getAjustesStock();
+  const filtered = all.filter((x) => x.id !== id);
+  saveAjustesStock(filtered);
+  notifyStockSync();
+
+  if (typeof window !== "undefined" && db) {
+    setDoc(doc(db, "stock_ajustes", id), { deleted: true }, { merge: true }).catch((err) => {
+      console.error("Error al marcar ajuste de stock como eliminado en Firestore:", err);
+    });
+  }
+
+  return true;
 }
 
 // =========================================================================
@@ -634,7 +736,12 @@ export function initStockFirestoreSync() {
       (snapshot) => {
         if (!snapshot.empty) {
           const remote: IngresoStockManual[] = [];
-          snapshot.forEach((d) => remote.push(d.data() as IngresoStockManual));
+          snapshot.forEach((d) => {
+            const val = d.data() as any;
+            if (!val.deleted) {
+              remote.push(val as IngresoStockManual);
+            }
+          });
           remote.sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
           saveIngresosManuales(remote);
           notifyStockSync();
@@ -686,6 +793,29 @@ export function initStockFirestoreSync() {
         console.warn("Firestore sync dieta tambo error:", error);
       }
     );
+
+    // 4. Sincronización de ajustes manuales de stock
+    const colAjustes = collection(db, "stock_ajustes");
+    onSnapshot(
+      colAjustes,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remote: AjusteStockManual[] = [];
+          snapshot.forEach((d) => {
+            const val = d.data() as any;
+            if (!val.deleted) {
+              remote.push(val as AjusteStockManual);
+            }
+          });
+          remote.sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+          saveAjustesStock(remote);
+          notifyStockSync();
+        }
+      },
+      (error) => {
+        console.warn("Firestore sync stock ajustes error:", error);
+      }
+    );
   } catch (err) {
     console.warn("Stock Firestore init error:", err);
   }
@@ -714,6 +844,54 @@ export function registrarIngresoStock(nuevo: Omit<IngresoStockManual, "id">): In
   return item;
 }
 
+export function actualizarIngresoStock(id: string, cambios: Partial<IngresoStockManual>): IngresoStockManual | null {
+  const all = getIngresosManuales();
+  const idx = all.findIndex((x) => x.id === id);
+  if (idx === -1) return null;
+  const updated = { ...all[idx], ...cambios };
+  all[idx] = updated;
+  saveIngresosManuales(all);
+  notifyStockSync();
+
+  if (typeof window !== "undefined" && db) {
+    setDoc(doc(db, "stock_ingresos", id), sanitizeForFirestore(updated), { merge: true }).catch((err) => {
+      console.error("Error al actualizar ingreso de stock en Firestore:", err);
+    });
+  }
+
+  return updated;
+}
+
+export function eliminarIngresoStock(id: string): boolean {
+  const all = getIngresosManuales();
+  const filtered = all.filter((x) => x.id !== id);
+  saveIngresosManuales(filtered);
+  notifyStockSync();
+
+  if (typeof window !== "undefined" && db) {
+    setDoc(doc(db, "stock_ingresos", id), { deleted: true }, { merge: true }).catch((err) => {
+      console.error("Error al marcar ingreso como eliminado en Firestore:", err);
+    });
+  }
+
+  return true;
+}
+
+export function reasignarAcopioGrano(
+  ingresoId: string,
+  nuevaUbicacion: string,
+  tipoLugar?: StockUbicacionBreakdown["tipoLugar"]
+): IngresoStockManual | null {
+  let tipo: StockUbicacionBreakdown["tipoLugar"] = tipoLugar || "silo";
+  if (/afa|cardos/i.test(nuevaUbicacion)) tipo = "afa";
+  else if (/puerto/i.test(nuevaUbicacion)) tipo = "puerto";
+  else if (/coop/i.test(nuevaUbicacion)) tipo = "cooperativa";
+  else if (/tambo/i.test(nuevaUbicacion)) tipo = "tambo";
+  else if (/silo/i.test(nuevaUbicacion)) tipo = "silo";
+
+  return actualizarIngresoStock(ingresoId, { ubicacion: nuevaUbicacion, tipoLugar: tipo });
+}
+
 // =========================================================================
 // FUNCIÓN PRINCIPAL: CÁLCULO DE STOCK DISPONIBLE Y CRUCE CON LABORES Y VALORES MÓVILES
 // =========================================================================
@@ -727,6 +905,7 @@ export function getStockActualInsumos(): {
 } {
   const activities: Activity[] = agricultureData.listActivities();
   const ingresosManuales = getIngresosManuales();
+  const ajustesManuales = getAjustesStock();
   const dolarBNA = getDolarBnaVenta();
 
   const movimientos: MovimientoStockItem[] = [];
@@ -778,27 +957,6 @@ export function getStockActualInsumos(): {
     }
   }
 
-  // 2. Sumar ingresos manuales / compras registradas
-  const ingresosMap = new Map<string, number>();
-  for (const ing of ingresosManuales) {
-    const current = ingresosMap.get(ing.insumoId) || 0;
-    ingresosMap.set(ing.insumoId, current + ing.cantidad);
-
-    const catItem = INSUMOS_BASE_CATALOGO.find((x) => x.id === ing.insumoId);
-    movimientos.push({
-      id: ing.id,
-      insumoId: ing.insumoId,
-      insumoNombre: catItem?.nombre || ing.insumoId,
-      fecha: ing.fecha,
-      tipo: "Ingreso / Compra",
-      cantidad: ing.cantidad,
-      unidad: catItem?.unidad || "unidades",
-      detalle: `Ingreso de Stock · ${ing.remitoProveedor} ${ing.observaciones ? `(${ing.observaciones})` : ""}`,
-      remitoProveedor: ing.remitoProveedor,
-      costoArs: ing.costoUnitarioArs ? ing.costoUnitarioArs * ing.cantidad : undefined,
-    });
-  }
-
   // Estructura para registrar desglose por ubicación
   type UbicacionEntry = {
     lugar: string;
@@ -834,6 +992,160 @@ export function getStockActualInsumos(): {
     const entry = inner.get(lugar)!;
     entry.cantidad += cantidad;
     entry.detalles.unshift(mov);
+  }
+
+  // 2. Sumar ingresos manuales / compras registradas
+  const ingresosMap = new Map<string, number>();
+  for (const ing of ingresosManuales) {
+    const current = ingresosMap.get(ing.insumoId) || 0;
+    ingresosMap.set(ing.insumoId, current + ing.cantidad);
+
+    const catItem = INSUMOS_BASE_CATALOGO.find((x) => x.id === ing.insumoId);
+    const isCerealOGrano =
+      (catItem?.categoria === "Granos" || catItem?.categoria === "Forrajes & Granos") &&
+      (catItem?.id.includes("grano") || catItem?.id === "silo-maiz");
+    const isRollo = catItem?.id.includes("rollo");
+
+    let lugar = ing.ubicacion;
+    let tipoLugar: StockUbicacionBreakdown["tipoLugar"] = ing.tipoLugar || "otro";
+    let icono = "📦";
+
+    if (isCerealOGrano) {
+      if (!lugar) {
+        const txt = `${ing.remitoProveedor} ${ing.observaciones || ""}`.toLowerCase();
+        if (/afa|cardos/i.test(txt)) {
+          lugar = "AFA Los Cardos";
+        } else if (/puerto/i.test(txt)) {
+          lugar = "Puerto (San Lorenzo)";
+        } else if (/coop/i.test(txt)) {
+          lugar = "Cooperativa";
+        } else if (/silo/i.test(txt)) {
+          lugar = "Silos";
+        } else {
+          // Si no se especificó ubicación de acopio de grano, por defecto asignar a AFA Los Cardos
+          lugar = "AFA Los Cardos";
+        }
+      }
+
+      if (/afa|cardos/i.test(lugar)) { tipoLugar = "afa"; icono = "🌾"; }
+      else if (/puerto/i.test(lugar)) { tipoLugar = "puerto"; icono = "🚢"; }
+      else if (/coop/i.test(lugar)) { tipoLugar = "cooperativa"; icono = "🏬"; }
+      else if (/tambo/i.test(lugar)) { tipoLugar = "tambo"; icono = "🥛"; }
+      else { tipoLugar = "silo"; icono = "🏢"; }
+    } else if (isRollo) {
+      if (!lugar) {
+        lugar = "Campo Keuneke";
+        tipoLugar = "campo";
+        icono = "🏠";
+      } else {
+        if (/tambo/i.test(lugar)) { tipoLugar = "tambo"; icono = "🥛"; }
+        else { tipoLugar = "campo"; icono = "🏠"; }
+      }
+    } else if (catItem?.id.includes("pellet")) {
+      lugar = lugar || "Tambo";
+      tipoLugar = "tambo";
+      icono = "🥛";
+    } else {
+      lugar = lugar || catItem?.ubicacion || "Depósito Central";
+      tipoLugar = "galpon";
+      icono = "🏢";
+    }
+
+    const cantTn = isCerealOGrano ? Number((ing.cantidad / 1000).toFixed(2)) : undefined;
+
+    // Acreditar en desglose por ubicación
+    addUbicacionStock(
+      ing.insumoId,
+      lugar,
+      tipoLugar,
+      icono,
+      ing.cantidad,
+      {
+        id: `ing-${ing.id}`,
+        fecha: ing.fecha,
+        tipo: "Ingreso / Compra",
+        campo: lugar,
+        cantidad: ing.cantidad,
+        cantidadTn: cantTn,
+        unidad: isCerealOGrano ? "kg" : (catItem?.unidad || "unidades"),
+        referencia: `${lugar} · Ingreso`,
+        detalle: `Ingreso de ${isCerealOGrano ? `${cantTn} Tn` : `${ing.cantidad} ${catItem?.unidad || ""}`} · Acopio/Ubicación: ${lugar}${ing.remitoProveedor ? ` · Rem: ${ing.remitoProveedor}` : ""}`,
+      }
+    );
+
+    movimientos.push({
+      id: ing.id,
+      insumoId: ing.insumoId,
+      insumoNombre: catItem?.nombre || ing.insumoId,
+      fecha: ing.fecha,
+      tipo: "Ingreso / Compra",
+      cantidad: ing.cantidad,
+      cantidadTn: cantTn,
+      unidad: catItem?.unidad || "unidades",
+      ubicacion: lugar,
+      referencia: lugar,
+      detalle: `Ingreso de Stock · Acopio/Ubicación: ${lugar} · ${ing.remitoProveedor} ${ing.observaciones ? `(${ing.observaciones})` : ""}`,
+      remitoProveedor: ing.remitoProveedor,
+      costoArs: ing.costoUnitarioArs ? ing.costoUnitarioArs * ing.cantidad : undefined,
+    });
+  }
+
+  // 2.1. Sumar o restar ajustes manuales de stock (corrección de errores, restas de toneladas, mermas)
+  const ajustesMap = new Map<string, number>();
+  for (const aj of ajustesManuales) {
+    if (aj.deleted) continue;
+    const current = ajustesMap.get(aj.insumoId) || 0;
+    ajustesMap.set(aj.insumoId, current + aj.cantidadDelta);
+
+    const catItem = INSUMOS_BASE_CATALOGO.find((x) => x.id === aj.insumoId);
+    const isCerealOGrano =
+      (catItem?.categoria === "Granos" || catItem?.categoria === "Forrajes & Granos") &&
+      (catItem?.id.includes("grano") || catItem?.id === "silo-maiz");
+
+    let lugar = aj.ubicacion || (isCerealOGrano ? "AFA Los Cardos" : catItem?.ubicacion || "Depósito Central");
+    let tipoLugar: StockUbicacionBreakdown["tipoLugar"] = aj.tipoLugar || "otro";
+    let icono = "⚖️";
+
+    if (/afa|cardos/i.test(lugar)) { tipoLugar = "afa"; icono = "🌾"; }
+    else if (/puerto/i.test(lugar)) { tipoLugar = "puerto"; icono = "🚢"; }
+    else if (/coop/i.test(lugar)) { tipoLugar = "cooperativa"; icono = "🏬"; }
+    else if (/tambo/i.test(lugar)) { tipoLugar = "tambo"; icono = "🥛"; }
+    else if (/silo/i.test(lugar)) { tipoLugar = "silo"; icono = "🏢"; }
+
+    const cantTn = isCerealOGrano ? Number((aj.cantidadDelta / 1000).toFixed(2)) : undefined;
+
+    addUbicacionStock(
+      aj.insumoId,
+      lugar,
+      tipoLugar,
+      icono,
+      aj.cantidadDelta,
+      {
+        id: `aj-${aj.id}`,
+        fecha: aj.fecha,
+        tipo: "Ajuste de Inventario",
+        campo: lugar,
+        cantidad: aj.cantidadDelta,
+        cantidadTn: cantTn,
+        unidad: isCerealOGrano ? "kg" : (catItem?.unidad || "unidades"),
+        referencia: `${lugar} · Ajuste`,
+        detalle: `Ajuste manual: ${aj.cantidadDelta > 0 ? `+${aj.cantidadDelta}` : aj.cantidadDelta} ${catItem?.unidad || "kg"}${cantTn !== undefined ? ` (${cantTn > 0 ? `+${cantTn}` : cantTn} Tn)` : ""} · Motivo: ${aj.motivo}`,
+      }
+    );
+
+    movimientos.push({
+      id: aj.id,
+      insumoId: aj.insumoId,
+      insumoNombre: catItem?.nombre || aj.insumoId,
+      fecha: aj.fecha,
+      tipo: "Ajuste de Inventario",
+      cantidad: aj.cantidadDelta,
+      cantidadTn: cantTn,
+      unidad: catItem?.unidad || "unidades",
+      ubicacion: lugar,
+      referencia: lugar,
+      detalle: `Ajuste de inventario · ${aj.motivo}${aj.stockResultante !== undefined ? ` · Stock resultante: ${aj.stockResultante}` : ""}`,
+    });
   }
 
   // 3. Sumar producción propia de labores agrícolas realizadas (Cosechas de Cereales, Armado y Sacado de Rollos)
@@ -1344,12 +1656,14 @@ export function getStockActualInsumos(): {
     const produccionPropia = Math.round((produccionMap.get(base.id) || 0) * 10) / 10;
     const canjeSalidas = Math.round((canjesSalidasMap.get(base.id) || 0) * 10) / 10;
     const canjeIngresos = Math.round((canjesIngresosMap.get(base.id) || 0) * 10) / 10;
+    const ajuste = Math.round((ajustesMap.get(base.id) || 0) * 10) / 10;
 
     const stockActual = Math.max(
       0,
-      Math.round((base.stockInicial + ingreso + produccionPropia + canjeIngresos - consumo - canjeSalidas) * 10) / 10
+      Math.round((base.stockInicial + ingreso + produccionPropia + canjeIngresos + ajuste - consumo - canjeSalidas) * 10) / 10
     );
-    const enAlerta = (base.stockInicial + ingreso + produccionPropia + canjeIngresos > 0) && stockActual <= base.stockMinimoAlerta;
+    const totalEntradas = base.stockInicial + ingreso + produccionPropia + canjeIngresos + (ajuste > 0 ? ajuste : 0);
+    const enAlerta = totalEntradas > 0 && stockActual <= base.stockMinimoAlerta;
     if (enAlerta) insumosEnAlerta++;
 
     const isCerealOGrano = (base.categoria === "Granos" || base.categoria === "Forrajes & Granos") && (base.id.includes("grano") || base.id === "silo-maiz");
@@ -1458,6 +1772,12 @@ export function getStockActualInsumos(): {
     } else if (base.id === "biofertilizante-liq") {
       precioArs = 1200;
       precioUsd = Number((1200 / dolarBNA).toFixed(2));
+    } else if (base.id === "sal-mineral") {
+      precioArs = 1289.88;
+      precioUsd = Number((1289.88 / dolarBNA).toFixed(3));
+    } else if (base.id === "sal-anionica") {
+      precioArs = 1450.00;
+      precioUsd = Number((1450.00 / dolarBNA).toFixed(3));
     } else if (!precioArs || precioArs <= 0) {
       if (precioUsd > 0) precioArs = precioUsd * dolarBNA;
       else {
@@ -1474,7 +1794,7 @@ export function getStockActualInsumos(): {
 
     const porcentajeStock = Math.min(
       100,
-      Math.max(0, Math.round((stockActual / (base.stockInicial + ingreso + produccionPropia + canjeIngresos || 1)) * 100))
+      Math.max(0, Math.round((stockActual / (totalEntradas || 1)) * 100))
     );
 
     return {
@@ -1485,6 +1805,7 @@ export function getStockActualInsumos(): {
       produccionPropia,
       canjeIngresos,
       canjeSalidas,
+      ajustesInventario: ajuste,
       precioUnitarioArs: Math.round(precioArs * 100) / 100,
       precioUnitarioUsd: Number(precioUsd.toFixed(3)),
       valorTotalArs,

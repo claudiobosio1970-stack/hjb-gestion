@@ -9,6 +9,14 @@ import {
   MovimientoStockItem,
   getStockActualInsumos,
   registrarIngresoStock,
+  actualizarIngresoStock,
+  eliminarIngresoStock,
+  reasignarAcopioGrano,
+  getIngresosManuales,
+  AjusteStockManual,
+  getAjustesStock,
+  registrarAjusteStock,
+  eliminarAjusteStock,
   registrarCanjeGranoPellet,
   calcularAutonomiaPelletTambo,
   getDietaTambo,
@@ -44,13 +52,26 @@ export default function InsumosPage() {
 
   // Modal Ingreso de Stock
   const [modalIngresoOpen, setModalIngresoOpen] = useState(false);
-  const [formIngreso, setFormIngreso] = useState({
-    insumoId: "glifosato",
-    cantidad: 100,
+  const [formIngreso, setFormIngreso] = useState<{
+    insumoId: string;
+    cantidad: number;
+    cantidadTn?: number;
+    fecha: string;
+    remitoProveedor: string;
+    costoUnitarioArs: number;
+    observaciones: string;
+    ubicacion: string;
+    tipoLugar?: any;
+  }>({
+    insumoId: "soja-grano",
+    cantidad: 68000,
+    cantidadTn: 68,
     fecha: new Date().toISOString().split("T")[0],
-    remitoProveedor: "Remito ACA #",
+    remitoProveedor: "",
     costoUnitarioArs: 0,
     observaciones: "",
+    ubicacion: "AFA Los Cardos",
+    tipoLugar: "afa",
   });
 
   // Modal Canje de Grano a Pellet (AFA)
@@ -76,6 +97,23 @@ export default function InsumosPage() {
   // Modal Stock por Ubicación (Cereales y Rollos)
   const [insumoUbicaciones, setInsumoUbicaciones] = useState<InsumoStockItem | null>(null);
 
+  // Modal Ajustar Stock / Corregir Inventario (Restar toneladas por error, mermas, eliminar ingresos erróneos)
+  const [modalAjusteOpen, setModalAjusteOpen] = useState(false);
+  const [insumoAjuste, setInsumoAjuste] = useState<InsumoStockItem | null>(null);
+  const [formAjuste, setFormAjuste] = useState<{
+    tipo: "restar" | "sumar" | "fijar";
+    cantidad: number;
+    cantidadTn?: number;
+    motivo: string;
+    ubicacion: string;
+  }>({
+    tipo: "restar",
+    cantidad: 1000,
+    cantidadTn: 1,
+    motivo: "Error de carga / Corrección de toneladas",
+    ubicacion: "",
+  });
+
   function cargarDatos() {
     setData(getStockActualInsumos());
     setDietaActiva(getDietaTambo());
@@ -85,6 +123,10 @@ export default function InsumosPage() {
     if (insumoUbicaciones) {
       const updated = data.items.find((x) => x.id === insumoUbicaciones.id);
       if (updated) setInsumoUbicaciones(updated);
+    }
+    if (insumoAjuste) {
+      const updated = data.items.find((x) => x.id === insumoAjuste.id);
+      if (updated) setInsumoAjuste(updated);
     }
   }, [data]);
 
@@ -111,15 +153,60 @@ export default function InsumosPage() {
   }
 
   function handleAbrirIngreso(insumoId?: string) {
+    const id = insumoId || (data.items[0]?.id ?? "soja-grano");
+    const item = data.items.find((x) => x.id === id);
+    const isGrano = (item?.categoria === "Granos" || item?.categoria === "Forrajes & Granos") && (item?.id.includes("grano") || item?.id === "silo-maiz");
+    const isRollo = item?.id.includes("rollo");
+
+    let defUbic = item?.ubicacion || "Depósito Central";
+    let defTipo: any = "otro";
+
+    if (isGrano) {
+      defUbic = "AFA Los Cardos";
+      defTipo = "afa";
+    } else if (isRollo) {
+      defUbic = "Campo Keuneke";
+      defTipo = "campo";
+    } else if (item?.id.includes("pellet")) {
+      defUbic = "Tambo";
+      defTipo = "tambo";
+    }
+
     setFormIngreso({
-      insumoId: insumoId || (data.items[0]?.id ?? "glifosato"),
-      cantidad: 100,
+      insumoId: id,
+      cantidad: isGrano ? 30000 : 100,
+      cantidadTn: isGrano ? 30 : undefined,
       fecha: new Date().toISOString().split("T")[0],
       remitoProveedor: "",
       costoUnitarioArs: 0,
       observaciones: "",
+      ubicacion: defUbic,
+      tipoLugar: defTipo,
     });
     setModalIngresoOpen(true);
+  }
+
+  function handleCambiarInsumoIngreso(newId: string) {
+    const item = data.items.find((x) => x.id === newId);
+    const isGrano = (item?.categoria === "Granos" || item?.categoria === "Forrajes & Granos") && (item?.id.includes("grano") || item?.id === "silo-maiz");
+    let defUbic = item?.ubicacion || "Depósito Central";
+    let defTipo: any = "otro";
+    if (isGrano) {
+      defUbic = "AFA Los Cardos";
+      defTipo = "afa";
+    } else if (item?.id.includes("pellet")) {
+      defUbic = "Tambo";
+      defTipo = "tambo";
+    }
+    const cant = isGrano ? (formIngreso.cantidadTn ? formIngreso.cantidadTn * 1000 : 30000) : (formIngreso.cantidad || 100);
+    setFormIngreso({
+      ...formIngreso,
+      insumoId: newId,
+      cantidad: cant,
+      cantidadTn: isGrano ? cant / 1000 : undefined,
+      ubicacion: defUbic,
+      tipoLugar: defTipo,
+    });
   }
 
   function handleGuardarIngreso(e: React.FormEvent) {
@@ -129,19 +216,129 @@ export default function InsumosPage() {
       return;
     }
 
+    const item = data.items.find((x) => x.id === formIngreso.insumoId);
+    const isGrano = (item?.categoria === "Granos" || item?.categoria === "Forrajes & Granos") && (item?.id.includes("grano") || item?.id === "silo-maiz");
+
     registrarIngresoStock({
       insumoId: formIngreso.insumoId,
       cantidad: Number(formIngreso.cantidad),
+      cantidadTn: isGrano ? (formIngreso.cantidadTn || Number(formIngreso.cantidad) / 1000) : undefined,
       fecha: formIngreso.fecha || new Date().toISOString().split("T")[0],
-      remitoProveedor: formIngreso.remitoProveedor.trim() || "Ingreso manual a galpón",
+      remitoProveedor: formIngreso.remitoProveedor.trim() || `Ingreso manual a ${formIngreso.ubicacion || "galpón"}`,
       costoUnitarioArs: formIngreso.costoUnitarioArs ? Number(formIngreso.costoUnitarioArs) : undefined,
       observaciones: formIngreso.observaciones.trim() || undefined,
+      ubicacion: formIngreso.ubicacion,
+      tipoLugar: formIngreso.tipoLugar,
     });
 
     setModalIngresoOpen(false);
     cargarDatos();
-    const item = data.items.find((x) => x.id === formIngreso.insumoId);
-    triggerFeedback(`✓ Se ingresaron +${formIngreso.cantidad} ${item?.unidad || ""} de ${item?.nombre || "insumo"} al stock.`);
+    const cantStr = isGrano
+      ? `${((formIngreso.cantidad || 0) / 1000).toLocaleString("es-AR")} Tn`
+      : `${formIngreso.cantidad} ${item?.unidad || ""}`;
+    triggerFeedback(`✓ Se ingresaron +${cantStr} de ${item?.nombre || "insumo"} en ${formIngreso.ubicacion || "stock"}.`);
+  }
+
+  function handleReasignarStockGrano(cerealId: string, nuevoLugar: string) {
+    const allIngresos = getIngresosManuales().filter((x) => x.insumoId === cerealId && !x.deleted);
+    if (allIngresos.length === 0) {
+      registrarIngresoStock({
+        insumoId: cerealId,
+        cantidad: 68000,
+        cantidadTn: 68,
+        fecha: new Date().toISOString().split("T")[0],
+        remitoProveedor: `Asignación de stock a ${nuevoLugar}`,
+        ubicacion: nuevoLugar,
+      });
+    } else {
+      for (const ing of allIngresos) {
+        reasignarAcopioGrano(ing.id, nuevoLugar);
+      }
+    }
+    cargarDatos();
+    triggerFeedback(`✓ Stock de grano asignado exitosamente a: ${nuevoLugar}`);
+  }
+
+  function handleEliminarIngreso(ingresoId: string) {
+    if (confirm("¿Estás seguro de que deseás eliminar este registro de ingreso de stock?")) {
+      eliminarIngresoStock(ingresoId);
+      cargarDatos();
+      triggerFeedback("✓ Ingreso de stock eliminado exitosamente.");
+    }
+  }
+
+  function handleAbrirAjuste(item: InsumoStockItem) {
+    setInsumoAjuste(item);
+    const isGrano = (item.categoria === "Granos" || item.categoria === "Forrajes & Granos") && (item.id.includes("grano") || item.id === "silo-maiz");
+    const isPellet = item.id.includes("pellet");
+    const defaultTn = isGrano ? (item.totalTn || 1) : Number((item.stockActual / 1000).toFixed(2));
+    const defCant = (isGrano || isPellet)
+      ? (defaultTn > 0 ? defaultTn * 1000 : 1000)
+      : Math.min(item.stockActual > 0 ? item.stockActual : 10, 100);
+
+    setFormAjuste({
+      tipo: "restar",
+      cantidad: defCant,
+      cantidadTn: (isGrano || isPellet) ? (defCant / 1000) : undefined,
+      motivo: "Error de carga / Corrección de stock",
+      ubicacion: item.ubicacion || (item.stockPorUbicacion?.[0]?.lugar || "Stock General"),
+    });
+    setModalAjusteOpen(true);
+  }
+
+  function handleGuardarAjuste(e: React.FormEvent) {
+    e.preventDefault();
+    if (!insumoAjuste) return;
+
+    const cantNum = Number(formAjuste.cantidad) || 0;
+    if (cantNum <= 0 && formAjuste.tipo !== "fijar") {
+      alert("Por favor ingresá una cantidad mayor a cero para ajustar.");
+      return;
+    }
+
+    let delta = 0;
+    if (formAjuste.tipo === "restar") {
+      delta = -Math.abs(cantNum);
+    } else if (formAjuste.tipo === "sumar") {
+      delta = Math.abs(cantNum);
+    } else if (formAjuste.tipo === "fijar") {
+      delta = cantNum - insumoAjuste.stockActual;
+    }
+
+    if (delta === 0) {
+      alert("El valor ingresado no genera ningún cambio en el stock actual.");
+      return;
+    }
+
+    const stockResultante = Math.max(0, Math.round((insumoAjuste.stockActual + delta) * 10) / 10);
+    const isGranoOPellet = insumoAjuste.esCerealOGrano || insumoAjuste.id.includes("pellet");
+    const cantTn = isGranoOPellet ? Number((delta / 1000).toFixed(2)) : undefined;
+
+    registrarAjusteStock({
+      insumoId: insumoAjuste.id,
+      fecha: new Date().toISOString().split("T")[0],
+      tipo: formAjuste.tipo,
+      cantidadDelta: delta,
+      cantidadTn: cantTn,
+      stockResultante,
+      motivo: formAjuste.motivo.trim() || "Ajuste manual de inventario",
+      ubicacion: formAjuste.ubicacion || undefined,
+    });
+
+    setModalAjusteOpen(false);
+    cargarDatos();
+    const cantStr = cantTn !== undefined
+      ? `${Math.abs(cantTn).toLocaleString("es-AR")} Tn`
+      : `${Math.abs(delta).toLocaleString("es-AR")} ${insumoAjuste.unidad}`;
+    triggerFeedback(`✓ Ajuste registrado en ${insumoAjuste.nombre}: ${delta < 0 ? `-${cantStr}` : `+${cantStr}`}. Stock actual: ${stockResultante.toLocaleString("es-AR")} ${insumoAjuste.unidad}.`);
+  }
+
+  function handleEliminarAjuste(ajusteId: string) {
+    if (confirm("¿Estás seguro de que deseás eliminar este ajuste de inventario?")) {
+      eliminarAjusteStock(ajusteId);
+      cargarDatos();
+      triggerFeedback("✓ Ajuste de inventario revertido y eliminado.");
+    }
   }
 
   function handleAbrirCanje(cerealId?: string) {
@@ -689,6 +886,22 @@ export default function InsumosPage() {
                           <button
                             type="button"
                             className="ghostButton"
+                            onClick={() => handleAbrirAjuste(item)}
+                            style={{
+                              padding: "3px 7px",
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              color: "#b45309",
+                              background: "rgba(245, 158, 11, 0.08)",
+                              borderColor: "rgba(245, 158, 11, 0.35)",
+                            }}
+                            title="Editar stock, restar toneladas por error o corregir inventario"
+                          >
+                            ✏️ Ajustar
+                          </button>
+                          <button
+                            type="button"
+                            className="ghostButton"
                             onClick={() => setInsumoTrazabilidad(item)}
                             style={{ padding: "3px 7px", fontSize: "11px", fontWeight: 700 }}
                             title="Ver historial de aplicaciones y compras"
@@ -771,7 +984,7 @@ export default function InsumosPage() {
                 </label>
                 <select
                   value={formIngreso.insumoId}
-                  onChange={(e) => setFormIngreso({ ...formIngreso, insumoId: e.target.value })}
+                  onChange={(e) => handleCambiarInsumoIngreso(e.target.value)}
                   style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13.5px", fontWeight: 600 }}
                   required
                 >
@@ -783,34 +996,145 @@ export default function InsumosPage() {
                 </select>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
-                    Cantidad Ingresada:
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={formIngreso.cantidad}
-                    onChange={(e) => setFormIngreso({ ...formIngreso, cantidad: parseFloat(e.target.value) || 0 })}
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700 }}
-                    required
-                  />
-                </div>
+              {(() => {
+                const itemSel = data.items.find((x) => x.id === formIngreso.insumoId);
+                const isGrano =
+                  (itemSel?.categoria === "Granos" || itemSel?.categoria === "Forrajes & Granos") &&
+                  (itemSel?.id.includes("grano") || itemSel?.id === "silo-maiz");
+                return (
+                  <>
+                    {/* SELECCIÓN DE LUGAR DE ACOPIO / DESTINO DEL GRANO */}
+                    {isGrano ? (
+                      <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "10px", padding: "12px 14px" }}>
+                        <label style={{ display: "block", fontSize: "12.5px", fontWeight: 800, color: "#166534", marginBottom: "8px" }}>
+                          📍 ¿A dónde va a quedar stockeado el grano? (Lugar de Acopio):
+                        </label>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
+                          {[
+                            { id: "AFA Los Cardos", tipo: "afa", label: "AFA Los Cardos", icon: "🌾", desc: "Acopio externo (Habilita canje a Pellet)" },
+                            { id: "Silos", tipo: "silo", label: "Silos (Planta / Campo)", icon: "🏢", desc: "Almacenamiento en silos propios" },
+                            { id: "Cooperativa", tipo: "cooperativa", label: "Cooperativa", icon: "🏬", desc: "Acopio cooperativo Lehmann / similar" },
+                            { id: "Puerto (San Lorenzo)", tipo: "puerto", label: "Puerto (San Lorenzo)", icon: "🚢", desc: "Entrega directa a terminal portuaria" },
+                          ].map((op) => {
+                            const isSelected = formIngreso.ubicacion === op.id;
+                            return (
+                              <button
+                                type="button"
+                                key={op.id}
+                                onClick={() => setFormIngreso({ ...formIngreso, ubicacion: op.id, tipoLugar: op.tipo as any })}
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "flex-start",
+                                  textAlign: "left",
+                                  padding: "8px 10px",
+                                  borderRadius: "8px",
+                                  border: isSelected ? "2px solid #16a34a" : "1px solid #cbd5e1",
+                                  background: isSelected ? "#ffffff" : "#f8fafc",
+                                  boxShadow: isSelected ? "0 2px 6px rgba(22, 163, 74, 0.15)" : "none",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, fontSize: "12.5px", color: isSelected ? "#15803d" : "#334155" }}>
+                                  <span>{op.icon}</span>
+                                  <span>{op.label}</span>
+                                  {isSelected && <span style={{ marginLeft: "auto", color: "#16a34a", fontSize: "13px" }}>✓</span>}
+                                </div>
+                                <span style={{ fontSize: "10.5px", color: "#64748b", marginTop: "2px" }}>{op.desc}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
+                          📍 Ubicación de Almacenamiento / Depósito:
+                        </label>
+                        <input
+                          type="text"
+                          value={formIngreso.ubicacion}
+                          onChange={(e) => setFormIngreso({ ...formIngreso, ubicacion: e.target.value })}
+                          placeholder="Ej: Depósito de Químicos - Aguilera, Galpón Tambo, etc."
+                          style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                        />
+                      </div>
+                    )}
 
-                <div>
-                  <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
-                    Fecha de Recepción:
-                  </label>
-                  <input
-                    type="date"
-                    value={formIngreso.fecha}
-                    onChange={(e) => setFormIngreso({ ...formIngreso, fecha: e.target.value })}
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                    required
-                  />
-                </div>
-              </div>
+                    {/* CANTIDAD Y FECHA */}
+                    {isGrano ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
+                            Cantidad en Toneladas (Tn):
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formIngreso.cantidadTn !== undefined ? formIngreso.cantidadTn : (formIngreso.cantidad ? formIngreso.cantidad / 1000 : "")}
+                            onChange={(e) => {
+                              const tn = parseFloat(e.target.value) || 0;
+                              setFormIngreso({
+                                ...formIngreso,
+                                cantidadTn: tn,
+                                cantidad: Math.round(tn * 1000),
+                              });
+                            }}
+                            placeholder="Ej: 68 Tn"
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700 }}
+                            required
+                          />
+                          <small style={{ color: "#166534", fontWeight: 600, fontSize: "11px", marginTop: "3px", display: "block" }}>
+                            = {(formIngreso.cantidad || 0).toLocaleString("es-AR")} kg netos
+                          </small>
+                        </div>
+
+                        <div>
+                          <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
+                            Fecha de Recepción:
+                          </label>
+                          <input
+                            type="date"
+                            value={formIngreso.fecha}
+                            onChange={(e) => setFormIngreso({ ...formIngreso, fecha: e.target.value })}
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                            required
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
+                            Cantidad Ingresada ({itemSel?.unidad || "unidades"}):
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={formIngreso.cantidad}
+                            onChange={(e) => setFormIngreso({ ...formIngreso, cantidad: parseFloat(e.target.value) || 0 })}
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700 }}
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
+                            Fecha de Recepción:
+                          </label>
+                          <input
+                            type="date"
+                            value={formIngreso.fecha}
+                            onChange={(e) => setFormIngreso({ ...formIngreso, fecha: e.target.value })}
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                            required
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               <div>
                 <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
@@ -1142,6 +1466,76 @@ export default function InsumosPage() {
                 </div>
               </div>
 
+              {/* Barra de Asignación Rápida de Acopio de Grano */}
+              {insumoUbicaciones.esCerealOGrano && (
+                <div
+                  style={{
+                    background: "#f0fdf4",
+                    border: "1.5px solid #86efac",
+                    borderRadius: "10px",
+                    padding: "14px 18px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+                    <div>
+                      <strong style={{ fontSize: "13.5px", color: "#166534", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>📍</span> ¿A dónde va a quedar stockeado el grano? (Asignación Rápida)
+                      </strong>
+                      <p style={{ margin: "3px 0 0 0", fontSize: "12px", color: "#15803d" }}>
+                        Podés asignar o reasignar todo el stock disponible ({insumoUbicaciones.totalTn || 0} Tn) al acopio que desees con un clic:
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="primaryButton"
+                      onClick={() => {
+                        const cId = insumoUbicaciones.id;
+                        setInsumoUbicaciones(null);
+                        handleAbrirIngreso(cId);
+                      }}
+                      style={{ fontSize: "12px", padding: "6px 12px", background: "#15803d" }}
+                    >
+                      ➕ Cargar Ingreso de Grano
+                    </button>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    {[
+                      { id: "AFA Los Cardos", icon: "🌾", label: "AFA Los Cardos (Canje a Pellet)" },
+                      { id: "Silos", icon: "🏢", label: "Silos (Planta / Campo)" },
+                      { id: "Cooperativa", icon: "🏬", label: "Cooperativa" },
+                      { id: "Puerto (San Lorenzo)", icon: "🚢", label: "Puerto (San Lorenzo)" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => handleReasignarStockGrano(insumoUbicaciones.id, opt.id)}
+                        className="ghostButton"
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          background: "#ffffff",
+                          borderColor: "#86efac",
+                          color: "#166534",
+                          padding: "6px 12px",
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                        title={`Asignar o trasladar stock a ${opt.label}`}
+                      >
+                        <span>{opt.icon}</span>
+                        <span>Asignar a {opt.id}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Grid de Ubicaciones / Acopios */}
               <div>
                 <h4 style={{ fontSize: "13.5px", margin: "0 0 10px 0", color: "var(--slate-800)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
@@ -1207,33 +1601,53 @@ export default function InsumosPage() {
                           />
                         </div>
 
-                        {insumoUbicaciones.esCerealOGrano && (ubic.tipoLugar === "afa" || /afa|cardos/i.test(ubic.lugar)) && (
-                          <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px dashed #cbd5e1" }}>
+                        {insumoUbicaciones.esCerealOGrano && (
+                          <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {(ubic.tipoLugar === "afa" || /afa|cardos/i.test(ubic.lugar)) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const cId = insumoUbicaciones.id;
+                                  setInsumoUbicaciones(null);
+                                  handleAbrirCanje(cId);
+                                }}
+                                style={{
+                                  width: "100%",
+                                  padding: "6px 10px",
+                                  fontSize: "11.5px",
+                                  fontWeight: 700,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: "6px",
+                                  background: "#15803d",
+                                  color: "#ffffff",
+                                  borderRadius: "6px",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                                }}
+                              >
+                                🔄 Convertir en Pellet (AFA)
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => {
-                                const cId = insumoUbicaciones.id;
-                                setInsumoUbicaciones(null);
-                                handleAbrirCanje(cId);
-                              }}
+                              onClick={() => handleReasignarStockGrano(insumoUbicaciones.id, ubic.lugar)}
                               style={{
                                 width: "100%",
-                                padding: "6px 10px",
-                                fontSize: "11.5px",
-                                fontWeight: 700,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "6px",
-                                background: "#15803d",
-                                color: "#ffffff",
+                                padding: "5px 8px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                background: ubic.cantidad > 0 ? "rgba(22, 163, 74, 0.08)" : "#f8fafc",
+                                color: ubic.cantidad > 0 ? "#166534" : "var(--slate-600)",
                                 borderRadius: "6px",
-                                border: "none",
+                                border: "1px solid #cbd5e1",
                                 cursor: "pointer",
-                                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                               }}
+                              title={`Asignar stock a ${ubic.lugar}`}
                             >
-                              🔄 Convertir en Pellet (AFA)
+                              📍 Asignar stock aquí
                             </button>
                           </div>
                         )}
@@ -1284,9 +1698,63 @@ export default function InsumosPage() {
                                 <small style={{ color: "var(--slate-500)" }}>{det.tipo}</small>
                               </td>
                               <td>
-                                <span className="pill badgeBlue" style={{ fontSize: "11px", fontWeight: 700 }}>
-                                  📍 {det.referencia}
-                                </span>
+                                {insumoUbicaciones.esCerealOGrano && det.id.startsWith("ing-") ? (
+                                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <select
+                                      value={
+                                        /afa|cardos/i.test(det.referencia || "")
+                                          ? "AFA Los Cardos"
+                                          : /silo/i.test(det.referencia || "")
+                                          ? "Silos"
+                                          : /coop/i.test(det.referencia || "")
+                                          ? "Cooperativa"
+                                          : /puerto/i.test(det.referencia || "")
+                                          ? "Puerto (San Lorenzo)"
+                                          : "AFA Los Cardos"
+                                      }
+                                      onChange={(e) => {
+                                        const rawIngId = det.id.replace("ing-", "");
+                                        reasignarAcopioGrano(rawIngId, e.target.value);
+                                        cargarDatos();
+                                        triggerFeedback(`✓ Acopio reasignado a: ${e.target.value}`);
+                                      }}
+                                      style={{
+                                        fontSize: "11px",
+                                        padding: "3px 6px",
+                                        borderRadius: "6px",
+                                        border: "1.5px solid #86efac",
+                                        background: "#f0fdf4",
+                                        fontWeight: 700,
+                                        color: "#166534",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      <option value="AFA Los Cardos">🌾 AFA Los Cardos</option>
+                                      <option value="Silos">🏢 Silos</option>
+                                      <option value="Cooperativa">🏬 Cooperativa</option>
+                                      <option value="Puerto (San Lorenzo)">🚢 Puerto</option>
+                                    </select>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEliminarIngreso(det.id.replace("ing-", ""))}
+                                      style={{
+                                        background: "none",
+                                        border: "none",
+                                        color: "#ef4444",
+                                        cursor: "pointer",
+                                        fontSize: "12px",
+                                        padding: "2px",
+                                      }}
+                                      title="Eliminar este ingreso"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="pill badgeBlue" style={{ fontSize: "11px", fontWeight: 700 }}>
+                                    📍 {det.referencia}
+                                  </span>
+                                )}
                               </td>
                               <td style={{ textAlign: "right", fontWeight: 800, color: "#166534" }}>
                                 {insumoUbicaciones.esCerealOGrano && det.cantidadTn !== undefined
@@ -1809,6 +2277,475 @@ export default function InsumosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+      {/* MODAL 5: AJUSTAR STOCK / CORREGIR INVENTARIO (RESTAR TONELADAS POR ERROR) */}
+      {/* ========================================================================= */}
+      {modalAjusteOpen && insumoAjuste && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.7)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "16px",
+          }}
+          onClick={() => setModalAjusteOpen(false)}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "14px",
+              maxWidth: "800px",
+              width: "100%",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Encabezado del Modal */}
+            <div
+              style={{
+                padding: "18px 24px",
+                borderBottom: "1px solid var(--line)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "linear-gradient(to right, #fffbeb, #ffffff)",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "24px" }}>⚖️</span>
+                  <h3 style={{ margin: 0, fontSize: "17.5px", color: "var(--slate-900)" }}>
+                    Ajustar Stock: {insumoAjuste.nombre}
+                  </h3>
+                </div>
+                <p className="muted" style={{ margin: "3px 0 0 0", fontSize: "12.5px" }}>
+                  Restá toneladas por error de carga, asentá mermas o eliminá directamente compras e ingresos erróneos.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setModalAjusteOpen(false)}
+                style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "var(--slate-400)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Contenido scrolleable */}
+            <div style={{ padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "20px" }}>
+              {/* Tarjeta de Stock Actual */}
+              <div
+                style={{
+                  background: "#f8fafc",
+                  border: "1px solid var(--line)",
+                  borderRadius: "10px",
+                  padding: "14px 18px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: "11px", color: "var(--slate-500)", textTransform: "uppercase", fontWeight: 700 }}>
+                    Stock Físico Actual
+                  </span>
+                  <div style={{ fontSize: "22px", fontWeight: 900, color: insumoAjuste.stockActual > 0 ? "#166534" : "#64748b" }}>
+                    {insumoAjuste.esCerealOGrano || insumoAjuste.id.includes("pellet")
+                      ? `${(insumoAjuste.stockActual / 1000).toLocaleString("es-AR")} Toneladas`
+                      : `${insumoAjuste.stockActual.toLocaleString("es-AR")} ${insumoAjuste.unidad}`}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "var(--slate-500)" }}>
+                    {insumoAjuste.stockActual.toLocaleString("es-AR")} {insumoAjuste.unidad} en existencias
+                  </div>
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                  <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
+                    📍 {insumoAjuste.ubicacion}
+                  </span>
+                  <div style={{ fontSize: "11.5px", color: "var(--slate-500)", marginTop: "4px" }}>
+                    Valor ref: ${insumoAjuste.precioUnitarioArs.toLocaleString("es-AR")} / {insumoAjuste.unidad}
+                  </div>
+                </div>
+              </div>
+
+              {/* Formulario de Ajuste Manual */}
+              <form onSubmit={handleGuardarAjuste} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
+                  1. Registrar Nuevo Ajuste de Inventario
+                </strong>
+
+                {/* Tipo de Ajuste */}
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "6px" }}>
+                    Operación a realizar:
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                    {[
+                      { id: "restar", label: "➖ Restar Toneladas / Stock", sub: "Por error de carga o merma", color: "#dc2626" },
+                      { id: "sumar", label: "➕ Sumar Stock", sub: "Sobrante o ingreso omitido", color: "#16a34a" },
+                      { id: "fijar", label: "🎯 Fijar Stock Exacto", sub: "Recuento físico auditado", color: "#2563eb" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setFormAjuste({ ...formAjuste, tipo: opt.id as any })}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: formAjuste.tipo === opt.id ? `2px solid ${opt.color}` : "1px solid var(--line)",
+                          background: formAjuste.tipo === opt.id ? "#ffffff" : "#f8fafc",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          boxShadow: formAjuste.tipo === opt.id ? "0 2px 4px rgba(0,0,0,0.06)" : "none",
+                        }}
+                      >
+                        <div style={{ fontSize: "12.5px", fontWeight: 800, color: formAjuste.tipo === opt.id ? opt.color : "var(--slate-800)" }}>
+                          {opt.label}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                          {opt.sub}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cantidades a ajustar */}
+                <div style={{ display: "grid", gridTemplateColumns: insumoAjuste.esCerealOGrano || insumoAjuste.id.includes("pellet") ? "1fr 1fr" : "1fr", gap: "12px" }}>
+                  {(insumoAjuste.esCerealOGrano || insumoAjuste.id.includes("pellet")) && (
+                    <div>
+                      <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                        Cantidad en Toneladas (Tn):
+                      </label>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={formAjuste.cantidadTn ?? (formAjuste.cantidad / 1000)}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setFormAjuste({
+                              ...formAjuste,
+                              cantidadTn: val,
+                              cantidad: val * 1000,
+                            });
+                          }}
+                          style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 800 }}
+                        />
+                        <span style={{ fontWeight: 700, color: "var(--slate-600)" }}>Tn</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                      Cantidad en {insumoAjuste.unidad}:
+                    </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <input
+                        type="number"
+                        step={insumoAjuste.unidad === "Rollos" ? "1" : "10"}
+                        min="1"
+                        value={formAjuste.cantidad}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setFormAjuste({
+                            ...formAjuste,
+                            cantidad: val,
+                            cantidadTn: (insumoAjuste.esCerealOGrano || insumoAjuste.id.includes("pellet")) ? val / 1000 : undefined,
+                          });
+                        }}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 800 }}
+                      />
+                      <span style={{ fontWeight: 700, color: "var(--slate-600)" }}>{insumoAjuste.unidad}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Motivo del Ajuste con Chips Rápidos */}
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                    Motivo o Justificación del Ajuste:
+                  </label>
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "6px" }}>
+                    {[
+                      "Error de carga inicial",
+                      "Diferencia de balanza / remito",
+                      "Merma de acopio",
+                      "Recuento físico de inventario",
+                      "Consumo no registrado",
+                    ].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setFormAjuste({ ...formAjuste, motivo: m })}
+                        className="pill badgeSlate"
+                        style={{
+                          fontSize: "11px",
+                          cursor: "pointer",
+                          border: formAjuste.motivo === m ? "1px solid #2563eb" : "1px solid #cbd5e1",
+                          background: formAjuste.motivo === m ? "#eff6ff" : "#ffffff",
+                          color: formAjuste.motivo === m ? "#1d4ed8" : "var(--slate-700)",
+                        }}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    value={formAjuste.motivo}
+                    onChange={(e) => setFormAjuste({ ...formAjuste, motivo: e.target.value })}
+                    placeholder="Ej: Se cargaron toneladas por error en pellet en vez de grano comercial"
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                  />
+                </div>
+
+                {/* Previsualización del Resultado */}
+                {(() => {
+                  const cantNum = Number(formAjuste.cantidad) || 0;
+                  let delta = 0;
+                  if (formAjuste.tipo === "restar") delta = -Math.abs(cantNum);
+                  else if (formAjuste.tipo === "sumar") delta = Math.abs(cantNum);
+                  else if (formAjuste.tipo === "fijar") delta = cantNum - insumoAjuste.stockActual;
+
+                  const finalStock = Math.max(0, Math.round((insumoAjuste.stockActual + delta) * 10) / 10);
+                  const deltaTn = (insumoAjuste.esCerealOGrano || insumoAjuste.id.includes("pellet"))
+                    ? Number((delta / 1000).toFixed(2))
+                    : undefined;
+                  const finalTn = (insumoAjuste.esCerealOGrano || insumoAjuste.id.includes("pellet"))
+                    ? Number((finalStock / 1000).toFixed(2))
+                    : undefined;
+
+                  return (
+                    <div
+                      style={{
+                        background: delta < 0 ? "#fef2f2" : "#f0fdf4",
+                        border: delta < 0 ? "1px solid #fecaca" : "1px solid #bbf7d0",
+                        borderRadius: "8px",
+                        padding: "10px 14px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: delta < 0 ? "#991b1b" : "#166534" }}>
+                          Impacto en el Stock Disponible:
+                        </span>
+                        <div style={{ fontSize: "13.5px", fontWeight: 700, marginTop: "2px" }}>
+                          {insumoAjuste.stockActual.toLocaleString("es-AR")} {insumoAjuste.unidad}
+                          {" ➔ "}
+                          <span style={{ color: delta < 0 ? "#dc2626" : "#16a34a" }}>
+                            {delta < 0 ? `-${Math.abs(delta).toLocaleString("es-AR")}` : `+${delta.toLocaleString("es-AR")}`}
+                          </span>
+                          {" ➔ "}
+                          <strong style={{ color: "#0f172a" }}>
+                            {finalStock.toLocaleString("es-AR")} {insumoAjuste.unidad}
+                            {finalTn !== undefined && ` (${finalTn} Tn)`}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="primaryButton"
+                        style={{
+                          background: delta < 0 ? "#dc2626" : "#16a34a",
+                          borderColor: delta < 0 ? "#dc2626" : "#16a34a",
+                          padding: "8px 16px",
+                          fontSize: "13px",
+                        }}
+                      >
+                        {delta < 0 ? "💾 Aplicar Resta de Stock" : "💾 Guardar Ajuste"}
+                      </button>
+                    </div>
+                  );
+                })()}
+              </form>
+
+              <hr style={{ border: "none", borderTop: "1px solid var(--line)", margin: "4px 0" }} />
+
+              {/* 2. Ingresos Manuales Registrados de este Insumo (Eliminar ingresos erróneos directamente) */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <div>
+                    <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
+                      2. Compras e Ingresos Manuales Registrados
+                    </strong>
+                    <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "var(--slate-500)" }}>
+                      Si cargaste un ingreso con cantidad equivocada (por ej. 68.000 kg en lugar de grano), podés eliminarlo directamente:
+                    </p>
+                  </div>
+                </div>
+
+                {(() => {
+                  const ingresosItem = getIngresosManuales().filter((x) => x.insumoId === insumoAjuste.id && !x.deleted);
+                  if (ingresosItem.length === 0) {
+                    return (
+                      <div style={{ padding: "12px", background: "#f8fafc", borderRadius: "8px", fontSize: "12.5px", color: "var(--slate-500)", textAlign: "center" }}>
+                        No hay ingresos manuales registrados para este insumo.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="tableWrap">
+                      <table className="dataTable" style={{ fontSize: "12px" }}>
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th style={{ textAlign: "right" }}>Cantidad</th>
+                            <th>Ubicación</th>
+                            <th>Remito / Detalle</th>
+                            <th style={{ textAlign: "center" }}>Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ingresosItem.map((ing) => {
+                            const cantTn = (insumoAjuste.esCerealOGrano || insumoAjuste.id.includes("pellet"))
+                              ? Number((ing.cantidad / 1000).toFixed(2))
+                              : undefined;
+
+                            return (
+                              <tr key={ing.id}>
+                                <td>{ing.fecha}</td>
+                                <td style={{ textAlign: "right", fontWeight: 800, color: "#166534" }}>
+                                  +{ing.cantidad.toLocaleString("es-AR")} {insumoAjuste.unidad}
+                                  {cantTn !== undefined && (
+                                    <span style={{ fontSize: "11px", color: "var(--slate-500)", display: "block" }}>
+                                      ({cantTn} Tn)
+                                    </span>
+                                  )}
+                                </td>
+                                <td>
+                                  <span className="pill badgeSlate" style={{ fontSize: "10.5px" }}>
+                                    {ing.ubicacion || "Depósito"}
+                                  </span>
+                                </td>
+                                <td style={{ color: "var(--slate-600)" }}>
+                                  {ing.remitoProveedor} {ing.observaciones ? `· ${ing.observaciones}` : ""}
+                                </td>
+                                <td style={{ textAlign: "center" }}>
+                                  <button
+                                    type="button"
+                                    className="ghostButton"
+                                    onClick={() => handleEliminarIngreso(ing.id)}
+                                    style={{
+                                      padding: "3px 8px",
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      color: "#dc2626",
+                                      borderColor: "#fca5a5",
+                                      background: "#fef2f2",
+                                    }}
+                                    title="Eliminar este ingreso erróneo de la base de datos"
+                                  >
+                                    🗑️ Eliminar
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 3. Historial de Ajustes Previos Realizados */}
+              {(() => {
+                const ajustesItem = getAjustesStock().filter((x) => x.insumoId === insumoAjuste.id && !x.deleted);
+                if (ajustesItem.length === 0) return null;
+
+                return (
+                  <div>
+                    <strong style={{ fontSize: "13.5px", color: "var(--slate-900)", display: "block", marginBottom: "6px" }}>
+                      3. Ajustes de Inventario Realizados Anteriormente ({ajustesItem.length})
+                    </strong>
+                    <div className="tableWrap">
+                      <table className="dataTable" style={{ fontSize: "12px" }}>
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th style={{ textAlign: "right" }}>Ajuste</th>
+                            <th>Motivo</th>
+                            <th style={{ textAlign: "center" }}>Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ajustesItem.map((aj) => (
+                            <tr key={aj.id}>
+                              <td>{aj.fecha}</td>
+                              <td style={{ textAlign: "right", fontWeight: 800, color: aj.cantidadDelta < 0 ? "#dc2626" : "#16a34a" }}>
+                                {aj.cantidadDelta > 0 ? `+${aj.cantidadDelta.toLocaleString("es-AR")}` : aj.cantidadDelta.toLocaleString("es-AR")} {insumoAjuste.unidad}
+                                {aj.cantidadTn !== undefined && (
+                                  <span style={{ fontSize: "11px", color: "var(--slate-500)", display: "block" }}>
+                                    ({aj.cantidadTn > 0 ? `+${aj.cantidadTn}` : aj.cantidadTn} Tn)
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ color: "var(--slate-600)" }}>{aj.motivo}</td>
+                              <td style={{ textAlign: "center" }}>
+                                <button
+                                  type="button"
+                                  className="ghostButton"
+                                  onClick={() => handleEliminarAjuste(aj.id)}
+                                  style={{ padding: "2px 6px", fontSize: "11px", color: "#dc2626" }}
+                                  title="Revertir este ajuste"
+                                >
+                                  🗑️ Deshacer
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer Modal */}
+            <div
+              style={{
+                padding: "12px 24px",
+                borderTop: "1px solid var(--line)",
+                background: "#f8fafc",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                className="ghostButton"
+                onClick={() => setModalAjusteOpen(false)}
+                style={{ fontWeight: 700, padding: "6px 14px" }}
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
