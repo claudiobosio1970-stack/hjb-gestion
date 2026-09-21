@@ -9,8 +9,29 @@ export type CategoriaInsumo =
   | "Fitosanitarios"
   | "Semillas"
   | "Fertilizantes"
+  | "Granos"
+  | "Forrajes"
   | "Forrajes & Granos"
   | "Combustibles";
+
+export interface CanjeGranoPellet {
+  id: string;
+  fecha: string;
+  cerealInsumoId: string; // ej: "soja-grano" o "maiz-grano"
+  cerealNombre: string;
+  acopioOrigen: string; // "AFA Los Cardos"
+  toneladasGrano: number;
+  kgGrano: number;
+  porcentajeCanje: number; // ej: 75 (%)
+  toneladasPellet: number;
+  kgPellet: number;
+  pelletInsumoId: string; // "pellet-soja"
+  pelletNombre: string;
+  destinoPellet: string; // "Galpón de Raciones - Tambo"
+  comprobante?: string;
+  observaciones?: string;
+  createdAt: string;
+}
 
 export interface StockUbicacionMovimiento {
   id: string;
@@ -52,6 +73,8 @@ export interface InsumoStockItem {
   consumoAgricola: number;
   ingresosCompras: number;
   produccionPropia: number;
+  canjeIngresos?: number;
+  canjeSalidas?: number;
   precioUnitarioArs: number;
   precioUnitarioUsd: number;
   valorTotalArs: number;
@@ -70,11 +93,20 @@ export interface MovimientoStockItem {
   insumoId: string;
   insumoNombre: string;
   fecha: string;
-  tipo: "Ingreso / Compra" | "Consumo Agrícola" | "Consumo Ganadería" | "Ajuste de Inventario" | "Producción Propia" | "Traslado / Destino";
+  tipo:
+    | "Ingreso / Compra"
+    | "Consumo Agrícola"
+    | "Consumo Ganadería"
+    | "Ajuste de Inventario"
+    | "Producción Propia"
+    | "Traslado / Destino"
+    | "Canje a Pellet (AFA)"
+    | "Ingreso por Canje";
   cantidad: number; // Positivo para ingresos y producción, negativo para consumos
   cantidadTn?: number;
   unidad: string;
   ubicacion?: string;
+  referencia?: string;
   detalle: string;
   remitoProveedor?: string;
   costoArs?: number;
@@ -270,11 +302,11 @@ export const INSUMOS_BASE_CATALOGO: Omit<
     aliasLabores: ["enmienda", "estiércol", "compost"],
   },
 
-  // 4. FORRAJES, GRANOS Y ALIMENTACIÓN
+  // 4. GRANOS Y CEREALES COMERCIALES
   {
     id: "maiz-grano",
     nombre: "Maíz Grano Comercial",
-    categoria: "Forrajes & Granos",
+    categoria: "Granos",
     unidad: "kg",
     stockInicial: 0,
     stockMinimoAlerta: 10000,
@@ -285,7 +317,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   {
     id: "soja-grano",
     nombre: "Soja Grano Comercial",
-    categoria: "Forrajes & Granos",
+    categoria: "Granos",
     unidad: "kg",
     stockInicial: 0,
     stockMinimoAlerta: 10000,
@@ -296,7 +328,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   {
     id: "trigo-grano",
     nombre: "Trigo Grano Comercial",
-    categoria: "Forrajes & Granos",
+    categoria: "Granos",
     unidad: "kg",
     stockInicial: 0,
     stockMinimoAlerta: 5000,
@@ -304,10 +336,12 @@ export const INSUMOS_BASE_CATALOGO: Omit<
     valorMovilId: "trigo",
     aliasLabores: ["trigo", "trigo grano", "cosecha trigo", "trigo pan"],
   },
+
+  // 5. FORRAJES, SUBPRODUCTOS Y ALIMENTACIÓN
   {
     id: "silo-maiz",
     nombre: "Silo de Maíz Picado Fino (Bolsa)",
-    categoria: "Forrajes & Granos",
+    categoria: "Forrajes",
     unidad: "kg",
     stockInicial: 0,
     stockMinimoAlerta: 25000,
@@ -318,7 +352,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   {
     id: "pellet-soja",
     nombre: "Pellet de Soja Proteico (Harina)",
-    categoria: "Forrajes & Granos",
+    categoria: "Forrajes",
     unidad: "kg",
     stockInicial: 0,
     stockMinimoAlerta: 3000,
@@ -329,7 +363,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   {
     id: "rollo-alfalfa",
     nombre: "Rollos de Alfalfa Primera Henificada",
-    categoria: "Forrajes & Granos",
+    categoria: "Forrajes",
     unidad: "Rollos",
     stockInicial: 0,
     stockMinimoAlerta: 40,
@@ -340,7 +374,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   {
     id: "rollo-avena",
     nombre: "Rollos de Avena Henificada",
-    categoria: "Forrajes & Granos",
+    categoria: "Forrajes",
     unidad: "Rollos",
     stockInicial: 0,
     stockMinimoAlerta: 30,
@@ -351,7 +385,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   {
     id: "rollo-rastrojo",
     nombre: "Rollos de Rastrojo / Chala",
-    categoria: "Forrajes & Granos",
+    categoria: "Forrajes",
     unidad: "Rollos",
     stockInicial: 0,
     stockMinimoAlerta: 30,
@@ -362,7 +396,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   {
     id: "balanceado-iniciador",
     nombre: "Balanceado Iniciador Terneros Guachera",
-    categoria: "Forrajes & Granos",
+    categoria: "Forrajes",
     unidad: "kg",
     stockInicial: 0,
     stockMinimoAlerta: 600,
@@ -371,7 +405,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
     aliasLabores: ["balanceado", "iniciador", "balanceado terneros"],
   },
 
-  // 5. COMBUSTIBLES
+  // 6. COMBUSTIBLES
   {
     id: "gasoil",
     nombre: "Gas oil Agropecuario Grado 2 (DIESEL 500)",
@@ -387,6 +421,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
 
 // LocalStorage Keys
 const STORAGE_INGRESOS_STOCK = "hjb_stock_ingresos_manuales_v01";
+export const STORAGE_CANJES_STOCK = "hjb_stock_canjes_afa_v01";
 
 export const HJB_STOCK_SYNC_EVENT = "hjb_stock_sync";
 
@@ -414,6 +449,58 @@ export function saveIngresosManuales(ingresos: IngresoStockManual[]) {
   localStorage.setItem(STORAGE_INGRESOS_STOCK, JSON.stringify(ingresos));
 }
 
+// =========================================================================
+// MÉTODOS DE PERSISTENCIA Y RECUPERACIÓN DE CANJES DE GRANO A PELLET (AFA)
+// =========================================================================
+export function getCanjesGranoPellet(): CanjeGranoPellet[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_CANJES_STOCK);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCanjesGranoPellet(canjes: CanjeGranoPellet[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_CANJES_STOCK, JSON.stringify(canjes));
+}
+
+export function registrarCanjeGranoPellet(nuevo: Omit<CanjeGranoPellet, "id" | "createdAt">): CanjeGranoPellet {
+  const all = getCanjesGranoPellet();
+  const id = `canje-${Date.now()}`;
+  const item: CanjeGranoPellet = {
+    ...nuevo,
+    id,
+    createdAt: new Date().toISOString(),
+  };
+  all.unshift(item);
+  saveCanjesGranoPellet(all);
+  notifyStockSync();
+
+  if (typeof window !== "undefined" && db) {
+    setDoc(doc(db, "stock_canjes", item.id), sanitizeForFirestore(item)).catch((err) => {
+      console.error("Error al guardar canje de stock en Firestore:", err);
+    });
+  }
+
+  return item;
+}
+
+export function eliminarCanjeGranoPellet(id: string) {
+  const all = getCanjesGranoPellet();
+  const filtered = all.filter((c) => c.id !== id);
+  saveCanjesGranoPellet(filtered);
+  notifyStockSync();
+
+  if (typeof window !== "undefined" && db) {
+    setDoc(doc(db, "stock_canjes", id), { deleted: true }, { merge: true }).catch((err) => {
+      console.error("Error al eliminar canje de stock en Firestore:", err);
+    });
+  }
+}
+
 let isStockFirestoreSyncInitialized = false;
 
 export function initStockFirestoreSync() {
@@ -421,9 +508,10 @@ export function initStockFirestoreSync() {
   isStockFirestoreSyncInitialized = true;
 
   try {
-    const col = collection(db, "stock_ingresos");
+    // 1. Sincronización de ingresos manuales
+    const colIngresos = collection(db, "stock_ingresos");
     onSnapshot(
-      col,
+      colIngresos,
       (snapshot) => {
         if (!snapshot.empty) {
           const remote: IngresoStockManual[] = [];
@@ -434,7 +522,30 @@ export function initStockFirestoreSync() {
         }
       },
       (error) => {
-        console.warn("Firestore sync stock error:", error);
+        console.warn("Firestore sync stock ingresos error:", error);
+      }
+    );
+
+    // 2. Sincronización de canjes de grano a pellet en AFA
+    const colCanjes = collection(db, "stock_canjes");
+    onSnapshot(
+      colCanjes,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remote: CanjeGranoPellet[] = [];
+          snapshot.forEach((d) => {
+            const val = d.data() as any;
+            if (!val.deleted) {
+              remote.push(val as CanjeGranoPellet);
+            }
+          });
+          remote.sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+          saveCanjesGranoPellet(remote);
+          notifyStockSync();
+        }
+      },
+      (error) => {
+        console.warn("Firestore sync stock canjes error:", error);
       }
     );
   } catch (err) {
@@ -995,6 +1106,72 @@ export function getStockActualInsumos(): {
     }
   }
 
+  // 3.2. PROCESAR CANJES DE GRANO A PELLET EN AFA
+  const canjes = getCanjesGranoPellet();
+  const canjesSalidasMap = new Map<string, number>();
+  const canjesIngresosMap = new Map<string, number>();
+
+  for (const c of canjes) {
+    const kgGrano = c.kgGrano || (c.toneladasGrano * 1000);
+    const kgPellet = c.kgPellet || (c.toneladasPellet * 1000);
+
+    const currSal = canjesSalidasMap.get(c.cerealInsumoId) || 0;
+    canjesSalidasMap.set(c.cerealInsumoId, currSal + kgGrano);
+
+    const currIng = canjesIngresosMap.get(c.pelletInsumoId) || 0;
+    canjesIngresosMap.set(c.pelletInsumoId, currIng + kgPellet);
+
+    // Movimiento salida de cereal por canje
+    movimientos.push({
+      id: `mov-canje-cereal-${c.id}`,
+      insumoId: c.cerealInsumoId,
+      insumoNombre: c.cerealNombre,
+      fecha: c.fecha,
+      tipo: "Canje a Pellet (AFA)",
+      cantidad: -kgGrano,
+      cantidadTn: -c.toneladasGrano,
+      unidad: "kg",
+      ubicacion: c.acopioOrigen || "AFA Los Cardos",
+      detalle: `Canje en ${c.acopioOrigen}: -${c.toneladasGrano} Tn grano entregadas (${c.porcentajeCanje}% canje → +${c.toneladasPellet} Tn pellet)${c.comprobante ? ` · Liq/Comp: ${c.comprobante}` : ""}`,
+      referencia: c.acopioOrigen,
+    });
+
+    // Descontar en desglose de ubicación de AFA Los Cardos para el cereal
+    addUbicacionStock(
+      c.cerealInsumoId,
+      c.acopioOrigen || "AFA Los Cardos",
+      "afa",
+      "🌾",
+      -kgGrano,
+      {
+        id: `sub-canje-${c.id}`,
+        fecha: c.fecha,
+        tipo: "Canje a Pellet",
+        campo: "AFA Los Cardos",
+        cantidad: -kgGrano,
+        cantidadTn: -c.toneladasGrano,
+        unidad: "kg",
+        referencia: `${c.acopioOrigen} · Canje`,
+        detalle: `Canje por ${c.toneladasPellet} Tn de Pellet (${c.porcentajeCanje}% canje) · ${c.comprobante || "Sin comp."}`,
+      }
+    );
+
+    // Movimiento ingreso de pellet
+    movimientos.push({
+      id: `mov-canje-pellet-${c.id}`,
+      insumoId: c.pelletInsumoId,
+      insumoNombre: c.pelletNombre,
+      fecha: c.fecha,
+      tipo: "Ingreso por Canje",
+      cantidad: kgPellet,
+      cantidadTn: c.toneladasPellet,
+      unidad: "kg",
+      ubicacion: c.destinoPellet || "Galpón de Raciones - Tambo",
+      detalle: `Ingreso por canje en ${c.acopioOrigen}: +${c.toneladasPellet} Tn de pellet (de ${c.toneladasGrano} Tn de ${c.cerealNombre} al ${c.porcentajeCanje}%)${c.comprobante ? ` · Liq: ${c.comprobante}` : ""}`,
+      referencia: c.destinoPellet,
+    });
+  }
+
   // Ordenar movimientos recientes primero
   movimientos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
@@ -1007,11 +1184,17 @@ export function getStockActualInsumos(): {
     const consumo = Math.round((consumosMap.get(base.id) || 0) * 10) / 10;
     const ingreso = Math.round((ingresosMap.get(base.id) || 0) * 10) / 10;
     const produccionPropia = Math.round((produccionMap.get(base.id) || 0) * 10) / 10;
-    const stockActual = Math.max(0, Math.round((base.stockInicial + ingreso + produccionPropia - consumo) * 10) / 10);
-    const enAlerta = (base.stockInicial + ingreso + produccionPropia > 0) && stockActual <= base.stockMinimoAlerta;
+    const canjeSalidas = Math.round((canjesSalidasMap.get(base.id) || 0) * 10) / 10;
+    const canjeIngresos = Math.round((canjesIngresosMap.get(base.id) || 0) * 10) / 10;
+
+    const stockActual = Math.max(
+      0,
+      Math.round((base.stockInicial + ingreso + produccionPropia + canjeIngresos - consumo - canjeSalidas) * 10) / 10
+    );
+    const enAlerta = (base.stockInicial + ingreso + produccionPropia + canjeIngresos > 0) && stockActual <= base.stockMinimoAlerta;
     if (enAlerta) insumosEnAlerta++;
 
-    const isCerealOGrano = base.categoria === "Forrajes & Granos" && (base.id.includes("grano") || base.id === "silo-maiz");
+    const isCerealOGrano = (base.categoria === "Granos" || base.categoria === "Forrajes & Granos") && (base.id.includes("grano") || base.id === "silo-maiz");
     const isRollo = base.id.includes("rollo");
     const totalTn = isCerealOGrano ? Number((stockActual / 1000).toFixed(2)) : undefined;
 
@@ -1040,6 +1223,31 @@ export function getStockActualInsumos(): {
       });
 
       stockPorUbicacion.sort((a, b) => b.cantidad - a.cantidad);
+
+      if (isCerealOGrano) {
+        const defaultLocations: { lugar: string; tipoLugar: StockUbicacionBreakdown["tipoLugar"]; icono: string }[] = [
+          { lugar: "Silos", tipoLugar: "silo", icono: "🏢" },
+          { lugar: "Cooperativa", tipoLugar: "cooperativa", icono: "🏬" },
+          { lugar: "Puerto (San Lorenzo)", tipoLugar: "puerto", icono: "🚢" },
+          { lugar: "AFA Los Cardos", tipoLugar: "afa", icono: "🌾" },
+        ];
+        for (const def of defaultLocations) {
+          const exists = stockPorUbicacion.some((u) => u.lugar === def.lugar || (def.tipoLugar === "puerto" && u.tipoLugar === "puerto") || (def.tipoLugar === "afa" && u.tipoLugar === "afa"));
+          if (!exists) {
+            stockPorUbicacion.push({
+              lugar: def.lugar,
+              tipoLugar: def.tipoLugar,
+              icono: def.icono,
+              cantidad: 0,
+              cantidadTn: 0,
+              unidad: "Tn",
+              porcentaje: 0,
+              movimientosCount: 0,
+              detalles: [],
+            });
+          }
+        }
+      }
     } else {
       // Si aún no hay labores de cosecha registradas, inicializar las ubicaciones solicitadas en 0
       if (isCerealOGrano) {
@@ -1108,7 +1316,7 @@ export function getStockActualInsumos(): {
 
     const porcentajeStock = Math.min(
       100,
-      Math.max(0, Math.round((stockActual / (base.stockInicial + ingreso + produccionPropia || 1)) * 100))
+      Math.max(0, Math.round((stockActual / (base.stockInicial + ingreso + produccionPropia + canjeIngresos || 1)) * 100))
     );
 
     return {
@@ -1117,6 +1325,8 @@ export function getStockActualInsumos(): {
       consumoAgricola: consumo,
       ingresosCompras: ingreso,
       produccionPropia,
+      canjeIngresos,
+      canjeSalidas,
       precioUnitarioArs: Math.round(precioArs * 100) / 100,
       precioUnitarioUsd: Number(precioUsd.toFixed(3)),
       valorTotalArs,
