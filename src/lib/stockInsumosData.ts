@@ -4,6 +4,7 @@ import { Activity, agricultureData, realQuantity, plannedQuantity, sanitizeForFi
 import { getDolarBnaVenta, getPrecioReferencia, getValoresMoviles } from "./valoresMovilesData";
 import { db } from "./firebase";
 import { collection, doc, setDoc, onSnapshot } from "firebase/firestore";
+import { getCorrales, getTropas } from "./ganaderiaData";
 
 export type CategoriaInsumo =
   | "Fitosanitarios"
@@ -582,6 +583,7 @@ export function eliminarAjusteStock(id: string): boolean {
 // =========================================================================
 export interface DietaTamboConfig {
   vacasEnOrdeñe: number;
+  vacasPreparto?: number;
   racionesKgDia: {
     "pellet-soja": number;
     "pellet-trigo": number;
@@ -595,11 +597,17 @@ export interface DietaTamboConfig {
 
 export const DIETA_TAMBO_HJB_DEFAULT: DietaTamboConfig = {
   vacasEnOrdeñe: 187, // Rodeo lechero promedio en ordeño (~186.5 VO)
+  vacasPreparto: 25, // Lote de vacas secas / transición preparto
   racionesKgDia: {
     "pellet-soja": 2.5, // 2.5 kg/VO/día de Pellet de Soja Proteico (Harina)
     "pellet-trigo": 3.0, // 3.0 kg/VO/día de Pellet de Trigo (Afrechillo)
     "silo-maiz": 22.0, // 22.0 kg/VO/día de Silo de Maíz Picado Fino
     "maiz": 5.5, // 5.5 kg/VO/día de Maíz grano molido
+    "rollo-alfalfa": 3.0, // 3.0 kg/VO/día de Rollo de Alfalfa henificado
+    "semilla-algodon": 1.5, // 1.5 kg/VO/día de Semilla de Algodón
+    "sal-mineral": 0.15, // 150 g/VO/día de Sales Minerales MZM
+    "sal-anionica": 0.25, // 250 g/vaca/día en Lote Preparto
+    "rollo-avena": 3.0, // 3.0 kg/vaca/día en Lote Preparto
   },
   ultimaActualizacion: "2026-08-18T00:00:00.000Z",
   actualizadoPor: "Planilla Costo Alimentación VO (HJB)",
@@ -616,6 +624,7 @@ export function getDietaTambo(): DietaTamboConfig {
     const parsed = JSON.parse(raw);
     return {
       vacasEnOrdeñe: parsed.vacasEnOrdeñe || DIETA_TAMBO_HJB_DEFAULT.vacasEnOrdeñe,
+      vacasPreparto: parsed.vacasPreparto || DIETA_TAMBO_HJB_DEFAULT.vacasPreparto,
       racionesKgDia: {
         ...DIETA_TAMBO_HJB_DEFAULT.racionesKgDia,
         ...(parsed.racionesKgDia || {}),
@@ -633,6 +642,7 @@ export function saveDietaTambo(nueva: Partial<DietaTamboConfig>): DietaTamboConf
   const current = getDietaTambo();
   const updated: DietaTamboConfig = {
     vacasEnOrdeñe: nueva.vacasEnOrdeñe !== undefined ? Math.max(1, nueva.vacasEnOrdeñe) : current.vacasEnOrdeñe,
+    vacasPreparto: nueva.vacasPreparto !== undefined ? Math.max(0, nueva.vacasPreparto) : current.vacasPreparto,
     racionesKgDia: {
       ...current.racionesKgDia,
       ...(nueva.racionesKgDia || {}),
@@ -657,31 +667,267 @@ export function saveDietaTambo(nueva: Partial<DietaTamboConfig>): DietaTamboConf
   return updated;
 }
 
+// =========================================================================
+// CÁLCULO MULTI-CATEGORÍA Y CONSOLIDADO DE AUTONOMÍA FORRAJERA DEL RODEO
+// (Tambo VO + Preparto + Guachera + Recrías RM1/RM2/RM3 + Terminación)
+// =========================================================================
+export interface CategoriaConsumoRodeo {
+  id: string;
+  nombre: string;
+  sector: "Tambo" | "Ganadería";
+  icono: string;
+  cabezas: number;
+  racionKgDia: number;
+  consumoKgDia: number;
+  consumoRollosDia?: number;
+  porcentajeDelTotal?: number;
+}
+
+export interface AutonomiaAlimentoResult {
+  insumoId: string;
+  stockActual: number;
+  unidad: string;
+  totalCabezas: number;
+  consumoDiarioTotalKg: number;
+  consumoDiarioTotalRollos?: number;
+  diasAutonomia: number;
+  mesesAutonomia: number;
+  desglose: CategoriaConsumoRodeo[];
+  textoResumen: string;
+  textoTooltip: string;
+  // Campos de compatibilidad histórica con Tambo VO
+  vacasOrdeñe: number;
+  racionKgVacaDia: number;
+  consumoDiarioVOKg: number;
+  diasAutonomiaVO: number;
+  ultimaActualizacion?: string;
+  actualizadoPor?: string;
+}
+
+export interface OpcionesCalculoAutonomia {
+  unidad?: string;
+  vacasOrdeñe?: number;
+  racionKgVacaDia?: number;
+}
+
+export function calcularAutonomiaAlimentoRodeo(
+  stockActual: number,
+  insumoId: string = "pellet-soja",
+  options?: OpcionesCalculoAutonomia
+): AutonomiaAlimentoResult {
+  const dietaTambo = getDietaTambo();
+  const corrales = getCorrales();
+  const tropas = getTropas();
+
+  const idNorm = insumoId.toLowerCase().trim();
+  const desglose: CategoriaConsumoRodeo[] = [];
+
+  // 1. TAMBO - Vacas en Ordeñe (VO)
+  const vacasVO = options?.vacasOrdeñe !== undefined && options.vacasOrdeñe > 0
+    ? options.vacasOrdeñe
+    : dietaTambo.vacasEnOrdeñe;
+
+  let racionVO = 0;
+  if (options?.racionKgVacaDia !== undefined && options.racionKgVacaDia > 0) {
+    racionVO = options.racionKgVacaDia;
+  } else if (idNorm === "pellet-soja") {
+    racionVO = dietaTambo.racionesKgDia["pellet-soja"] ?? 2.5;
+  } else if (idNorm === "pellet-trigo") {
+    racionVO = dietaTambo.racionesKgDia["pellet-trigo"] ?? 3.0;
+  } else if (idNorm === "silo-maiz" || idNorm === "silo-maiz-kg") {
+    racionVO = dietaTambo.racionesKgDia["silo-maiz"] ?? 22.0;
+  } else if (idNorm === "maiz" || idNorm === "maiz-grano") {
+    racionVO = dietaTambo.racionesKgDia["maiz"] ?? 5.5;
+  } else if (idNorm === "rollo-alfalfa") {
+    racionVO = dietaTambo.racionesKgDia["rollo-alfalfa"] ?? 3.0;
+  } else if (idNorm === "sal-mineral") {
+    racionVO = dietaTambo.racionesKgDia["sal-mineral"] ?? 0.15;
+  } else if (idNorm === "semilla-algodon") {
+    racionVO = dietaTambo.racionesKgDia["semilla-algodon"] ?? 1.5;
+  } else if (dietaTambo.racionesKgDia[idNorm] !== undefined) {
+    racionVO = dietaTambo.racionesKgDia[idNorm];
+  }
+
+  if (racionVO > 0 && vacasVO > 0) {
+    const consumoKgDia = Math.round(vacasVO * racionVO * 10) / 10;
+    desglose.push({
+      id: "tambo-vo",
+      nombre: "Tambo (Vacas en Ordeñe)",
+      sector: "Tambo",
+      icono: "🥛",
+      cabezas: vacasVO,
+      racionKgDia: racionVO,
+      consumoKgDia,
+      consumoRollosDia: Number((consumoKgDia / 500).toFixed(2)),
+    });
+  }
+
+  // 2. TAMBO - Lote Preparto / Vacas Secas (Sal Aniónica, Rollos Avena/Alfalfa)
+  const vacasPreparto = dietaTambo.vacasPreparto || 25;
+  if (idNorm === "sal-anionica") {
+    const racionPreparto = options?.racionKgVacaDia ?? dietaTambo.racionesKgDia["sal-anionica"] ?? 0.25;
+    if (racionPreparto > 0 && vacasPreparto > 0) {
+      const consumoKgDia = Math.round(vacasPreparto * racionPreparto * 100) / 100;
+      desglose.push({
+        id: "tambo-preparto",
+        nombre: "Tambo (Lote Preparto / Transición)",
+        sector: "Tambo",
+        icono: "🤰",
+        cabezas: vacasPreparto,
+        racionKgDia: racionPreparto,
+        consumoKgDia,
+      });
+    }
+  } else if (idNorm === "rollo-avena") {
+    const racionPreparto = dietaTambo.racionesKgDia["rollo-avena"] ?? 3.0;
+    if (racionPreparto > 0 && vacasPreparto > 0) {
+      const consumoKgDia = Math.round(vacasPreparto * racionPreparto * 10) / 10;
+      desglose.push({
+        id: "tambo-preparto",
+        nombre: "Tambo (Lote Preparto / Vacas Secas)",
+        sector: "Tambo",
+        icono: "🤰",
+        cabezas: vacasPreparto,
+        racionKgDia: racionPreparto,
+        consumoKgDia,
+        consumoRollosDia: Number((consumoKgDia / 500).toFixed(2)),
+      });
+    }
+  }
+
+  // 3. GANADERÍA - Corrales y Tropas
+  corrales.forEach((corral) => {
+    const tropasEnCorral = tropas.filter((t) => t.corralId === corral.id);
+    let cabezasCorral = tropasEnCorral.reduce((sum, t) => sum + t.cabezas, 0);
+
+    if (cabezasCorral === 0) {
+      if (corral.id === "guachera") cabezasCorral = 24;
+      else if (corral.id === "rm1") cabezasCorral = 22;
+      else if (corral.id === "rm2") cabezasCorral = 28;
+      else if (corral.id === "rm3") cabezasCorral = 30;
+      else if (corral.id === "terminacion") cabezasCorral = 26;
+    }
+
+    if (cabezasCorral <= 0) return;
+
+    const compMatch = corral.dietaBase.find((comp) => {
+      const compId = comp.insumoId.toLowerCase().trim();
+      if (compId === idNorm) return true;
+      if ((idNorm === "maiz" || idNorm === "maiz-grano") && (compId === "maiz" || compId === "maiz-grano")) return true;
+      if ((idNorm === "silo-maiz" || idNorm === "silo-maiz-kg") && (compId === "silo-maiz" || compId === "silo-maiz-kg")) return true;
+      if (idNorm === "pellet-soja" && compId === "pellet-soja") return true;
+      if (idNorm === "pellet-trigo" && compId === "pellet-trigo") return true;
+      if (idNorm === "rollo-alfalfa" && compId === "rollo-alfalfa") return true;
+      if (idNorm === "sal-mineral" && compId === "sal-mineral") return true;
+      if (idNorm === "balanceado-iniciador" && (compId === "balanceado-iniciador" || compId === "balanceado-recria")) return true;
+      return false;
+    });
+
+    if (compMatch && compMatch.cantidadKgDia > 0) {
+      const consumoKgDia = Math.round(cabezasCorral * compMatch.cantidadKgDia * 100) / 100;
+      desglose.push({
+        id: corral.id,
+        nombre: `Ganadería (${corral.nombreCorto || corral.nombreCompleto})`,
+        sector: "Ganadería",
+        icono: corral.icono || "🐂",
+        cabezas: cabezasCorral,
+        racionKgDia: compMatch.cantidadKgDia,
+        consumoKgDia,
+        consumoRollosDia: Number((consumoKgDia / 500).toFixed(2)),
+      });
+    }
+  });
+
+  // Totales agregados
+  const totalCabezas = desglose.reduce((sum, item) => sum + item.cabezas, 0);
+  const consumoDiarioTotalKg = Number(desglose.reduce((sum, item) => sum + item.consumoKgDia, 0).toFixed(2));
+  const consumoDiarioTotalRollos = Number((consumoDiarioTotalKg / 500).toFixed(2));
+
+  if (consumoDiarioTotalKg > 0) {
+    desglose.forEach((item) => {
+      item.porcentajeDelTotal = Number(((item.consumoKgDia / consumoDiarioTotalKg) * 100).toFixed(1));
+    });
+  }
+
+  // Autonomía según unidad (Rollos o kg)
+  const unidad = options?.unidad || (idNorm.includes("rollo") ? "Rollos" : "kg");
+  let diasAutonomia = 0;
+  if (unidad.toLowerCase().includes("rollo")) {
+    diasAutonomia = consumoDiarioTotalRollos > 0 ? Math.floor(stockActual / consumoDiarioTotalRollos) : 0;
+  } else {
+    diasAutonomia = consumoDiarioTotalKg > 0 ? Math.floor(stockActual / consumoDiarioTotalKg) : 0;
+  }
+  const mesesAutonomia = Number((diasAutonomia / 30).toFixed(1));
+
+  // Consumo solo Tambo VO (para compatibilidad)
+  const consumoDiarioVOKg = Math.round(vacasVO * racionVO * 10) / 10;
+  const diasAutonomiaVO = consumoDiarioVOKg > 0 ? Math.floor(stockActual / consumoDiarioVOKg) : 0;
+
+  // Textos explicativos
+  const categoriasTambo = desglose.filter((x) => x.sector === "Tambo");
+  const categoriasGana = desglose.filter((x) => x.sector === "Ganadería");
+
+  let textoResumen = "";
+  if (totalCabezas > 0) {
+    const partes: string[] = [];
+    if (categoriasTambo.length > 0) {
+      partes.push(`${categoriasTambo.reduce((s, x) => s + x.cabezas, 0)} en Tambo`);
+    }
+    if (categoriasGana.length > 0) {
+      const nombresGana = categoriasGana.map((x) => x.nombre.replace("Ganadería (", "").replace(")", "")).join(", ");
+      partes.push(`${categoriasGana.reduce((s, x) => s + x.cabezas, 0)} en Ganadería (${nombresGana})`);
+    }
+    textoResumen = `${totalCabezas} animales: ${partes.join(" + ")}`;
+  } else {
+    textoResumen = "Sin consumo activo asignado en las dietas";
+  }
+
+  const lineasTooltip: string[] = [
+    `Rodeo consumidor: ${totalCabezas} cabezas (${consumoDiarioTotalKg.toLocaleString("es-AR")} kg/día)`,
+  ];
+  desglose.forEach((cat) => {
+    lineasTooltip.push(
+      `• ${cat.icono} ${cat.nombre}: ${cat.cabezas} cab. @ ${cat.racionKgDia} kg/d = ${cat.consumoKgDia.toLocaleString("es-AR")} kg/d (${cat.porcentajeDelTotal ?? 0}%)`
+    );
+  });
+  if (stockActual > 0 && diasAutonomia > 0) {
+    lineasTooltip.push(
+      `Stock: ${stockActual.toLocaleString("es-AR")} ${unidad} → ${diasAutonomia} días de ración (~${mesesAutonomia} meses)`
+    );
+  }
+  const textoTooltip = lineasTooltip.join("\n");
+
+  return {
+    insumoId,
+    stockActual,
+    unidad,
+    totalCabezas,
+    consumoDiarioTotalKg,
+    consumoDiarioTotalRollos,
+    diasAutonomia,
+    mesesAutonomia,
+    desglose,
+    textoResumen,
+    textoTooltip,
+    vacasOrdeñe: vacasVO,
+    racionKgVacaDia: racionVO,
+    consumoDiarioVOKg,
+    diasAutonomiaVO,
+    ultimaActualizacion: dietaTambo.ultimaActualizacion,
+    actualizadoPor: dietaTambo.actualizadoPor,
+  };
+}
+
 export function calcularAutonomiaPelletTambo(
   kgPellet: number,
   pelletInsumoId: string = "pellet-soja",
   vacasOrdeñe?: number,
   kgPorVacaDia?: number
 ) {
-  const dietaActual = getDietaTambo();
-  const vacas = vacasOrdeñe !== undefined && vacasOrdeñe > 0 ? vacasOrdeñe : dietaActual.vacasEnOrdeñe;
-  const racion = kgPorVacaDia !== undefined && kgPorVacaDia > 0
-    ? kgPorVacaDia
-    : (dietaActual.racionesKgDia[pelletInsumoId as keyof typeof dietaActual.racionesKgDia] ?? 2.5);
-
-  const consumoDiarioTotalKg = Math.round(vacas * racion * 10) / 10;
-  const diasAutonomia = consumoDiarioTotalKg > 0 ? Math.floor(kgPellet / consumoDiarioTotalKg) : 0;
-  const mesesAutonomia = Number((diasAutonomia / 30).toFixed(1));
-
-  return {
-    vacasOrdeñe: vacas,
-    racionKgVacaDia: racion,
-    consumoDiarioTotalKg,
-    diasAutonomia,
-    mesesAutonomia,
-    ultimaActualizacion: dietaActual.ultimaActualizacion,
-    actualizadoPor: dietaActual.actualizadoPor,
-  };
+  return calcularAutonomiaAlimentoRodeo(kgPellet, pelletInsumoId, {
+    vacasOrdeñe,
+    racionKgVacaDia: kgPorVacaDia,
+  });
 }
 
 // =========================================================================

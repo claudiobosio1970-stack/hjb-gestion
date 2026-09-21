@@ -20,6 +20,9 @@ import {
   registrarCanjeGranoPellet,
   trasladarStockPellet,
   calcularAutonomiaPelletTambo,
+  calcularAutonomiaAlimentoRodeo,
+  AutonomiaAlimentoResult,
+  CategoriaConsumoRodeo,
   getDietaTambo,
   saveDietaTambo,
   HJB_DIETA_SYNC_EVENT,
@@ -97,6 +100,9 @@ export default function InsumosPage() {
 
   // Modal Stock por Ubicación (Cereales y Rollos)
   const [insumoUbicaciones, setInsumoUbicaciones] = useState<InsumoStockItem | null>(null);
+
+  // Modal Detalle de Autonomía de Alimentación en Todo el Rodeo
+  const [modalAutonomia, setModalAutonomia] = useState<{ item: InsumoStockItem; auto: AutonomiaAlimentoResult } | null>(null);
 
   // Modal Ajustar Stock / Corregir Inventario (Restar toneladas por error, mermas, eliminar ingresos erróneos)
   const [modalAjusteOpen, setModalAjusteOpen] = useState(false);
@@ -454,11 +460,13 @@ export default function InsumosPage() {
     const kgGrano = Math.round(formCanje.toneladasGrano * 1000);
     const kgPellet = Math.round(tnPellet * 1000);
 
-    const { diasAutonomia } = calcularAutonomiaPelletTambo(
+    const autoCanje = calcularAutonomiaAlimentoRodeo(
       kgPellet,
       formCanje.pelletInsumoId,
-      formCanje.vacasEnOrdeñe,
-      formCanje.racionKgVacaDia
+      {
+        vacasOrdeñe: formCanje.vacasEnOrdeñe,
+        racionKgVacaDia: formCanje.racionKgVacaDia,
+      }
     );
 
     registrarCanjeGranoPellet({
@@ -480,7 +488,7 @@ export default function InsumosPage() {
 
     setModalCanjeOpen(false);
     cargarDatos();
-    triggerFeedback(`✓ Canje registrado (${formCanje.destinoPellet === "AFA Los Cardos" ? "Stockeado en AFA Los Cardos" : "Destino Tambo"} · ${formCanje.vacasEnOrdeñe} vacas @ ${formCanje.racionKgVacaDia} kg/día): +${tnPellet} Tn de ${pelletItem?.nombre || "Pellet"} (${diasAutonomia} días de alimentación).`);
+    triggerFeedback(`✓ Canje registrado (${formCanje.destinoPellet === "AFA Los Cardos" ? "Stockeado en AFA Los Cardos" : "Destino Tambo"} · ${autoCanje.totalCabezas} animales en dieta): +${tnPellet} Tn de ${pelletItem?.nombre || "Pellet"} (${autoCanje.diasAutonomia} días de alimentación).`);
   }
 
   // Filtrado de la tabla de insumos
@@ -835,19 +843,35 @@ export default function InsumosPage() {
                           </div>
                         )}
 
-                        {/* Indicador reactivo de autonomía según la dieta activa del rodeo */}
-                        {(item.id === "pellet-soja" || item.id === "pellet-trigo") && item.stockActual > 0 && (() => {
-                          const auto = calcularAutonomiaPelletTambo(item.stockActual, item.id);
-                          if (auto.diasAutonomia <= 0) return null;
+                        {/* Indicador reactivo de autonomía para TODOS los alimentos del rodeo */}
+                        {item.stockActual > 0 && (() => {
+                          const auto = calcularAutonomiaAlimentoRodeo(item.stockActual, item.id, { unidad: item.unidad });
+                          if (auto.diasAutonomia <= 0 || auto.totalCabezas <= 0) return null;
                           return (
                             <div style={{ marginTop: "3px" }}>
-                              <span
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setModalAutonomia({ item, auto });
+                                }}
                                 className="pill badgeGreen"
-                                style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px" }}
-                                title={`Dieta activa: ${auto.vacasOrdeñe} vacas @ ${auto.racionKgVacaDia} kg/vaca/día (${auto.consumoDiarioTotalKg} kg/día totales)`}
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  padding: "2px 7px",
+                                  cursor: "pointer",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  border: "1px solid rgba(22, 163, 74, 0.35)",
+                                  background: "rgba(22, 163, 74, 0.12)",
+                                  color: "#166534",
+                                }}
+                                title={`${auto.textoTooltip}\n\n👉 Hacé clic para ver el desglose detallado de categorías y corrales`}
                               >
-                                🥛 {auto.diasAutonomia} d ración ({auto.vacasOrdeñe} VO)
-                              </span>
+                                🍽️ {auto.diasAutonomia} d ración ({auto.totalCabezas} cab.) ℹ️
+                              </button>
                             </div>
                           );
                         })()}
@@ -2232,7 +2256,15 @@ export default function InsumosPage() {
                   const cerealItem = data.items.find((x) => x.id === formCanje.cerealInsumoId);
                   const pelletItem = data.items.find((x) => x.id === formCanje.pelletInsumoId) || { nombre: "Pellet de Soja Proteico (Harina)" };
 
-                  const { diasAutonomia, mesesAutonomia, consumoDiarioTotalKg, racionKgVacaDia, vacasOrdeñe } = calcularAutonomiaPelletTambo(
+                  const {
+                    diasAutonomia,
+                    mesesAutonomia,
+                    consumoDiarioTotalKg,
+                    racionKgVacaDia,
+                    vacasOrdeñe,
+                    totalCabezas,
+                    desglose,
+                  } = calcularAutonomiaPelletTambo(
                     kgPellet,
                     formCanje.pelletInsumoId,
                     formCanje.vacasEnOrdeñe,
@@ -2283,7 +2315,7 @@ export default function InsumosPage() {
                         </div>
                       </div>
 
-                      {/* Autonomía de Dieta para el Rodeo de Vacas */}
+                      {/* Autonomía de Dieta Consolidada para Todo el Rodeo */}
                       <div
                         style={{
                           marginTop: "8px",
@@ -2297,7 +2329,7 @@ export default function InsumosPage() {
                           <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                             <span style={{ fontSize: "15px" }}>⏱️</span>
                             <span style={{ fontSize: "11.5px", fontWeight: 800, color: "#166534", textTransform: "uppercase" }}>
-                              Autonomía para el Rodeo del Tambo:
+                              Autonomía Consolidada del Rodeo ({totalCabezas} cab.):
                             </span>
                           </div>
                           <span
@@ -2312,8 +2344,27 @@ export default function InsumosPage() {
                         </div>
 
                         <div style={{ fontSize: "11.5px", color: "var(--slate-700)", lineHeight: 1.45 }}>
-                          Alcanza para alimentar a las <strong>{vacasOrdeñe} vacas en ordeñe</strong> durante{" "}
-                          <strong>{diasAutonomia} días</strong> (aprox. {mesesAutonomia} meses{diasAutonomia > 0 ? `, hasta el ${fechaFinStr}` : ""}) según la dieta oficial de <strong>{racionKgVacaDia} kg/vaca/día</strong> ({consumoDiarioTotalKg} kg/día totales del rodeo).
+                          Alcanza para alimentar a todo el rodeo consumidor (<strong>{totalCabezas} cabezas</strong>: {vacasOrdeñe} VO en Tambo{totalCabezas > vacasOrdeñe ? ` + ${totalCabezas - vacasOrdeñe} novillos en Ganadería` : ""}) durante{" "}
+                          <strong>{diasAutonomia} días</strong> (aprox. {mesesAutonomia} meses{diasAutonomia > 0 ? `, hasta el ${fechaFinStr}` : ""}) con un consumo total de <strong>{consumoDiarioTotalKg} kg/día</strong> (VO: {racionKgVacaDia} kg/vaca/día).
+                        </div>
+
+                        {/* Desglose rápido de lotes y corrales */}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+                          {desglose.map((cat) => (
+                            <span
+                              key={cat.id}
+                              style={{
+                                fontSize: "10.5px",
+                                background: "#f8fafc",
+                                border: "1px solid #e2e8f0",
+                                padding: "2px 7px",
+                                borderRadius: "4px",
+                                color: "var(--slate-700)",
+                              }}
+                            >
+                              {cat.icono} {cat.nombre}: <strong>{cat.cabezas} cab.</strong> ({cat.consumoKgDia} kg/d)
+                            </span>
+                          ))}
                         </div>
 
                         <div style={{ marginTop: "6px", paddingTop: "5px", borderTop: "1px dashed #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -3132,6 +3183,228 @@ export default function InsumosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE DESGLOSE COMPLETO DE AUTONOMÍA DEL RODEO */}
+      {modalAutonomia && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.7)",
+            backdropFilter: "blur(3px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "16px",
+          }}
+          onClick={() => setModalAutonomia(null)}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "14px",
+              width: "100%",
+              maxWidth: "640px",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)",
+              border: "1px solid #cbd5e1",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "16px 20px",
+                borderBottom: "1px solid var(--line)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "#f8fafc",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "20px" }}>🍽️</span>
+                  <h3 style={{ margin: 0, fontSize: "17px", color: "var(--slate-900)" }}>
+                    Autonomía y Raciones del Rodeo
+                  </h3>
+                </div>
+                <p style={{ margin: "2px 0 0 0", fontSize: "12.5px", color: "var(--slate-500)" }}>
+                  {modalAutonomia.item.nombre} · Cálculo integrado Tambo + Ganadería
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalAutonomia(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "18px",
+                  cursor: "pointer",
+                  color: "var(--slate-400)",
+                  padding: "4px 8px",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+              {/* Tarjetas resumen */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px", borderRadius: "10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>
+                    Duración Estimada
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 900, color: "#15803d", marginTop: "2px" }}>
+                    {modalAutonomia.auto.diasAutonomia} días
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#166534" }}>
+                    ~{modalAutonomia.auto.mesesAutonomia} meses de ración
+                  </div>
+                </div>
+
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "12px", borderRadius: "10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--slate-600)", textTransform: "uppercase" }}>
+                    Rodeo Consumidor
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 900, color: "var(--slate-900)", marginTop: "2px" }}>
+                    {modalAutonomia.auto.totalCabezas} cab.
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                    Animales en dieta
+                  </div>
+                </div>
+
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "12px", borderRadius: "10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--slate-600)", textTransform: "uppercase" }}>
+                    Consumo Diario
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 900, color: "var(--slate-900)", marginTop: "2px" }}>
+                    {modalAutonomia.auto.consumoDiarioTotalKg.toLocaleString("es-AR")}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                    kg/día totales {modalAutonomia.auto.consumoDiarioTotalRollos ? `(~${modalAutonomia.auto.consumoDiarioTotalRollos} rollo/d)` : ""}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock disponible y resumen */}
+              <div style={{ background: "#f1f5f9", padding: "10px 14px", borderRadius: "8px", fontSize: "12.5px", color: "var(--slate-700)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                <div>
+                  <strong>Stock disponible:</strong> {modalAutonomia.auto.stockActual.toLocaleString("es-AR")} {modalAutonomia.auto.unidad}
+                  {modalAutonomia.auto.unidad === "kg" ? ` (${(modalAutonomia.auto.stockActual / 1000).toFixed(2)} Tn)` : ""}
+                </div>
+                <div style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
+                  {modalAutonomia.auto.textoResumen}
+                </div>
+              </div>
+
+              {/* Tabla de desglose por categoría y corral */}
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "var(--slate-800)", marginBottom: "8px" }}>
+                  Desglose por Categoría, Lote y Corral:
+                </div>
+                <div style={{ border: "1px solid var(--line)", borderRadius: "8px", overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                    <thead>
+                      <tr style={{ background: "#f8fafc", borderBottom: "1px solid var(--line)", textAlign: "left", color: "var(--slate-600)" }}>
+                        <th style={{ padding: "8px 12px" }}>Categoría / Corral</th>
+                        <th style={{ padding: "8px 12px", textAlign: "right" }}>Cabezas</th>
+                        <th style={{ padding: "8px 12px", textAlign: "right" }}>Ración Indiv.</th>
+                        <th style={{ padding: "8px 12px", textAlign: "right" }}>Consumo Total</th>
+                        <th style={{ padding: "8px 12px", textAlign: "right" }}>Participación</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modalAutonomia.auto.desglose.map((cat) => (
+                        <tr key={cat.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "8px 12px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span>{cat.icono}</span>
+                              <div>
+                                <strong>{cat.nombre}</strong>
+                                <span style={{ fontSize: "10px", color: "var(--slate-400)", marginLeft: "6px" }}>
+                                  [{cat.sector}]
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700 }}>
+                            {cat.cabezas} cab.
+                          </td>
+                          <td style={{ padding: "8px 12px", textAlign: "right", color: "var(--slate-600)" }}>
+                            {cat.racionKgDia} kg/cab/d
+                          </td>
+                          <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 800, color: "#166534" }}>
+                            {cat.consumoKgDia.toLocaleString("es-AR")} kg/d
+                          </td>
+                          <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                            <span className="pill badgeSlate" style={{ fontSize: "10.5px" }}>
+                              {cat.porcentajeDelTotal ?? 0}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Accesos rápidos para ajustar dietas */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", borderTop: "1px dashed var(--line)", flexWrap: "wrap", gap: "8px" }}>
+                <span style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                  ¿Querés modificar las raciones o cabezas asignadas?
+                </span>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <a
+                    href="/tambo"
+                    className="secondaryBtn"
+                    style={{ fontSize: "11px", padding: "4px 10px", textDecoration: "none" }}
+                  >
+                    🥛 Dieta Tambo
+                  </a>
+                  <a
+                    href="/ganaderia"
+                    className="secondaryBtn"
+                    style={{ fontSize: "11px", padding: "4px 10px", textDecoration: "none" }}
+                  >
+                    🐂 Corrales Ganadería
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: "12px 20px",
+                borderTop: "1px solid var(--line)",
+                background: "#f8fafc",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                className="primaryButton"
+                onClick={() => setModalAutonomia(null)}
+                style={{ padding: "6px 16px" }}
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

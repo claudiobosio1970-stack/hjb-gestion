@@ -8,6 +8,7 @@ import {
   getStockActualInsumos,
   getDietaTambo,
   saveDietaTambo,
+  calcularAutonomiaAlimentoRodeo,
   DietaTamboConfig,
   HJB_DIETA_SYNC_EVENT,
   HJB_STOCK_SYNC_EVENT,
@@ -106,6 +107,20 @@ export default function TamboPage() {
   const consumoDiaSilo = Math.round(formDieta.vacasEnOrdeñe * formDieta.siloMaiz * 10) / 10;
   const diasSilo = consumoDiaSilo > 0 ? Math.floor(stockSiloKg / consumoDiaSilo) : 0;
 
+  // Autonomías consolidadas de todo el rodeo (Tambo + Ganadería)
+  const autoSojaTotal = calcularAutonomiaAlimentoRodeo(stockPelletSojaKg, "pellet-soja", {
+    vacasOrdeñe: formDieta.vacasEnOrdeñe,
+    racionKgVacaDia: formDieta.pelletSoja,
+  });
+  const autoTrigoTotal = calcularAutonomiaAlimentoRodeo(stockPelletTrigoKg, "pellet-trigo", {
+    vacasOrdeñe: formDieta.vacasEnOrdeñe,
+    racionKgVacaDia: formDieta.pelletTrigo,
+  });
+  const autoSiloTotal = calcularAutonomiaAlimentoRodeo(stockSiloKg, "silo-maiz", {
+    vacasOrdeñe: formDieta.vacasEnOrdeñe,
+    racionKgVacaDia: formDieta.siloMaiz,
+  });
+
   // Costos de alimentación por vaca en ordeño (VO) y totales de rodeo
   const precioKgSoja = (getPrecioReferencia("pellet-soja", "ARS") || 295200) / 1000;
   const precioKgTrigo = (getPrecioReferencia("pellet-trigo", "ARS") || 221800) / 1000;
@@ -199,7 +214,7 @@ export default function TamboPage() {
           value={`${stockPelletSojaKg.toLocaleString("es-AR")} kg`}
           note={
             diasSoja > 0
-              ? `${diasSoja} días de ración (${(stockPelletSojaKg / 1000).toFixed(1)} Tn)`
+              ? `${diasSoja} d en VO · ${autoSojaTotal.diasAutonomia} d todo el rodeo (${autoSojaTotal.totalCabezas} cab.)`
               : "Sin stock disponible en Tambo"
           }
         />
@@ -208,7 +223,7 @@ export default function TamboPage() {
           value={`${stockSiloKg.toLocaleString("es-AR")} kg`}
           note={
             diasSilo > 0
-              ? `${diasSilo} días de reserva (${(stockSiloKg / 1000).toFixed(1)} Tn)`
+              ? `${diasSilo} d en VO · ${autoSiloTotal.diasAutonomia} d todo el rodeo (${autoSiloTotal.totalCabezas} cab.)`
               : "Sin stock cargado"
           }
         />
@@ -353,9 +368,14 @@ export default function TamboPage() {
                   </td>
                   <td style={{ textAlign: "center" }}>
                     {diasSoja > 0 ? (
-                      <span className="pill badgeGreen" style={{ fontSize: "12px", fontWeight: 800 }}>
-                        ⏱️ {diasSoja} días de stock
-                      </span>
+                      <div>
+                        <span className="pill badgeGreen" style={{ fontSize: "12px", fontWeight: 800 }}>
+                          ⏱️ {diasSoja} días (VO)
+                        </span>
+                        <div style={{ fontSize: "10.5px", color: "var(--slate-500)", marginTop: "2px" }} title={autoSojaTotal.textoTooltip}>
+                          {autoSojaTotal.diasAutonomia} d todo el rodeo ({autoSojaTotal.totalCabezas} cab.)
+                        </div>
+                      </div>
                     ) : (
                       <span className="pill badgeAmber" style={{ fontSize: "11px" }}>
                         Sin stock disponible
@@ -516,9 +536,14 @@ export default function TamboPage() {
                   </td>
                   <td style={{ textAlign: "center" }}>
                     {diasSilo > 0 ? (
-                      <span className="pill badgeGreen" style={{ fontSize: "12px", fontWeight: 800 }}>
-                        ⏱️ {diasSilo} días de reserva
-                      </span>
+                      <div>
+                        <span className="pill badgeGreen" style={{ fontSize: "12px", fontWeight: 800 }}>
+                          ⏱️ {diasSilo} días (VO)
+                        </span>
+                        <div style={{ fontSize: "10.5px", color: "var(--slate-500)", marginTop: "2px" }} title={autoSiloTotal.textoTooltip}>
+                          {autoSiloTotal.diasAutonomia} d todo el rodeo ({autoSiloTotal.totalCabezas} cab.)
+                        </div>
+                      </div>
                     ) : (
                       <span className="pill badgeAmber" style={{ fontSize: "11px" }}>
                         Confeccionar silo
