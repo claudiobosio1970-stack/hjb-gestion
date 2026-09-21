@@ -10,6 +10,8 @@ import {
   getStockActualInsumos,
   registrarIngresoStock,
   registrarCanjeGranoPellet,
+  calcularAutonomiaPelletTambo,
+  DIETA_TAMBO_HJB_DEFAULT,
   HJB_STOCK_SYNC_EVENT,
 } from "@/lib/stockInsumosData";
 import { HJB_AGRICULTURE_SYNC_EVENT } from "@/lib/agricultureData";
@@ -55,9 +57,12 @@ export default function InsumosPage() {
     porcentajeCanje: 75,
     pelletInsumoId: "pellet-soja",
     fecha: new Date().toISOString().split("T")[0],
-    destinoPellet: "Galpón de Raciones - Tambo",
+    destinoPellet: "Tambo",
     comprobante: "",
     observaciones: "",
+    vacasEnOrdeñe: DIETA_TAMBO_HJB_DEFAULT.vacasEnOrdeñe,
+    racionKgVacaDia: DIETA_TAMBO_HJB_DEFAULT.racionesKgDia["pellet-soja"],
+    mostrarAjusteDieta: false,
   });
 
   // Modal Trazabilidad / Movimientos de Insumo
@@ -137,15 +142,21 @@ export default function InsumosPage() {
     const afaUbic = cerealItem?.stockPorUbicacion?.find((u) => u.tipoLugar === "afa" || /afa|cardos/i.test(u.lugar));
     const availTn = afaUbic ? (afaUbic.cantidadTn || 0) : 0;
 
+    const defaultPelletId = "pellet-soja";
+    const defaultRacion = DIETA_TAMBO_HJB_DEFAULT.racionesKgDia[defaultPelletId] || 2.5;
+
     setFormCanje({
       cerealInsumoId: id,
       toneladasGrano: availTn > 0 ? availTn : 10,
       porcentajeCanje: 75,
-      pelletInsumoId: id === "maiz-grano" ? "balanceado-iniciador" : "pellet-soja",
+      pelletInsumoId: defaultPelletId, // SIEMPRE subproducto pellet, nunca balanceado de guacheras
       fecha: new Date().toISOString().split("T")[0],
-      destinoPellet: "Galpón de Raciones - Tambo",
+      destinoPellet: "Tambo", // ÚNICAMENTE Tambo
       comprobante: "",
       observaciones: "",
+      vacasEnOrdeñe: DIETA_TAMBO_HJB_DEFAULT.vacasEnOrdeñe,
+      racionKgVacaDia: defaultRacion,
+      mostrarAjusteDieta: false,
     });
     setModalCanjeOpen(true);
   }
@@ -168,6 +179,13 @@ export default function InsumosPage() {
     const kgGrano = Math.round(formCanje.toneladasGrano * 1000);
     const kgPellet = Math.round(tnPellet * 1000);
 
+    const { diasAutonomia } = calcularAutonomiaPelletTambo(
+      kgPellet,
+      formCanje.pelletInsumoId,
+      formCanje.vacasEnOrdeñe,
+      formCanje.racionKgVacaDia
+    );
+
     registrarCanjeGranoPellet({
       fecha: formCanje.fecha,
       cerealInsumoId: formCanje.cerealInsumoId,
@@ -180,14 +198,14 @@ export default function InsumosPage() {
       kgPellet,
       pelletInsumoId: formCanje.pelletInsumoId,
       pelletNombre: pelletItem?.nombre || "Pellet de Soja Proteico (Harina)",
-      destinoPellet: formCanje.destinoPellet,
+      destinoPellet: "Tambo", // ÚNICAMENTE Tambo
       comprobante: formCanje.comprobante.trim() || undefined,
       observaciones: formCanje.observaciones.trim() || undefined,
     });
 
     setModalCanjeOpen(false);
     cargarDatos();
-    triggerFeedback(`✓ Canje registrado con éxito: se convirtieron ${formCanje.toneladasGrano} Tn de ${cerealItem?.nombre || "grano"} en +${tnPellet} Tn de ${pelletItem?.nombre || "Pellet de Soja"} (${formCanje.porcentajeCanje}% canje AFA Los Cardos).`);
+    triggerFeedback(`✓ Canje registrado: ${formCanje.toneladasGrano} Tn de ${cerealItem?.nombre || "grano"} canjeadas por +${tnPellet} Tn de ${pelletItem?.nombre || "Pellet"} (${diasAutonomia} días de alimentación en Tambo).`);
   }
 
   // Filtrado de la tabla de insumos
@@ -1300,30 +1318,35 @@ export default function InsumosPage() {
               borderRadius: "14px",
               maxWidth: "580px",
               width: "100%",
+              maxHeight: "calc(100vh - 28px)",
+              display: "flex",
+              flexDirection: "column",
               boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
               border: "1px solid var(--line)",
               overflow: "hidden",
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Header Fijo */}
             <div
               style={{
-                padding: "18px 24px",
+                padding: "14px 20px",
                 borderBottom: "1px solid var(--line)",
                 background: "linear-gradient(to right, #f0fdf4, #ffffff)",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                flexShrink: 0,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "26px" }}>🔄</span>
+                <span style={{ fontSize: "24px" }}>🔄</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: "18px", color: "var(--slate-950)" }}>
+                  <h3 style={{ margin: 0, fontSize: "17px", color: "var(--slate-950)" }}>
                     Convertir Grano en Pellet (Canje AFA)
                   </h3>
                   <small style={{ color: "var(--slate-500)", fontSize: "12px" }}>
-                    Acreditación de pellet proteico en Tambo contra grano acopiado en AFA Los Cardos.
+                    Acreditación de pellet para Tambo contra cereal acopiado en AFA Los Cardos.
                   </small>
                 </div>
               </div>
@@ -1336,204 +1359,372 @@ export default function InsumosPage() {
               </button>
             </div>
 
-            <form onSubmit={handleGuardarCanje} style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-              {/* Selector de Cereal de Origen */}
-              <div>
-                <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
-                  Grano de Origen en AFA Los Cardos:
-                </label>
-                <select
-                  value={formCanje.cerealInsumoId}
-                  onChange={(e) => {
-                    const newId = e.target.value;
-                    const cItem = data.items.find((x) => x.id === newId);
-                    const afaU = cItem?.stockPorUbicacion?.find((u) => u.tipoLugar === "afa" || /afa|cardos/i.test(u.lugar));
-                    setFormCanje({
-                      ...formCanje,
-                      cerealInsumoId: newId,
-                      pelletInsumoId: newId === "maiz-grano" ? "balanceado-iniciador" : "pellet-soja",
-                      toneladasGrano: afaU && (afaU.cantidadTn || 0) > 0 ? afaU.cantidadTn || 0 : formCanje.toneladasGrano,
-                    });
-                  }}
-                  style={{ width: "100%", padding: "9px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13.5px", fontWeight: 600 }}
-                  required
-                >
-                  {data.items
-                    .filter((it) => it.categoria === "Granos" || it.id.includes("grano"))
-                    .map((it) => {
-                      const afaU = it.stockPorUbicacion?.find((u) => u.tipoLugar === "afa" || /afa|cardos/i.test(u.lugar));
-                      const tnAfa = afaU?.cantidadTn || 0;
-                      return (
-                        <option key={it.id} value={it.id}>
-                          🌾 {it.nombre} — Disponible en AFA: {tnAfa.toLocaleString("es-AR")} Tn
-                        </option>
-                      );
-                    })}
-                </select>
-              </div>
+            {/* Formulario con Scroll interno y campos compactos */}
+            <form
+              onSubmit={handleGuardarCanje}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                overflowY: "auto",
+                flex: "1 1 auto",
+              }}
+            >
+              <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                {/* Fila 1: Selector de Grano de Origen y Fecha */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>
+                      Grano de Origen en AFA Los Cardos:
+                    </label>
+                    <select
+                      value={formCanje.cerealInsumoId}
+                      onChange={(e) => {
+                        const newId = e.target.value;
+                        const cItem = data.items.find((x) => x.id === newId);
+                        const afaU = cItem?.stockPorUbicacion?.find((u) => u.tipoLugar === "afa" || /afa|cardos/i.test(u.lugar));
+                        setFormCanje({
+                          ...formCanje,
+                          cerealInsumoId: newId,
+                          toneladasGrano: afaU && (afaU.cantidadTn || 0) > 0 ? afaU.cantidadTn || 0 : formCanje.toneladasGrano,
+                        });
+                      }}
+                      style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", fontWeight: 600 }}
+                      required
+                    >
+                      {data.items
+                        .filter((it) => it.categoria === "Granos" || it.id.includes("grano"))
+                        .map((it) => {
+                          const afaU = it.stockPorUbicacion?.find((u) => u.tipoLugar === "afa" || /afa|cardos/i.test(u.lugar));
+                          const tnAfa = afaU?.cantidadTn || 0;
+                          return (
+                            <option key={it.id} value={it.id}>
+                              🌾 {it.nombre} — En AFA: {tnAfa.toLocaleString("es-AR")} Tn
+                            </option>
+                          );
+                        })}
+                    </select>
+                  </div>
 
-              {/* Fecha de la Conversión */}
-              <div>
-                <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
-                  Fecha de la Operación / Liquidación:
-                </label>
-                <input
-                  type="date"
-                  value={formCanje.fecha}
-                  onChange={(e) => setFormCanje({ ...formCanje, fecha: e.target.value })}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13.5px" }}
-                  required
-                />
-              </div>
-
-              {/* Toneladas a Convertir y Porcentaje de Canje */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
-                    Toneladas de Grano a Canjear:
-                  </label>
-                  <div style={{ position: "relative" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>
+                      Fecha de Liquidación:
+                    </label>
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={formCanje.toneladasGrano}
-                      onChange={(e) => setFormCanje({ ...formCanje, toneladasGrano: parseFloat(e.target.value) || 0 })}
-                      style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700 }}
+                      type="date"
+                      value={formCanje.fecha}
+                      onChange={(e) => setFormCanje({ ...formCanje, fecha: e.target.value })}
+                      style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
                       required
                     />
-                    <span style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "12px", color: "var(--slate-400)", fontWeight: 700 }}>
-                      Tn
-                    </span>
                   </div>
-                  <small style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "3px", display: "block" }}>
-                    Equivale a {(formCanje.toneladasGrano * 1000).toLocaleString("es-AR")} kg de cereal
-                  </small>
                 </div>
 
-                <div>
-                  <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
-                    Porcentaje de Canje (%):
-                  </label>
-                  <div style={{ position: "relative" }}>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="1"
-                      max="100"
-                      value={formCanje.porcentajeCanje}
-                      onChange={(e) => setFormCanje({ ...formCanje, porcentajeCanje: parseFloat(e.target.value) || 0 })}
-                      style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700 }}
-                      required
-                    />
-                    <span style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "12px", color: "var(--slate-400)", fontWeight: 700 }}>
-                      %
-                    </span>
-                  </div>
-                  <small style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "3px", display: "block" }}>
-                    Relación de entrega de subproducto
-                  </small>
-                </div>
-              </div>
-
-              {/* Tarjeta de Cálculo en Tiempo Real */}
-              {(() => {
-                const tnPellet = Number((formCanje.toneladasGrano * (formCanje.porcentajeCanje / 100)).toFixed(2));
-                const kgPellet = Math.round(tnPellet * 1000);
-                const cerealItem = data.items.find((x) => x.id === formCanje.cerealInsumoId);
-                const pelletItem = data.items.find((x) => x.id === formCanje.pelletInsumoId);
-
-                return (
-                  <div
-                    style={{
-                      background: "#f0fdf4",
-                      border: "1px solid #86efac",
-                      borderRadius: "10px",
-                      padding: "14px 16px",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#166534", textTransform: "uppercase" }}>
-                        🌾 Subproducto Resultante a Ingresar:
-                      </span>
-                      <span className="pill badgeGreen" style={{ fontSize: "10.5px", fontWeight: 800 }}>
-                        {formCanje.porcentajeCanje}% Canje AFA
+                {/* Fila 2: Toneladas a Canjear y Porcentaje de Canje */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>
+                      Toneladas de Grano a Canjear:
+                    </label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={formCanje.toneladasGrano}
+                        onChange={(e) => setFormCanje({ ...formCanje, toneladasGrano: parseFloat(e.target.value) || 0 })}
+                        style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13.5px", fontWeight: 700 }}
+                        required
+                      />
+                      <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", fontSize: "11.5px", color: "var(--slate-400)", fontWeight: 700 }}>
+                        Tn
                       </span>
                     </div>
+                    <small style={{ fontSize: "10.5px", color: "var(--slate-500)", marginTop: "2px", display: "block" }}>
+                      Equivale a {(formCanje.toneladasGrano * 1000).toLocaleString("es-AR")} kg de cereal
+                    </small>
+                  </div>
 
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-                      <div>
-                        <strong style={{ fontSize: "15px", color: "#166534", display: "block" }}>
-                          {pelletItem?.nombre || "Pellet de Soja Proteico (Harina)"}
-                        </strong>
-                        <span style={{ fontSize: "12px", color: "var(--slate-600)" }}>
-                          Destino: <strong>{formCanje.destinoPellet}</strong>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>
+                      Porcentaje de Canje (%):
+                    </label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="1"
+                        max="100"
+                        value={formCanje.porcentajeCanje}
+                        onChange={(e) => setFormCanje({ ...formCanje, porcentajeCanje: parseFloat(e.target.value) || 0 })}
+                        style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13.5px", fontWeight: 700 }}
+                        required
+                      />
+                      <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", fontSize: "11.5px", color: "var(--slate-400)", fontWeight: 700 }}>
+                        %
+                      </span>
+                    </div>
+                    <small style={{ fontSize: "10.5px", color: "var(--slate-500)", marginTop: "2px", display: "block" }}>
+                      Relación acordada con AFA
+                    </small>
+                  </div>
+                </div>
+
+                {/* Fila 3: Subproducto Resultante a Ingresar y Destino Físico (ÚNICAMENTE TAMBO) */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>
+                      Subproducto resultante a ingresar:
+                    </label>
+                    <select
+                      value={formCanje.pelletInsumoId}
+                      onChange={(e) => {
+                        const newPelletId = e.target.value;
+                        const newRacion = DIETA_TAMBO_HJB_DEFAULT.racionesKgDia[newPelletId as keyof typeof DIETA_TAMBO_HJB_DEFAULT.racionesKgDia] || 2.5;
+                        setFormCanje({
+                          ...formCanje,
+                          pelletInsumoId: newPelletId,
+                          racionKgVacaDia: newRacion,
+                        });
+                      }}
+                      style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", fontWeight: 600 }}
+                      required
+                    >
+                      <option value="pellet-soja">🥣 Pellet de Soja Proteico (Harina)</option>
+                      <option value="pellet-trigo">🌾 Pellet de Trigo (Afrechillo)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>
+                      Destino del Subproducto:
+                    </label>
+                    <div
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        background: "#f8fafc",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "var(--slate-800)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        height: "35px",
+                      }}
+                    >
+                      <span>🥛 Tambo</span>
+                      <span className="pill badgeGreen" style={{ fontSize: "10px", padding: "1px 7px" }}>
+                        Exclusivo
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tarjeta de Cálculo en Tiempo Real y Autonomía de Dieta */}
+                {(() => {
+                  const tnPellet = Number((formCanje.toneladasGrano * (formCanje.porcentajeCanje / 100)).toFixed(2));
+                  const kgPellet = Math.round(tnPellet * 1000);
+                  const cerealItem = data.items.find((x) => x.id === formCanje.cerealInsumoId);
+                  const pelletItem = data.items.find((x) => x.id === formCanje.pelletInsumoId) || { nombre: "Pellet de Soja Proteico (Harina)" };
+
+                  const { diasAutonomia, mesesAutonomia, consumoDiarioTotalKg, racionKgVacaDia, vacasOrdeñe } = calcularAutonomiaPelletTambo(
+                    kgPellet,
+                    formCanje.pelletInsumoId,
+                    formCanje.vacasEnOrdeñe,
+                    formCanje.racionKgVacaDia
+                  );
+
+                  const fechaBase = formCanje.fecha ? new Date(formCanje.fecha + "T12:00:00") : new Date();
+                  const fechaFin = new Date(fechaBase.getTime() + diasAutonomia * 24 * 60 * 60 * 1000);
+                  const fechaFinStr = diasAutonomia > 0
+                    ? fechaFin.toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })
+                    : "--";
+
+                  return (
+                    <div
+                      style={{
+                        background: "#f0fdf4",
+                        border: "1px solid #86efac",
+                        borderRadius: "10px",
+                        padding: "12px 14px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 800, color: "#166534", textTransform: "uppercase" }}>
+                          🌾 Subproducto Resultante a Ingresar:
+                        </span>
+                        <span className="pill badgeGreen" style={{ fontSize: "10px", fontWeight: 800 }}>
+                          {formCanje.porcentajeCanje}% Canje AFA
                         </span>
                       </div>
 
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: "#15803d" }}>
-                          +{tnPellet.toLocaleString("es-AR")} Tn
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                        <div>
+                          <strong style={{ fontSize: "14.5px", color: "#166534", display: "block" }}>
+                            {pelletItem.nombre}
+                          </strong>
+                          <span style={{ fontSize: "11.5px", color: "var(--slate-600)" }}>
+                            Destino asignado: <strong>Tambo</strong> (Alimentación del rodeo)
+                          </span>
                         </div>
-                        <small style={{ color: "#166534", fontWeight: 600, fontSize: "12px" }}>
-                          +{kgPellet.toLocaleString("es-AR")} kg disponibles en Tambo
-                        </small>
+
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "20px", fontWeight: 900, color: "#15803d" }}>
+                            +{tnPellet.toLocaleString("es-AR")} Tn
+                          </div>
+                          <small style={{ color: "#166534", fontWeight: 600, fontSize: "11px" }}>
+                            +{kgPellet.toLocaleString("es-AR")} kg disponibles en Tambo
+                          </small>
+                        </div>
+                      </div>
+
+                      {/* Autonomía de Dieta para el Rodeo de Vacas */}
+                      <div
+                        style={{
+                          marginTop: "8px",
+                          padding: "9px 12px",
+                          background: "#ffffff",
+                          borderRadius: "8px",
+                          border: "1px solid #bbf7d0",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                            <span style={{ fontSize: "15px" }}>⏱️</span>
+                            <span style={{ fontSize: "11.5px", fontWeight: 800, color: "#166534", textTransform: "uppercase" }}>
+                              Autonomía para el Rodeo del Tambo:
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: "14.5px",
+                              fontWeight: 900,
+                              color: diasAutonomia > 0 ? "#15803d" : "var(--slate-400)",
+                            }}
+                          >
+                            {diasAutonomia} días de stock
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: "11.5px", color: "var(--slate-700)", lineHeight: 1.45 }}>
+                          Alcanza para alimentar a las <strong>{vacasOrdeñe} vacas en ordeñe</strong> durante{" "}
+                          <strong>{diasAutonomia} días</strong> (aprox. {mesesAutonomia} meses{diasAutonomia > 0 ? `, hasta el ${fechaFinStr}` : ""}) según la dieta oficial de <strong>{racionKgVacaDia} kg/vaca/día</strong> ({consumoDiarioTotalKg} kg/día totales del rodeo).
+                        </div>
+
+                        <div style={{ marginTop: "6px", paddingTop: "5px", borderTop: "1px dashed #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <button
+                            type="button"
+                            onClick={() => setFormCanje({ ...formCanje, mostrarAjusteDieta: !formCanje.mostrarAjusteDieta })}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              fontSize: "11px",
+                              color: "#15803d",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              textDecoration: "underline",
+                            }}
+                          >
+                            {formCanje.mostrarAjusteDieta ? "▲ Ocultar ajuste de rodeo" : "⚙️ Ajustar vacas en ordeñe o ración"}
+                          </button>
+                          <span style={{ fontSize: "10px", color: "var(--slate-400)" }}>
+                            Dieta Tambo HJB
+                          </span>
+                        </div>
+
+                        {formCanje.mostrarAjusteDieta && (
+                          <div
+                            style={{
+                              marginTop: "6px",
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: "8px",
+                              background: "#f8fafc",
+                              padding: "6px 8px",
+                              borderRadius: "6px",
+                              border: "1px solid #e2e8f0",
+                            }}
+                          >
+                            <div>
+                              <label style={{ fontSize: "10px", fontWeight: 700, display: "block", color: "var(--slate-600)", marginBottom: "2px" }}>
+                                Vacas en Ordeñe (VO):
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={formCanje.vacasEnOrdeñe}
+                                onChange={(e) => setFormCanje({ ...formCanje, vacasEnOrdeñe: parseInt(e.target.value) || 1 })}
+                                style={{ width: "100%", padding: "4px 6px", fontSize: "11.5px", borderRadius: "4px", border: "1px solid #cbd5e1" }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: "10px", fontWeight: 700, display: "block", color: "var(--slate-600)", marginBottom: "2px" }}>
+                                Ración Pellet (kg/vaca/día):
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                min="0.1"
+                                value={formCanje.racionKgVacaDia}
+                                onChange={(e) => setFormCanje({ ...formCanje, racionKgVacaDia: parseFloat(e.target.value) || 0.1 })}
+                                style={{ width: "100%", padding: "4px 6px", fontSize: "11.5px", borderRadius: "4px", border: "1px solid #cbd5e1" }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ marginTop: "8px", paddingTop: "6px", borderTop: "1px dashed #bbf7d0", fontSize: "11px", color: "#166534" }}>
+                        💡 Descuenta <strong>{formCanje.toneladasGrano} Tn</strong> de {cerealItem?.nombre || "grano"} en <strong>AFA Los Cardos</strong> e ingresa <strong>{tnPellet} Tn</strong> al stock de Tambo.
                       </div>
                     </div>
+                  );
+                })()}
 
-                    <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px dashed #bbf7d0", fontSize: "11.5px", color: "#166534" }}>
-                      💡 Descuenta <strong>{formCanje.toneladasGrano} Tn</strong> de {cerealItem?.nombre || "grano"} en <strong>AFA Los Cardos</strong> e ingresa <strong>{tnPellet} Tn</strong> al stock de alimentación del Tambo.
-                    </div>
+                {/* Fila 4: Nro de Comprobante / Liquidación AFA y Observaciones */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>
+                      Nro. Liquidación / Remito AFA:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Liq. AFA N° 84920"
+                      value={formCanje.comprobante}
+                      onChange={(e) => setFormCanje({ ...formCanje, comprobante: e.target.value })}
+                      style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
+                    />
                   </div>
-                );
-              })()}
 
-              {/* Nro de Comprobante / Liquidación AFA y Observaciones */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
-                    Nro. Liquidación / Remito AFA:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej: Liq. AFA N° 84920"
-                    value={formCanje.comprobante}
-                    onChange={(e) => setFormCanje({ ...formCanje, comprobante: e.target.value })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
-                    Destino Físico del Pellet:
-                  </label>
-                  <select
-                    value={formCanje.destinoPellet}
-                    onChange={(e) => setFormCanje({ ...formCanje, destinoPellet: e.target.value })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                  >
-                    <option value="Galpón de Raciones - Tambo">Galpón de Raciones - Tambo</option>
-                    <option value="Silo de Alimento Tambo">Silo de Alimento Tambo</option>
-                    <option value="Depósito Guachera">Depósito Guachera</option>
-                  </select>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "3px" }}>
+                      Observaciones / Flete:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Detalles sobre entrega en planta o flete..."
+                      value={formCanje.observaciones}
+                      onChange={(e) => setFormCanje({ ...formCanje, observaciones: e.target.value })}
+                      style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "12.5px", fontWeight: 700, marginBottom: "4px" }}>
-                  Observaciones / Notas Adicionales:
-                </label>
-                <input
-                  type="text"
-                  placeholder="Detalles sobre entrega en planta o flete..."
-                  value={formCanje.observaciones}
-                  onChange={(e) => setFormCanje({ ...formCanje, observaciones: e.target.value })}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                />
-              </div>
-
-              {/* Botones */}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
+              {/* Footer Fijo con Botones Siempre Visibles */}
+              <div
+                style={{
+                  padding: "12px 20px",
+                  borderTop: "1px solid var(--line)",
+                  background: "#f8fafc",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px",
+                  flexShrink: 0,
+                }}
+              >
                 <button
                   type="button"
                   className="ghostButton"

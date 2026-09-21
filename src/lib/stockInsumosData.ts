@@ -356,9 +356,20 @@ export const INSUMOS_BASE_CATALOGO: Omit<
     unidad: "kg",
     stockInicial: 0,
     stockMinimoAlerta: 3000,
-    ubicacion: "Galpón de Raciones - Tambo",
+    ubicacion: "Tambo",
     valorMovilId: "pellet-soja",
     aliasLabores: ["pellet", "pellet de soja", "pellet soja"],
+  },
+  {
+    id: "pellet-trigo",
+    nombre: "Pellet de Trigo (Afrechillo)",
+    categoria: "Forrajes",
+    unidad: "kg",
+    stockInicial: 0,
+    stockMinimoAlerta: 3000,
+    ubicacion: "Tambo",
+    valorMovilId: "pellet-trigo",
+    aliasLabores: ["pellet trigo", "pellet de trigo", "afrechillo"],
   },
   {
     id: "rollo-alfalfa",
@@ -447,6 +458,43 @@ export function getIngresosManuales(): IngresoStockManual[] {
 export function saveIngresosManuales(ingresos: IngresoStockManual[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_INGRESOS_STOCK, JSON.stringify(ingresos));
+}
+
+// =========================================================================
+// PARÁMETROS DE DIETA Y CONSUMO DEL RODEO LECHERO EN TAMBO HJB
+// (Fuente: Planilla Oficial Costo Alimentación Vacas en Ordeño - HJB)
+// =========================================================================
+export const DIETA_TAMBO_HJB_DEFAULT = {
+  vacasEnOrdeñe: 187, // Rodeo lechero promedio en ordeño (~186.5 VO)
+  racionesKgDia: {
+    "pellet-soja": 2.5, // 2.5 kg/VO/día de Pellet de Soja Proteico (Harina)
+    "pellet-trigo": 3.0, // 3.0 kg/VO/día de Pellet de Trigo (Afrechillo)
+    "silo-maiz": 22.0, // 22.0 kg/VO/día de Silo de Maíz Picado Fino
+    "maiz": 5.5, // 5.5 kg/VO/día de Maíz grano molido
+  },
+};
+
+export function calcularAutonomiaPelletTambo(
+  kgPellet: number,
+  pelletInsumoId: string = "pellet-soja",
+  vacasOrdeñe: number = 187,
+  kgPorVacaDia?: number
+) {
+  const racion = kgPorVacaDia !== undefined && kgPorVacaDia > 0
+    ? kgPorVacaDia
+    : (DIETA_TAMBO_HJB_DEFAULT.racionesKgDia[pelletInsumoId as keyof typeof DIETA_TAMBO_HJB_DEFAULT.racionesKgDia] || 2.5);
+
+  const consumoDiarioTotalKg = Math.round(vacasOrdeñe * racion * 10) / 10;
+  const diasAutonomia = consumoDiarioTotalKg > 0 ? Math.floor(kgPellet / consumoDiarioTotalKg) : 0;
+  const mesesAutonomia = Number((diasAutonomia / 30).toFixed(1));
+
+  return {
+    vacasOrdeñe,
+    racionKgVacaDia: racion,
+    consumoDiarioTotalKg,
+    diasAutonomia,
+    mesesAutonomia,
+  };
 }
 
 // =========================================================================
@@ -1166,10 +1214,30 @@ export function getStockActualInsumos(): {
       cantidad: kgPellet,
       cantidadTn: c.toneladasPellet,
       unidad: "kg",
-      ubicacion: c.destinoPellet || "Galpón de Raciones - Tambo",
+      ubicacion: c.destinoPellet || "Tambo",
       detalle: `Ingreso por canje en ${c.acopioOrigen}: +${c.toneladasPellet} Tn de pellet (de ${c.toneladasGrano} Tn de ${c.cerealNombre} al ${c.porcentajeCanje}%)${c.comprobante ? ` · Liq: ${c.comprobante}` : ""}`,
-      referencia: c.destinoPellet,
+      referencia: c.destinoPellet || "Tambo",
     });
+
+    // Agregar desglose por ubicación de Tambo para el pellet
+    addUbicacionStock(
+      c.pelletInsumoId,
+      c.destinoPellet || "Tambo",
+      "tambo",
+      "🥛",
+      kgPellet,
+      {
+        id: `sub-canje-pellet-${c.id}`,
+        fecha: c.fecha,
+        tipo: "Ingreso Canje AFA",
+        campo: "Tambo",
+        cantidad: kgPellet,
+        cantidadTn: c.toneladasPellet,
+        unidad: "kg",
+        referencia: `${c.acopioOrigen} · Canje`,
+        detalle: `Ingreso de ${c.toneladasPellet} Tn de Pellet por canje de ${c.toneladasGrano} Tn de ${c.cerealNombre} (${c.porcentajeCanje}%)`,
+      }
+    );
   }
 
   // Ordenar movimientos recientes primero
@@ -1270,9 +1338,9 @@ export function getStockActualInsumos(): {
     let precioUsd = getPrecioReferencia(base.valorMovilId, "USD");
 
     // Ajuste de unidades si es necesario (ej: $/Tn ➔ $/kg)
-    if (base.valorMovilId === "maiz" || base.valorMovilId === "pellet-soja" || base.valorMovilId === "soja" || base.valorMovilId === "trigo") {
-      precioArs = precioArs > 0 ? precioArs / 1000 : (base.valorMovilId === "soja" ? 555 : base.valorMovilId === "trigo" ? 344.6 : 295.2);
-      precioUsd = precioUsd > 0 ? precioUsd / 1000 : (base.valorMovilId === "soja" ? 0.37 : base.valorMovilId === "trigo" ? 0.23 : 0.193);
+    if (base.valorMovilId === "maiz" || base.valorMovilId === "pellet-soja" || base.valorMovilId === "pellet-trigo" || base.valorMovilId === "soja" || base.valorMovilId === "trigo") {
+      precioArs = precioArs > 0 ? precioArs / 1000 : (base.valorMovilId === "soja" ? 555 : base.valorMovilId === "trigo" ? 344.6 : base.valorMovilId === "pellet-trigo" ? 221.8 : 295.2);
+      precioUsd = precioUsd > 0 ? precioUsd / 1000 : (base.valorMovilId === "soja" ? 0.37 : base.valorMovilId === "trigo" ? 0.23 : base.valorMovilId === "pellet-trigo" ? 0.148 : 0.193);
     } else if (base.id === "semilla-maiz") {
       precioUsd = 150;
       precioArs = precioUsd * dolarBNA;
