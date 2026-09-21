@@ -11,6 +11,10 @@ import {
   registrarIngresoStock,
   registrarCanjeGranoPellet,
   calcularAutonomiaPelletTambo,
+  getDietaTambo,
+  saveDietaTambo,
+  HJB_DIETA_SYNC_EVENT,
+  DietaTamboConfig,
   DIETA_TAMBO_HJB_DEFAULT,
   HJB_STOCK_SYNC_EVENT,
 } from "@/lib/stockInsumosData";
@@ -51,6 +55,7 @@ export default function InsumosPage() {
 
   // Modal Canje de Grano a Pellet (AFA)
   const [modalCanjeOpen, setModalCanjeOpen] = useState(false);
+  const [dietaActiva, setDietaActiva] = useState<DietaTamboConfig>(getDietaTambo());
   const [formCanje, setFormCanje] = useState({
     cerealInsumoId: "soja-grano",
     toneladasGrano: 30,
@@ -73,6 +78,7 @@ export default function InsumosPage() {
 
   function cargarDatos() {
     setData(getStockActualInsumos());
+    setDietaActiva(getDietaTambo());
   }
 
   useEffect(() => {
@@ -91,9 +97,11 @@ export default function InsumosPage() {
 
     window.addEventListener(HJB_STOCK_SYNC_EVENT, onSync);
     window.addEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+    window.addEventListener(HJB_DIETA_SYNC_EVENT, onSync);
     return () => {
       window.removeEventListener(HJB_STOCK_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+      window.removeEventListener(HJB_DIETA_SYNC_EVENT, onSync);
     };
   }, []);
 
@@ -142,8 +150,9 @@ export default function InsumosPage() {
     const afaUbic = cerealItem?.stockPorUbicacion?.find((u) => u.tipoLugar === "afa" || /afa|cardos/i.test(u.lugar));
     const availTn = afaUbic ? (afaUbic.cantidadTn || 0) : 0;
 
+    const currentDieta = getDietaTambo();
     const defaultPelletId = "pellet-soja";
-    const defaultRacion = DIETA_TAMBO_HJB_DEFAULT.racionesKgDia[defaultPelletId] || 2.5;
+    const defaultRacion = currentDieta.racionesKgDia[defaultPelletId] || 2.5;
 
     setFormCanje({
       cerealInsumoId: id,
@@ -154,7 +163,7 @@ export default function InsumosPage() {
       destinoPellet: "Tambo", // ÚNICAMENTE Tambo
       comprobante: "",
       observaciones: "",
-      vacasEnOrdeñe: DIETA_TAMBO_HJB_DEFAULT.vacasEnOrdeñe,
+      vacasEnOrdeñe: currentDieta.vacasEnOrdeñe,
       racionKgVacaDia: defaultRacion,
       mostrarAjusteDieta: false,
     });
@@ -171,6 +180,16 @@ export default function InsumosPage() {
       alert("El porcentaje de canje debe estar comprendido entre 1% y 100%.");
       return;
     }
+
+    // 1. Guardar y actualizar la dieta activa del Tambo con los parámetros vigentes
+    saveDietaTambo({
+      vacasEnOrdeñe: formCanje.vacasEnOrdeñe,
+      racionesKgDia: {
+        ...getDietaTambo().racionesKgDia,
+        [formCanje.pelletInsumoId]: formCanje.racionKgVacaDia,
+      },
+      actualizadoPor: "Canje AFA en Insumos",
+    });
 
     const cerealItem = data.items.find((x) => x.id === formCanje.cerealInsumoId);
     const pelletItem = data.items.find((x) => x.id === formCanje.pelletInsumoId);
@@ -205,7 +224,7 @@ export default function InsumosPage() {
 
     setModalCanjeOpen(false);
     cargarDatos();
-    triggerFeedback(`✓ Canje registrado: ${formCanje.toneladasGrano} Tn de ${cerealItem?.nombre || "grano"} canjeadas por +${tnPellet} Tn de ${pelletItem?.nombre || "Pellet"} (${diasAutonomia} días de alimentación en Tambo).`);
+    triggerFeedback(`✓ Canje registrado y dieta actualizada (${formCanje.vacasEnOrdeñe} vacas @ ${formCanje.racionKgVacaDia} kg/día): +${tnPellet} Tn de ${pelletItem?.nombre || "Pellet"} (${diasAutonomia} días de alimentación en Tambo).`);
   }
 
   // Filtrado de la tabla de insumos
@@ -528,6 +547,23 @@ export default function InsumosPage() {
                             {item.stockActual.toLocaleString("es-AR")} {item.unidad}
                           </div>
                         )}
+
+                        {/* Indicador reactivo de autonomía según la dieta activa del rodeo */}
+                        {(item.id === "pellet-soja" || item.id === "pellet-trigo") && item.stockActual > 0 && (() => {
+                          const auto = calcularAutonomiaPelletTambo(item.stockActual, item.id);
+                          if (auto.diasAutonomia <= 0) return null;
+                          return (
+                            <div style={{ marginTop: "3px" }}>
+                              <span
+                                className="pill badgeGreen"
+                                style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px" }}
+                                title={`Dieta activa: ${auto.vacasOrdeñe} vacas @ ${auto.racionKgVacaDia} kg/vaca/día (${auto.consumoDiarioTotalKg} kg/día totales)`}
+                              >
+                                🥛 {auto.diasAutonomia} d ración ({auto.vacasOrdeñe} VO)
+                              </span>
+                            </div>
+                          );
+                        })()}
 
                         <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
                           {item.produccionPropia > 0 ? (
@@ -1671,6 +1707,38 @@ export default function InsumosPage() {
                                 onChange={(e) => setFormCanje({ ...formCanje, racionKgVacaDia: parseFloat(e.target.value) || 0.1 })}
                                 style={{ width: "100%", padding: "4px 6px", fontSize: "11.5px", borderRadius: "4px", border: "1px solid #cbd5e1" }}
                               />
+                            </div>
+                            <div style={{ gridColumn: "span 2", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", paddingTop: "4px", borderTop: "1px dashed #cbd5e1" }}>
+                              <span style={{ fontSize: "10px", color: "var(--slate-500)" }}>
+                                {dietaActiva.ultimaActualizacion ? `Actualizada: ${new Date(dietaActiva.ultimaActualizacion).toLocaleDateString("es-AR")}` : "Dieta oficial HJB"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const saved = saveDietaTambo({
+                                    vacasEnOrdeñe: formCanje.vacasEnOrdeñe,
+                                    racionesKgDia: {
+                                      ...getDietaTambo().racionesKgDia,
+                                      [formCanje.pelletInsumoId]: formCanje.racionKgVacaDia,
+                                    },
+                                    actualizadoPor: "Panel Canje Insumos",
+                                  });
+                                  setDietaActiva(saved);
+                                  triggerFeedback(`✓ Dieta guardada como vigente en todo el sistema: ${formCanje.vacasEnOrdeñe} vacas @ ${formCanje.racionKgVacaDia} kg/día.`);
+                                }}
+                                style={{
+                                  background: "#166534",
+                                  color: "#ffffff",
+                                  border: "none",
+                                  borderRadius: "4px",
+                                  padding: "3px 8px",
+                                  fontSize: "10.5px",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                💾 Guardar como Dieta Vigente
+                              </button>
                             </div>
                           </div>
                         )}

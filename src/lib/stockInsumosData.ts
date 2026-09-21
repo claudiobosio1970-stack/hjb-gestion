@@ -464,7 +464,20 @@ export function saveIngresosManuales(ingresos: IngresoStockManual[]) {
 // PARÁMETROS DE DIETA Y CONSUMO DEL RODEO LECHERO EN TAMBO HJB
 // (Fuente: Planilla Oficial Costo Alimentación Vacas en Ordeño - HJB)
 // =========================================================================
-export const DIETA_TAMBO_HJB_DEFAULT = {
+export interface DietaTamboConfig {
+  vacasEnOrdeñe: number;
+  racionesKgDia: {
+    "pellet-soja": number;
+    "pellet-trigo": number;
+    "silo-maiz": number;
+    "maiz": number;
+    [key: string]: number;
+  };
+  ultimaActualizacion?: string;
+  actualizadoPor?: string;
+}
+
+export const DIETA_TAMBO_HJB_DEFAULT: DietaTamboConfig = {
   vacasEnOrdeñe: 187, // Rodeo lechero promedio en ordeño (~186.5 VO)
   racionesKgDia: {
     "pellet-soja": 2.5, // 2.5 kg/VO/día de Pellet de Soja Proteico (Harina)
@@ -472,28 +485,86 @@ export const DIETA_TAMBO_HJB_DEFAULT = {
     "silo-maiz": 22.0, // 22.0 kg/VO/día de Silo de Maíz Picado Fino
     "maiz": 5.5, // 5.5 kg/VO/día de Maíz grano molido
   },
+  ultimaActualizacion: "2026-08-18T00:00:00.000Z",
+  actualizadoPor: "Planilla Costo Alimentación VO (HJB)",
 };
+
+export const STORAGE_DIETA_TAMBO = "hjb_dieta_tambo_config_v01";
+export const HJB_DIETA_SYNC_EVENT = "hjb_dieta_sync_event";
+
+export function getDietaTambo(): DietaTamboConfig {
+  if (typeof window === "undefined") return { ...DIETA_TAMBO_HJB_DEFAULT };
+  try {
+    const raw = localStorage.getItem(STORAGE_DIETA_TAMBO);
+    if (!raw) return { ...DIETA_TAMBO_HJB_DEFAULT };
+    const parsed = JSON.parse(raw);
+    return {
+      vacasEnOrdeñe: parsed.vacasEnOrdeñe || DIETA_TAMBO_HJB_DEFAULT.vacasEnOrdeñe,
+      racionesKgDia: {
+        ...DIETA_TAMBO_HJB_DEFAULT.racionesKgDia,
+        ...(parsed.racionesKgDia || {}),
+      },
+      ultimaActualizacion: parsed.ultimaActualizacion,
+      actualizadoPor: parsed.actualizadoPor,
+    };
+  } catch {
+    return { ...DIETA_TAMBO_HJB_DEFAULT };
+  }
+}
+
+export function saveDietaTambo(nueva: Partial<DietaTamboConfig>): DietaTamboConfig {
+  if (typeof window === "undefined") return { ...DIETA_TAMBO_HJB_DEFAULT };
+  const current = getDietaTambo();
+  const updated: DietaTamboConfig = {
+    vacasEnOrdeñe: nueva.vacasEnOrdeñe !== undefined ? Math.max(1, nueva.vacasEnOrdeñe) : current.vacasEnOrdeñe,
+    racionesKgDia: {
+      ...current.racionesKgDia,
+      ...(nueva.racionesKgDia || {}),
+    },
+    ultimaActualizacion: new Date().toISOString(),
+    actualizadoPor: nueva.actualizadoPor || "Usuario HJB",
+  };
+
+  localStorage.setItem(STORAGE_DIETA_TAMBO, JSON.stringify(updated));
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(HJB_DIETA_SYNC_EVENT, { detail: updated }));
+    notifyStockSync();
+  }
+
+  if (typeof window !== "undefined" && db) {
+    setDoc(doc(db, "tambo_config", "dieta_actual"), sanitizeForFirestore(updated), { merge: true }).catch((err) => {
+      console.warn("Error guardando dieta de tambo en Firestore:", err);
+    });
+  }
+
+  return updated;
+}
 
 export function calcularAutonomiaPelletTambo(
   kgPellet: number,
   pelletInsumoId: string = "pellet-soja",
-  vacasOrdeñe: number = 187,
+  vacasOrdeñe?: number,
   kgPorVacaDia?: number
 ) {
+  const dietaActual = getDietaTambo();
+  const vacas = vacasOrdeñe !== undefined && vacasOrdeñe > 0 ? vacasOrdeñe : dietaActual.vacasEnOrdeñe;
   const racion = kgPorVacaDia !== undefined && kgPorVacaDia > 0
     ? kgPorVacaDia
-    : (DIETA_TAMBO_HJB_DEFAULT.racionesKgDia[pelletInsumoId as keyof typeof DIETA_TAMBO_HJB_DEFAULT.racionesKgDia] || 2.5);
+    : (dietaActual.racionesKgDia[pelletInsumoId as keyof typeof dietaActual.racionesKgDia] ?? 2.5);
 
-  const consumoDiarioTotalKg = Math.round(vacasOrdeñe * racion * 10) / 10;
+  const consumoDiarioTotalKg = Math.round(vacas * racion * 10) / 10;
   const diasAutonomia = consumoDiarioTotalKg > 0 ? Math.floor(kgPellet / consumoDiarioTotalKg) : 0;
   const mesesAutonomia = Number((diasAutonomia / 30).toFixed(1));
 
   return {
-    vacasOrdeñe,
+    vacasOrdeñe: vacas,
     racionKgVacaDia: racion,
     consumoDiarioTotalKg,
     diasAutonomia,
     mesesAutonomia,
+    ultimaActualizacion: dietaActual.ultimaActualizacion,
+    actualizadoPor: dietaActual.actualizadoPor,
   };
 }
 
@@ -594,6 +665,25 @@ export function initStockFirestoreSync() {
       },
       (error) => {
         console.warn("Firestore sync stock canjes error:", error);
+      }
+    );
+
+    // 3. Sincronización de Dieta y Consumo de Tambo
+    const docDieta = doc(db, "tambo_config", "dieta_actual");
+    onSnapshot(
+      docDieta,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const remote = snapshot.data() as DietaTamboConfig;
+          if (remote && typeof window !== "undefined") {
+            localStorage.setItem(STORAGE_DIETA_TAMBO, JSON.stringify(remote));
+            window.dispatchEvent(new CustomEvent(HJB_DIETA_SYNC_EVENT, { detail: remote }));
+            notifyStockSync();
+          }
+        }
+      },
+      (error) => {
+        console.warn("Firestore sync dieta tambo error:", error);
       }
     );
   } catch (err) {
