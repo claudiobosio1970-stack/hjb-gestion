@@ -432,6 +432,9 @@ export default function InsumosPage() {
         if (item.categoria !== "Granos" && !(item.categoria === "Forrajes & Granos" && item.id.includes("grano"))) return false;
       } else if (filtroCategoria === "Forrajes") {
         if (item.categoria !== "Forrajes" && !(item.categoria === "Forrajes & Granos" && !item.id.includes("grano"))) return false;
+        if (item.id.includes("pellet") || item.id.includes("sal-") || item.id === "semilla-algodon") return false;
+      } else if (filtroCategoria === "Pellets & Sales") {
+        if (item.categoria !== "Pellets & Sales" && !item.id.includes("pellet") && !item.id.includes("sal-") && item.id !== "semilla-algodon") return false;
       } else if (item.categoria !== filtroCategoria) {
         return false;
       }
@@ -450,10 +453,11 @@ export default function InsumosPage() {
   const categorias: { id: string; label: string; icon: string }[] = [
     { id: "Todos", label: `Todos (${data.items.length})`, icon: "📋" },
     { id: "Fitosanitarios", label: "Fitosanitarios", icon: "🧪" },
-    { id: "Semillas", label: "Semillas", icon: "🌾" },
-    { id: "Fertilizantes", label: "Fertilizantes", icon: "🌱" },
-    { id: "Granos", label: "Granos", icon: "🌾" },
+    { id: "Semillas", label: "Semillas", icon: "🌱" },
+    { id: "Fertilizantes", label: "Fertilizantes", icon: "🌾" },
+    { id: "Granos", label: "Granos", icon: "🌽" },
     { id: "Forrajes", label: "Forrajes", icon: "🌿" },
+    { id: "Pellets & Sales", label: "Pellets & Sales", icon: "🥣" },
     { id: "Combustibles", label: "Combustibles", icon: "⛽" },
   ];
 
@@ -724,7 +728,20 @@ export default function InsumosPage() {
                       </td>
 
                       <td>
-                        <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
+                        <span
+                          className={
+                            item.categoria === "Pellets & Sales"
+                              ? "pill badgePurple"
+                              : item.categoria === "Granos"
+                              ? "pill badgeAmber"
+                              : item.categoria === "Forrajes"
+                              ? "pill badgeGreen"
+                              : item.categoria === "Combustibles"
+                              ? "pill badgeBlue"
+                              : "pill badgeSlate"
+                          }
+                          style={{ fontSize: "11px", fontWeight: 600 }}
+                        >
                           {item.categoria}
                         </span>
                       </td>

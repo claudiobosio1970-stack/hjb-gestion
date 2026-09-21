@@ -11,6 +11,7 @@ export type CategoriaInsumo =
   | "Fertilizantes"
   | "Granos"
   | "Forrajes"
+  | "Pellets & Sales"
   | "Forrajes & Granos"
   | "Combustibles";
 
@@ -358,28 +359,6 @@ export const INSUMOS_BASE_CATALOGO: Omit<
     aliasLabores: ["silo", "silo de maíz", "silo picado"],
   },
   {
-    id: "pellet-soja",
-    nombre: "Pellet de Soja Proteico (Harina)",
-    categoria: "Forrajes",
-    unidad: "kg",
-    stockInicial: 0,
-    stockMinimoAlerta: 3000,
-    ubicacion: "Tambo",
-    valorMovilId: "pellet-soja",
-    aliasLabores: ["pellet", "pellet de soja", "pellet soja"],
-  },
-  {
-    id: "pellet-trigo",
-    nombre: "Pellet de Trigo (Afrechillo)",
-    categoria: "Forrajes",
-    unidad: "kg",
-    stockInicial: 0,
-    stockMinimoAlerta: 3000,
-    ubicacion: "Tambo",
-    valorMovilId: "pellet-trigo",
-    aliasLabores: ["pellet trigo", "pellet de trigo", "afrechillo"],
-  },
-  {
     id: "rollo-alfalfa",
     nombre: "Rollos de Alfalfa Primera Henificada",
     categoria: "Forrajes",
@@ -423,10 +402,45 @@ export const INSUMOS_BASE_CATALOGO: Omit<
     valorMovilId: "balanceado-iniciador",
     aliasLabores: ["balanceado", "iniciador", "balanceado terneros"],
   },
+
+  // 6. PELLETS & SALES
+  {
+    id: "pellet-soja",
+    nombre: "Pellet de Soja Proteico (Harina)",
+    categoria: "Pellets & Sales",
+    unidad: "kg",
+    stockInicial: 0,
+    stockMinimoAlerta: 3000,
+    ubicacion: "Galpón de Raciones - Tambo",
+    valorMovilId: "pellet-soja",
+    aliasLabores: ["pellet", "pellet de soja", "pellet soja", "harina de soja"],
+  },
+  {
+    id: "pellet-trigo",
+    nombre: "Pellet de Trigo (Afrechillo)",
+    categoria: "Pellets & Sales",
+    unidad: "kg",
+    stockInicial: 0,
+    stockMinimoAlerta: 3000,
+    ubicacion: "Galpón de Raciones - Tambo",
+    valorMovilId: "pellet-trigo",
+    aliasLabores: ["pellet trigo", "pellet de trigo", "afrechillo"],
+  },
+  {
+    id: "semilla-algodon",
+    nombre: "Semilla de Algodón",
+    categoria: "Pellets & Sales",
+    unidad: "kg",
+    stockInicial: 0,
+    stockMinimoAlerta: 2000,
+    ubicacion: "Galpón de Raciones - Tambo",
+    valorMovilId: "semilla-algodon",
+    aliasLabores: ["semilla algodon", "algodon", "semilla de algodón"],
+  },
   {
     id: "sal-mineral",
     nombre: "Sal Mineral V.O. (MZM con Levadura)",
-    categoria: "Forrajes",
+    categoria: "Pellets & Sales",
     unidad: "kg",
     stockInicial: 0,
     stockMinimoAlerta: 500,
@@ -437,7 +451,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
   {
     id: "sal-anionica",
     nombre: "Sal Aniónica Preparto",
-    categoria: "Forrajes",
+    categoria: "Pellets & Sales",
     unidad: "kg",
     stockInicial: 0,
     stockMinimoAlerta: 300,
@@ -446,7 +460,7 @@ export const INSUMOS_BASE_CATALOGO: Omit<
     aliasLabores: ["sal aniónica", "sales aniónicas", "anionica", "preparto"],
   },
 
-  // 6. COMBUSTIBLES
+  // 7. COMBUSTIBLES
   {
     id: "gasoil",
     nombre: "Gas oil Agropecuario Grado 2 (DIESEL 500)",
@@ -1742,9 +1756,16 @@ export function getStockActualInsumos(): {
     let precioUsd = getPrecioReferencia(base.valorMovilId, "USD");
 
     // Ajuste de unidades si es necesario (ej: $/Tn ➔ $/kg)
-    if (base.valorMovilId === "maiz" || base.valorMovilId === "pellet-soja" || base.valorMovilId === "pellet-trigo" || base.valorMovilId === "soja" || base.valorMovilId === "trigo") {
-      precioArs = precioArs > 0 ? precioArs / 1000 : (base.valorMovilId === "soja" ? 555 : base.valorMovilId === "trigo" ? 344.6 : base.valorMovilId === "pellet-trigo" ? 221.8 : 295.2);
-      precioUsd = precioUsd > 0 ? precioUsd / 1000 : (base.valorMovilId === "soja" ? 0.37 : base.valorMovilId === "trigo" ? 0.23 : base.valorMovilId === "pellet-trigo" ? 0.148 : 0.193);
+    if (
+      base.valorMovilId === "maiz" ||
+      base.valorMovilId === "pellet-soja" ||
+      base.valorMovilId === "pellet-trigo" ||
+      base.valorMovilId === "soja" ||
+      base.valorMovilId === "trigo" ||
+      base.valorMovilId === "semilla-algodon"
+    ) {
+      precioArs = precioArs > 0 ? precioArs / 1000 : (base.valorMovilId === "soja" ? 555 : base.valorMovilId === "trigo" ? 344.6 : base.valorMovilId === "pellet-trigo" ? 221.8 : base.valorMovilId === "semilla-algodon" ? 345 : 295.2);
+      precioUsd = precioUsd > 0 ? precioUsd / 1000 : (base.valorMovilId === "soja" ? 0.37 : base.valorMovilId === "trigo" ? 0.23 : base.valorMovilId === "pellet-trigo" ? 0.148 : base.valorMovilId === "semilla-algodon" ? 0.225 : 0.193);
     } else if (base.id === "semilla-maiz") {
       precioUsd = 150;
       precioArs = precioUsd * dolarBNA;
