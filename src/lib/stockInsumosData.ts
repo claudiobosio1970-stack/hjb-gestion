@@ -584,6 +584,10 @@ export function eliminarAjusteStock(id: string): boolean {
 export interface DietaTamboConfig {
   vacasEnOrdeñe: number;
   vacasPreparto?: number;
+  litrosPromedioVO?: number; // Lts/VO/día de control lechero o tanque
+  precioLitroLecheArs?: number; // $/lt liquidación leche
+  otrosCostosOperativosVODiaArs?: number; // $/VO/d otros costos del tambo (personal, energía, sanidad, flete)
+  precioNovilloGordoVivoArs?: number; // $/kg vivo novillo terminado faena
   racionesKgDia: {
     "pellet-soja": number;
     "pellet-trigo": number;
@@ -598,6 +602,10 @@ export interface DietaTamboConfig {
 export const DIETA_TAMBO_HJB_DEFAULT: DietaTamboConfig = {
   vacasEnOrdeñe: 187, // Rodeo lechero promedio en ordeño (~186.5 VO)
   vacasPreparto: 25, // Lote de vacas secas / transición preparto
+  litrosPromedioVO: 27.0, // Promedio histórico de control lechero HJB
+  precioLitroLecheArs: 548.0, // $/lt cobrado
+  otrosCostosOperativosVODiaArs: 0, // $/VO/d otros costos operativos (personal, luz, sanidad)
+  precioNovilloGordoVivoArs: 4200, // $/kg vivo novillo pesado faena
   racionesKgDia: {
     "pellet-soja": 2.5, // 2.5 kg/VO/día de Pellet de Soja Proteico (Harina)
     "pellet-trigo": 3.0, // 3.0 kg/VO/día de Pellet de Trigo (Afrechillo)
@@ -625,6 +633,10 @@ export function getDietaTambo(): DietaTamboConfig {
     return {
       vacasEnOrdeñe: parsed.vacasEnOrdeñe || DIETA_TAMBO_HJB_DEFAULT.vacasEnOrdeñe,
       vacasPreparto: parsed.vacasPreparto || DIETA_TAMBO_HJB_DEFAULT.vacasPreparto,
+      litrosPromedioVO: parsed.litrosPromedioVO !== undefined ? Number(parsed.litrosPromedioVO) : DIETA_TAMBO_HJB_DEFAULT.litrosPromedioVO,
+      precioLitroLecheArs: parsed.precioLitroLecheArs !== undefined ? Number(parsed.precioLitroLecheArs) : DIETA_TAMBO_HJB_DEFAULT.precioLitroLecheArs,
+      otrosCostosOperativosVODiaArs: parsed.otrosCostosOperativosVODiaArs !== undefined ? Number(parsed.otrosCostosOperativosVODiaArs) : DIETA_TAMBO_HJB_DEFAULT.otrosCostosOperativosVODiaArs,
+      precioNovilloGordoVivoArs: parsed.precioNovilloGordoVivoArs !== undefined ? Number(parsed.precioNovilloGordoVivoArs) : DIETA_TAMBO_HJB_DEFAULT.precioNovilloGordoVivoArs,
       racionesKgDia: {
         ...DIETA_TAMBO_HJB_DEFAULT.racionesKgDia,
         ...(parsed.racionesKgDia || {}),
@@ -643,6 +655,10 @@ export function saveDietaTambo(nueva: Partial<DietaTamboConfig>): DietaTamboConf
   const updated: DietaTamboConfig = {
     vacasEnOrdeñe: nueva.vacasEnOrdeñe !== undefined ? Math.max(1, nueva.vacasEnOrdeñe) : current.vacasEnOrdeñe,
     vacasPreparto: nueva.vacasPreparto !== undefined ? Math.max(0, nueva.vacasPreparto) : current.vacasPreparto,
+    litrosPromedioVO: nueva.litrosPromedioVO !== undefined ? Number(nueva.litrosPromedioVO) : (current.litrosPromedioVO ?? 27.0),
+    precioLitroLecheArs: nueva.precioLitroLecheArs !== undefined ? Number(nueva.precioLitroLecheArs) : (current.precioLitroLecheArs ?? 548.0),
+    otrosCostosOperativosVODiaArs: nueva.otrosCostosOperativosVODiaArs !== undefined ? Number(nueva.otrosCostosOperativosVODiaArs) : (current.otrosCostosOperativosVODiaArs ?? 0),
+    precioNovilloGordoVivoArs: nueva.precioNovilloGordoVivoArs !== undefined ? Number(nueva.precioNovilloGordoVivoArs) : (current.precioNovilloGordoVivoArs ?? 4200),
     racionesKgDia: {
       ...current.racionesKgDia,
       ...(nueva.racionesKgDia || {}),
