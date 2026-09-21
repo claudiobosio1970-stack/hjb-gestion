@@ -603,10 +603,10 @@ export interface DietaTamboConfig {
 export const DIETA_TAMBO_HJB_DEFAULT: DietaTamboConfig = {
   vacasEnOrdeñe: 187, // Rodeo lechero promedio en ordeño (~186.5 VO)
   vacasPreparto: 25, // Lote de vacas secas / transición preparto
-  litrosPromedioVO: 27.0, // Promedio histórico de control lechero HJB
-  precioLitroLecheArs: 548.0, // $/lt cobrado
+  litrosPromedioVO: 27.0, // Promedio histórico de control lechero HJB (DelPro en vinculación)
+  precioLitroLecheArs: 549.0, // $549 / litro (precio real informado por usuario)
   costoOperativoLitrosVO: 10.0, // 10 litros/VO/día de costo operativo real HJB
-  otrosCostosOperativosVODiaArs: 5480.0, // 10 lts × $548 = $5.480 / VO / día
+  otrosCostosOperativosVODiaArs: 5490.0, // 10 lts × $549 = $5.490 / VO / día
   precioNovilloGordoVivoArs: 4200, // $/kg vivo novillo pesado faena
   racionesKgDia: {
     "pellet-soja": 2.5, // 2.5 kg/VO/día de Pellet de Soja Proteico (Harina)

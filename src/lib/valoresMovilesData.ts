@@ -87,6 +87,19 @@ export const VALORES_MOVILES_DEFAULT: ValorMovil[] = [
     nota: "YPF DIESEL 500 (Grado 2) surtidor oficial Res. 314/16",
     fechaActualizacion: "15/9/26",
   },
+  {
+    id: "leche",
+    nombre: "Leche cruda (Liquidación usina)",
+    categoria: "Macro & Combustibles",
+    valorArs: 549,
+    valorUsd: toUsd(549, BASE_TC, 3),
+    unidadArs: "$/lt",
+    unidadUsd: "USD/lt",
+    fuente: "Manual HJB",
+    esEditableManual: true,
+    nota: "Precio liquidación usina láctea HJB ($549 / litro)",
+    fechaActualizacion: "21/9/26",
+  },
 
   // ==========================================
   // 2. GRANOS (API Granos.ar / Pizarra Rosario BCR)
@@ -721,9 +734,13 @@ export function getPrecioReferencia(id: string, moneda: "ARS" | "USD" = "ARS"): 
     else if (id === "rollo-avena-rollo") item = items.find((x) => x.id === "rollo-avena");
     else if (id === "rollo-chala-maiz-rollo") item = items.find((x) => x.id === "rollo-chala-maiz");
     else if (id === "rollo-gramineas-rollo") item = items.find((x) => x.id === "rollo-gramineas");
+    else if (id === "leche" || id === "leche-cruda") item = items.find((x) => x.id === "leche");
     else if (id === "silo-maiz-kg") item = items.find((x) => x.id === "silo-maiz-kg");
   }
-  if (!item) return 0;
+  if (!item) {
+    if (id === "leche" || id === "leche-cruda") return 549.0;
+    return 0;
+  }
   if (moneda === "USD") {
     return typeof item.valorUsd === "number" ? item.valorUsd : 0;
   }

@@ -28,6 +28,12 @@ import {
 } from "@/lib/ganaderiaData";
 import { getPrecioReferencia } from "@/lib/valoresMovilesData";
 import { campos } from "@/lib/mockData";
+import {
+  getDelProConfig,
+  DelProConfig,
+  HJB_DELPRO_SYNC_EVENT,
+  aplicarSincronizacionDelPro,
+} from "@/lib/delproData";
 
 type TabTipo = "consolidado" | "tambo" | "agricultura" | "ganaderia";
 
@@ -43,12 +49,14 @@ export default function InicioPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [corrales, setCorrales] = useState<DefinicionCorral[]>([]);
   const [tropas, setTropas] = useState<TropaGanadera[]>([]);
+  const [delproConfig, setDelproConfig] = useState<DelProConfig>(() => getDelProConfig());
 
-  // Modal para ajuste de Parámetros Reales (CERO DATOS INVENTADOS)
+  // Modales
   const [modalParametrosOpen, setModalParametrosOpen] = useState(false);
+  const [modalDelProOpen, setModalDelProOpen] = useState(false);
   const [formParametros, setFormParametros] = useState({
     litrosPromedioVO: 27.0,
-    precioLitroLecheArs: 548.0,
+    precioLitroLecheArs: 549.0, // Precio real informado por usuario
     costoOperativoLitrosVO: 10.0,
     precioNovilloGordoVivoArs: 4200,
   });
@@ -62,9 +70,10 @@ export default function InicioPage() {
     setActivities(agricultureData.listActivities());
     setCorrales(getCorrales());
     setTropas(getTropas());
+    setDelproConfig(getDelProConfig());
     setFormParametros({
       litrosPromedioVO: d.litrosPromedioVO ?? 27.0,
-      precioLitroLecheArs: d.precioLitroLecheArs ?? 548.0,
+      precioLitroLecheArs: d.precioLitroLecheArs ?? 549.0,
       costoOperativoLitrosVO: d.costoOperativoLitrosVO ?? 10.0,
       precioNovilloGordoVivoArs: d.precioNovilloGordoVivoArs ?? 4200,
     });
@@ -80,11 +89,13 @@ export default function InicioPage() {
     window.addEventListener(HJB_DIETA_SYNC_EVENT, onSync);
     window.addEventListener(HJB_STOCK_SYNC_EVENT, onSync);
     window.addEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+    window.addEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
 
     return () => {
       window.removeEventListener(HJB_DIETA_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_STOCK_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
+      window.removeEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
     };
   }, []);
 
@@ -111,18 +122,19 @@ export default function InicioPage() {
   }
 
   // =========================================================================
-  // 1. CÁLCULOS CLAVE - TAMBO, COSTOS DE ALIMENTACIÓN & LITROS LIBRES
+  // 1. CÁLCULOS CLAVE - TAMBO, COSTOS DE ALIMENTACIÓN & LITROS LIBRES (DELAVAL DELPRO)
   // =========================================================================
-  const vacasVO = dieta.vacasEnOrdeñe || 187;
-  const vacasPreparto = dieta.vacasPreparto || 25;
+  const delproDatos = delproConfig.datosSincronizados;
+  const vacasVO = delproDatos?.vacasEnOrdeñe || dieta.vacasEnOrdeñe || 187;
+  const vacasPreparto = delproDatos?.vacasSecasPreparto || dieta.vacasPreparto || 25;
   const totalRodeoTambo = vacasVO + vacasPreparto;
 
-  const litrosPromedioVO = dieta.litrosPromedioVO ?? 27.0;
-  const precioLitroLeche = dieta.precioLitroLecheArs ?? 548.0;
+  const litrosTotalesDia = delproDatos?.litrosTotalesDia || Math.round(vacasVO * (dieta.litrosPromedioVO ?? 27.0));
+  const litrosPromedioVO = vacasVO > 0 ? Number((litrosTotalesDia / vacasVO).toFixed(2)) : (dieta.litrosPromedioVO ?? 27.0);
+  const precioLitroLeche = dieta.precioLitroLecheArs ?? 549.0;
   const costoOperativoLitrosVO = dieta.costoOperativoLitrosVO ?? 10.0;
   const otrosCostosOperativosVO = Math.round(costoOperativoLitrosVO * precioLitroLeche);
 
-  const litrosTotalesDia = Math.round(vacasVO * litrosPromedioVO);
   const facturacionLecheDia = Math.round(litrosTotalesDia * precioLitroLeche);
   const facturacionPorVODia = Math.round(litrosPromedioVO * precioLitroLeche);
 
@@ -135,14 +147,24 @@ export default function InicioPage() {
   const precioKgSalMineral = getPrecioReferencia("sal-mineral", "ARS") || 1289.88;
   const precioKgSemillaAlgodon = (getPrecioReferencia("semilla-algodon", "ARS") || 345000) / 1000;
 
+  // Raciones de la dieta: sincronizadas con DeLaval DelPro
+  const racionesDelPro = delproDatos?.dietaAsignada;
+  const racionSojaVO = racionesDelPro?.pelletSojaKg ?? dieta.racionesKgDia["pellet-soja"] ?? 2.5;
+  const racionTrigoVO = racionesDelPro?.pelletTrigoKg ?? dieta.racionesKgDia["pellet-trigo"] ?? 3.0;
+  const racionSiloVO = racionesDelPro?.siloMaizKg ?? dieta.racionesKgDia["silo-maiz"] ?? 22.0;
+  const racionMaizVO = racionesDelPro?.maizKg ?? dieta.racionesKgDia["maiz"] ?? 5.5;
+  const racionRolloVO = racionesDelPro?.rolloAlfalfaKg ?? dieta.racionesKgDia["rollo-alfalfa"] ?? 3.0;
+  const racionSalVO = racionesDelPro?.salMineralGramos != null ? (racionesDelPro.salMineralGramos / 1000) : (dieta.racionesKgDia["sal-mineral"] ?? 0.15);
+  const racionSemillaVO = dieta.racionesKgDia["semilla-algodon"] ?? 0;
+
   // Costo diario de cada ingrediente por Vaca en Ordeñe (VO)
-  const costoSojaVO = (dieta.racionesKgDia["pellet-soja"] || 2.5) * precioKgSoja;
-  const costoTrigoVO = (dieta.racionesKgDia["pellet-trigo"] || 3.0) * precioKgTrigo;
-  const costoSiloVO = (dieta.racionesKgDia["silo-maiz"] || 22.0) * precioKgSilo;
-  const costoMaizVO = (dieta.racionesKgDia["maiz"] || 5.5) * precioKgMaiz;
-  const costoRolloVO = (dieta.racionesKgDia["rollo-alfalfa"] || 3.0) * precioKgRollo;
-  const costoSalVO = (dieta.racionesKgDia["sal-mineral"] || 0.15) * precioKgSalMineral;
-  const costoSemillaVO = (dieta.racionesKgDia["semilla-algodon"] || 0) * precioKgSemillaAlgodon;
+  const costoSojaVO = racionSojaVO * precioKgSoja;
+  const costoTrigoVO = racionTrigoVO * precioKgTrigo;
+  const costoSiloVO = racionSiloVO * precioKgSilo;
+  const costoMaizVO = racionMaizVO * precioKgMaiz;
+  const costoRolloVO = racionRolloVO * precioKgRollo;
+  const costoSalVO = racionSalVO * precioKgSalMineral;
+  const costoSemillaVO = racionSemillaVO * precioKgSemillaAlgodon;
 
   // Costo de Alimentación Total por Vaca/Día
   const costoAlimentacionVODia = Number(
@@ -206,14 +228,14 @@ export default function InicioPage() {
       const auto = calcularAutonomiaAlimentoRodeo(stockActual, alimento.id, { unidad });
 
       let racionVO = 0;
-      if (alimento.id === "pellet-soja") racionVO = dieta.racionesKgDia["pellet-soja"] || 2.5;
-      else if (alimento.id === "pellet-trigo") racionVO = dieta.racionesKgDia["pellet-trigo"] || 3.0;
-      else if (alimento.id === "silo-maiz") racionVO = dieta.racionesKgDia["silo-maiz"] || 22.0;
-      else if (alimento.id === "maiz-grano") racionVO = dieta.racionesKgDia["maiz"] || 5.5;
-      else if (alimento.id === "rollo-alfalfa") racionVO = dieta.racionesKgDia["rollo-alfalfa"] || 3.0;
-      else if (alimento.id === "sal-mineral") racionVO = dieta.racionesKgDia["sal-mineral"] || 0.15;
+      if (alimento.id === "pellet-soja") racionVO = racionSojaVO;
+      else if (alimento.id === "pellet-trigo") racionVO = racionTrigoVO;
+      else if (alimento.id === "silo-maiz") racionVO = racionSiloVO;
+      else if (alimento.id === "maiz-grano") racionVO = racionMaizVO;
+      else if (alimento.id === "rollo-alfalfa") racionVO = racionRolloVO;
+      else if (alimento.id === "sal-mineral") racionVO = racionSalVO;
       else if (alimento.id === "sal-anionica") racionVO = dieta.racionesKgDia["sal-anionica"] || 0.25;
-      else if (alimento.id === "semilla-algodon") racionVO = dieta.racionesKgDia["semilla-algodon"] || 0;
+      else if (alimento.id === "semilla-algodon") racionVO = racionSemillaVO;
 
       const consumoTamboDia = Math.round(vacasVO * racionVO * 10) / 10;
       const costoDiarioVOItem = Number((racionVO * alimento.precioUnit).toFixed(2));
@@ -315,10 +337,11 @@ export default function InicioPage() {
   }, [tropas]);
 
   const tropaTerminacion = useMemo(() => {
-    return tropas.find((t) => t.corralId === "terminacion") || {
+    const machosTerminacionDelPro = delproConfig.datosSincronizados?.machosEnRecriaEngorde?.terminacion;
+    const base = tropas.find((t) => t.corralId === "terminacion") || {
       id: "tropa-cg-1",
       codigo: "TR-26-GORDOS",
-      nombre: "Lote Terminación Frigorífico",
+      nombre: "Lote Terminación Frigorífico (Solo Machos)",
       corralId: "terminacion" as const,
       cabezas: 26,
       fechaIngreso: "20/06/26",
@@ -326,9 +349,13 @@ export default function InicioPage() {
       pesoInicialKg: 274,
       pesoActualKg: 404.0,
       gdpvKgDia: 1.49,
-      origen: "Pase desde RM3",
+      origen: "Solo Machos Tambo HJB (DelPro)",
     };
-  }, [tropas]);
+    if (machosTerminacionDelPro !== undefined && machosTerminacionDelPro > 0) {
+      return { ...base, cabezas: machosTerminacionDelPro };
+    }
+    return base;
+  }, [tropas, delproConfig]);
 
   // Proyección financiera exacta para la PRÓXIMA VENTA DE GORDOS
   const proximaVentaGordos = useMemo(() => {
@@ -426,8 +453,41 @@ export default function InicioPage() {
           </p>
         </div>
 
-        {/* Botón de Parámetros Reales y Buscador Rápido */}
+        {/* Botón de DelPro, Parámetros Reales y Buscador Rápido */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          {/* Badge / Botón DeLaval DelPro */}
+          <button
+            type="button"
+            onClick={() => setModalDelProOpen(true)}
+            className="secondaryBtn"
+            style={{
+              padding: "8px 14px",
+              fontSize: "13px",
+              fontWeight: 700,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              background: delproConfig.estadoConexion === "conectado" ? "#f0fdf4" : "#fefce8",
+              color: delproConfig.estadoConexion === "conectado" ? "#15803d" : "#854d0e",
+              borderColor: delproConfig.estadoConexion === "conectado" ? "#bbf7d0" : "#fef08a",
+              cursor: "pointer",
+            }}
+          >
+            <span>🔗 DeLaval DelPro</span>
+            <span
+              className="pill"
+              style={{
+                fontSize: "10.5px",
+                fontWeight: 800,
+                background: delproConfig.estadoConexion === "conectado" ? "#dcfce7" : "#fef9c3",
+                color: delproConfig.estadoConexion === "conectado" ? "#166534" : "#a16207",
+                padding: "2px 6px",
+              }}
+            >
+              {delproConfig.estadoConexion === "conectado" ? "✓ Conectado" : "⏳ En vinculación"}
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => setModalParametrosOpen(true)}
@@ -928,11 +988,11 @@ export default function InicioPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontSize: "22px" }}>🥩</span>
                   <h2 style={{ fontSize: "18px", margin: 0 }}>
-                    Próxima Venta de Gordos & Proyección de Faena
+                    Próxima Venta de Novillos Machos & Proyección de Faena
                   </h2>
                 </div>
                 <p className="muted" style={{ fontSize: "12.5px", margin: "4px 0 0 0" }}>
-                  Lote en Terminación (Corral General): {proximaVentaGordos.cabezas} novillos pesados próximos a salir a frigorífico.
+                  Engorde a corral de machos ({proximaVentaGordos.cabezas} novillos en Terminación). <strong>Regla HJB:</strong> Las terneras hembras van 100% al tambo como reposición; solo los machos se engordan para faena.
                 </p>
               </div>
 
@@ -958,13 +1018,16 @@ export default function InicioPage() {
             >
               <div>
                 <div style={{ fontSize: "11.5px", fontWeight: 800, color: "#9a3412", textTransform: "uppercase" }}>
-                  Tropa Lista para Faena
+                  Tropa Machos para Faena
                 </div>
                 <div style={{ fontSize: "20px", fontWeight: 900, color: "#c2410c", marginTop: "2px" }}>
-                  {proximaVentaGordos.cabezas} Novillos Gordos
+                  {proximaVentaGordos.cabezas} Novillos Machos
                 </div>
                 <div style={{ fontSize: "12px", color: "var(--slate-700)", marginTop: "4px" }}>
                   Peso actual: <strong>{proximaVentaGordos.pesoActualPromedio} kg</strong> → Objetivo: <strong>{proximaVentaGordos.pesoObjetivoPromedio} kg</strong>
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                  Nacimientos DelPro · Hembras van al tambo
                 </div>
                 <div style={{ fontSize: "11.5px", color: "#15803d", fontWeight: 700, marginTop: "2px" }}>
                   Ganancia diaria: +{proximaVentaGordos.gdpv} kg/día
@@ -1505,6 +1568,123 @@ export default function InicioPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ESTADO DE VINCULACIÓN CON DELAVAL DELPRO                          */}
+      {/* ========================================================================= */}
+      {modalDelProOpen && (
+        <div className="modalOverlay" onClick={() => setModalDelProOpen(false)}>
+          <div
+            className="modalContent"
+            style={{ maxWidth: "620px", padding: "24px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "22px" }}>🔗</span>
+                <h2 style={{ fontSize: "18px", margin: 0 }}>Integración DeLaval DelPro FarmManager</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalDelProOpen(false)}
+                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--slate-400)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div
+              style={{
+                background: delproConfig.estadoConexion === "conectado" ? "#f0fdf4" : "#fefce8",
+                border: `1px solid ${delproConfig.estadoConexion === "conectado" ? "#bbf7d0" : "#fef08a"}`,
+                borderRadius: "8px",
+                padding: "12px 16px",
+                marginBottom: "16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <span style={{ fontSize: "20px" }}>
+                {delproConfig.estadoConexion === "conectado" ? "✓" : "⏳"}
+              </span>
+              <div>
+                <strong style={{ fontSize: "13px", color: delproConfig.estadoConexion === "conectado" ? "#166534" : "#854d0e" }}>
+                  {delproConfig.mensajeEstado}
+                </strong>
+                <div style={{ fontSize: "11.5px", color: "var(--slate-600)" }}>
+                  Instancia: {delproConfig.servidorHost} · Base: {delproConfig.baseDatosSql}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: "13px", color: "var(--slate-700)", marginBottom: "16px", lineHeight: "1.5" }}>
+              Esta arquitectura conecta automáticamente las variables del tambo y la hacienda con el software oficial de ordeñe:
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
+              <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
+                  1. Producción Lechera
+                </div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "#1e40af", marginTop: "2px" }}>
+                  🥛 {litrosTotalesDia.toLocaleString("es-AR")} lts/día
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                  Caudalímetros DelPro / Tanque de leche
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
+                  2. Rodeo en Ordeñe (VO)
+                </div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "#15803d", marginTop: "2px" }}>
+                  🐄 {vacasVO} Vacas en Ordeñe
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                  Promedio: {litrosPromedioVO} lts/VO/día
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
+                  3. Dieta y Raciones
+                </div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "#ca8a04", marginTop: "2px" }}>
+                  🥣 Formulaciones Activas
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                  Estaciones de alimentación y mixer
+                </div>
+              </div>
+
+              <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "12px", borderRadius: "8px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--slate-500)", textTransform: "uppercase" }}>
+                  4. Partos & Destino Animal
+                </div>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "#c2410c", marginTop: "2px" }}>
+                  🐂 Solo Machos al Engorde
+                </div>
+                <div style={{ fontSize: "11px", color: "#166534", fontWeight: 700, marginTop: "2px" }}>
+                  ✓ Hembras 100% al Tambo (Reposición)
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setModalDelProOpen(false)}
+                className="primaryBtn"
+                style={{ padding: "8px 18px" }}
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

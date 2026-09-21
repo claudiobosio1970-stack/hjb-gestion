@@ -460,7 +460,7 @@ export function getCostoInsumoDieta(insumoId: string): number {
     return p > 0 ? p / 500 : 69.0; // $/kg
   }
   if (insumoId === "leche") {
-    return 548.0; // $/lt
+    return 549.0; // $/lt
   }
   if (insumoId === "balanceado-iniciador") {
     return 340.0; // $/kg
