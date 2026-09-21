@@ -1192,7 +1192,6 @@ export default function SoilPanel({
                       {activeSummary.perfilHumedad.estratos.map((est, i) => {
                         const pct = est.aguaUtilPct ?? 0;
                         const colorEst = pct >= 60 ? "#15803d" : pct >= 35 ? "#b45309" : "#b91c1c";
-                        const iconEst = pct >= 60 ? "🟢" : pct >= 35 ? "🟡" : "🔴";
                         return (
                           <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
                             <td style={{ padding: "6px 4px", fontWeight: 700 }}>{est.profundidadCm} cm</td>
@@ -1200,7 +1199,6 @@ export default function SoilPanel({
                             <td style={{ padding: "6px 4px", color: "var(--muted)" }}>{est.pmpPct}%</td>
                             <td style={{ padding: "6px 4px" }}>{est.aguaUtilPct}%</td>
                             <td style={{ padding: "6px 4px", textAlign: "right", fontWeight: 800, color: colorEst }}>
-                              <span style={{ fontSize: "9px", marginRight: "3px" }}>{iconEst}</span>
                               {est.aguaUtilMm} mm
                             </td>
                           </tr>

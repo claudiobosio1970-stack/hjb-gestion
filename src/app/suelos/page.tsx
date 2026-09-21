@@ -418,14 +418,14 @@ export default function SuelosPage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "11px", fontWeight: 800 }}>
-                <span style={{ background: "#dcfce7", color: "#15803d", padding: "2px 8px", borderRadius: "6px", border: "1px solid #86efac", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                  🟢 Óptimo / Suficiente
+                <span style={{ background: "#dcfce7", color: "#15803d", padding: "2px 8px", borderRadius: "6px", border: "1px solid #86efac", display: "inline-flex", alignItems: "center" }}>
+                  Óptimo / Suficiente
                 </span>
-                <span style={{ background: "#fef3c7", color: "#b45309", padding: "2px 8px", borderRadius: "6px", border: "1px solid #fcd34d", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                  🟡 Medio / Alerta
+                <span style={{ background: "#fef3c7", color: "#b45309", padding: "2px 8px", borderRadius: "6px", border: "1px solid #fcd34d", display: "inline-flex", alignItems: "center" }}>
+                  Medio / Alerta
                 </span>
-                <span style={{ background: "#fee2e2", color: "#b91c1c", padding: "2px 8px", borderRadius: "6px", border: "1px solid #fca5a5", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                  🔴 Bajo / Crítico
+                <span style={{ background: "#fee2e2", color: "#b91c1c", padding: "2px 8px", borderRadius: "6px", border: "1px solid #fca5a5", display: "inline-flex", alignItems: "center" }}>
+                  Bajo / Crítico
                 </span>
               </div>
             </div>
@@ -492,10 +492,8 @@ export default function SuelosPage() {
                             borderRadius: "999px",
                             display: "inline-flex",
                             alignItems: "center",
-                            gap: "4px",
                           }}
                         >
-                          <span>{hasRed ? "🔴" : hasYellow ? "🟡" : "🟢"}</span>
                           <span>{hasRed ? "Atención nutrientes" : hasYellow ? "Equilibrado" : "Excelente fertilidad"}</span>
                         </span>
                       </div>
@@ -792,14 +790,12 @@ export default function SuelosPage() {
                         {m.estratos.map((est, idx) => {
                           const pct = est.aguaUtilPct ?? 0;
                           const colorEst = pct >= 60 ? "#15803d" : pct >= 35 ? "#b45309" : "#b91c1c";
-                          const iconEst = pct >= 60 ? "🟢" : pct >= 35 ? "🟡" : "🔴";
                           return (
                             <tr key={idx} style={{ borderBottom: "1px solid var(--slate-100)" }}>
                               <td style={{ padding: "6px 8px", fontWeight: 600 }}>{est.profundidadCm} cm</td>
                               <td style={{ padding: "6px 8px", textAlign: "right" }}>{est.humedadActualPct}%</td>
                               <td style={{ padding: "6px 8px", textAlign: "right", color: "var(--muted)" }}>{est.pmpPct}%</td>
                               <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 700, color: colorEst }}>
-                                <span style={{ fontSize: "10px", marginRight: "4px" }}>{iconEst}</span>
                                 {est.aguaUtilMm} mm ({est.aguaUtilPct}%)
                               </td>
                             </tr>

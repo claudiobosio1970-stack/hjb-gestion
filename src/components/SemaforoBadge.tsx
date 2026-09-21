@@ -59,19 +59,18 @@ export function SemaforoCell({
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: "3px",
             fontSize: "10px",
             fontWeight: 800,
-            padding: "1px 6px",
+            padding: "2px 8px",
             borderRadius: "999px",
             background: result.bgColor,
             color: result.textColor,
             border: `1px solid ${result.borderColor}`,
             whiteSpace: "nowrap",
+            letterSpacing: "0.01em",
           }}
         >
-          <span>{result.icon}</span>
-          <span>{result.label}</span>
+          {result.label}
         </span>
       </div>
 
@@ -136,7 +135,7 @@ export function SemaforoBadge({
         gap: isSm ? "3px" : "5px",
         fontSize: isSm ? "9.5px" : "11px",
         fontWeight: 800,
-        padding: isSm ? "2px 6px" : "3px 9px",
+        padding: isSm ? "2px 7px" : "3px 10px",
         borderRadius: "999px",
         background: result.bgColor,
         color: result.textColor,
@@ -145,7 +144,6 @@ export function SemaforoBadge({
       }}
       title={`${result.label}. ${result.explicacion}${result.rangoReferencia ? ` (${result.rangoReferencia})` : ""}`}
     >
-      <span>{result.icon}</span>
       {valor !== undefined && <strong style={{ marginRight: "2px" }}>{valor}</strong>}
       <span>{customLabel || result.label}</span>
     </span>
