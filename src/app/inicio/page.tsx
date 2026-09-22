@@ -546,7 +546,7 @@ export default function InicioPage() {
             {totalMaizHa} ha Maíz <span style={{ fontSize: "16px", color: "var(--slate-500)", fontWeight: 700 }}>(50,9%)</span>
           </div>
           <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "4px" }}>
-            <strong>99 ha</strong> Maíz Grano (a cosecha) · <strong>43 ha</strong> Maíz Forrajero · 98 ha Soja · 39 ha Alfalfa
+            <strong>99 ha</strong> Maíz Grano · <strong>43 ha</strong> Maíz Forrajero · 98 ha Soja · 39 ha Alfalfa
           </div>
           <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
             279 ha totales auditadas en los 5 campos
@@ -710,7 +710,7 @@ export default function InicioPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "18px" }}>🌾</span>
               <h2 style={{ fontSize: "16px", fontWeight: 800, margin: 0 }}>
-                2. Agricultura — Matriz de Cultivos y Destinos (279 ha)
+                2. Agricultura — Matriz de Cultivos (279 ha)
               </h2>
             </div>
             <div style={{ fontSize: "12px", color: "#c2410c", fontWeight: 800 }}>
@@ -722,11 +722,10 @@ export default function InicioPage() {
             <table className="dataTable">
               <thead>
                 <tr>
-                  <th style={{ minWidth: "200px" }}>Cultivo</th>
-                  <th style={{ minWidth: "240px" }}>Lotes y Campos Asignados</th>
-                  <th style={{ width: "110px", textAlign: "right" }}>Superficie</th>
-                  <th style={{ width: "95px", textAlign: "right" }}>% Campo</th>
-                  <th style={{ width: "260px", textAlign: "center" }}>Destino Previsto / Selección a Cosecha</th>
+                  <th style={{ minWidth: "220px" }}>Cultivo</th>
+                  <th style={{ minWidth: "320px" }}>Lotes y Campos Asignados</th>
+                  <th style={{ width: "130px", textAlign: "right" }}>Superficie</th>
+                  <th style={{ width: "110px", textAlign: "right" }}>% Campo</th>
                 </tr>
               </thead>
               <tbody>
@@ -751,63 +750,6 @@ export default function InicioPage() {
                     <td style={{ textAlign: "right", color: "var(--slate-600)" }}>
                       {item.pct}%
                     </td>
-                    <td style={{ textAlign: "center" }}>
-                      {item.tipo === "maiz_grano" ? (
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
-                          <select
-                            value={destinoMaizGrano}
-                            onChange={(e) => handleCambiarDestinoMaiz(e.target.value)}
-                            style={{
-                              padding: "4px 8px",
-                              fontSize: "11px",
-                              fontWeight: 700,
-                              borderRadius: "6px",
-                              border: `1.5px solid ${opcionMaizActual.border}`,
-                              background: opcionMaizActual.badgeBg,
-                              color: opcionMaizActual.badgeColor,
-                              cursor: "pointer",
-                              outline: "none",
-                              maxWidth: "240px",
-                              width: "100%",
-                            }}
-                            title="Seleccione el destino del grano a cosecha"
-                          >
-                            {OPCIONES_DESTINO_MAIZ.map((op) => (
-                              <option key={op.id} value={op.id}>
-                                {op.label}
-                              </option>
-                            ))}
-                          </select>
-                          <span style={{ fontSize: "10px", color: "var(--slate-500)", fontStyle: "italic" }}>
-                            {opcionMaizActual.detalle}
-                          </span>
-                        </div>
-                      ) : (
-                        <span
-                          style={{
-                            display: "inline-block",
-                            padding: "3px 8px",
-                            borderRadius: "4px",
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            background:
-                              item.tipo === "granos"
-                                ? "#fef3c7"
-                                : item.cultivo.includes("Alfalfa")
-                                ? "#dcfce7"
-                                : "#dbeafe",
-                            color:
-                              item.tipo === "granos"
-                                ? "#92400e"
-                                : item.cultivo.includes("Alfalfa")
-                                ? "#166534"
-                                : "#1e40af",
-                          }}
-                        >
-                          {item.destino}
-                        </span>
-                      )}
-                    </td>
                   </tr>
                 ))}
                 <tr style={{ background: "#f8fafc", fontWeight: 800, borderTop: "2px solid var(--line)" }}>
@@ -819,9 +761,6 @@ export default function InicioPage() {
                   </td>
                   <td style={{ textAlign: "right", color: "var(--slate-900)" }}>
                     100.0%
-                  </td>
-                  <td style={{ textAlign: "center", fontSize: "11.5px", color: "var(--slate-600)" }}>
-                    99 ha Maíz Grano (a cosecha) · 43 ha Maíz Forrajero · 98 ha Soja · 39 ha Alfalfa
                   </td>
                 </tr>
               </tbody>
