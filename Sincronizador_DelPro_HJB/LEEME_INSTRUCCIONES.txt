@@ -1,0 +1,31 @@
+=====================================================================
+ HJB GESTION - PAQUETE DE VINCULACION CON DELAVAL DELPRO
+=====================================================================
+
+COMO INSTALARLO EN LA COMPUTADORA DEL TAMBO (OFICINA DE ORDENIE):
+
+PASO 1: Copiar esta carpeta 'Sincronizador_DelPro_HJB' a la computadora
+        donde esta instalado DeLaval DelPro (por ejemplo en el disco C:\ o en el Escritorio).
+
+PASO 2: Hacer doble clic sobre el archivo:
+        --> Sincronizar_DelPro.bat
+
+        El sistema buscara la base de datos de DelPro, extraera:
+        - Litros totales ordeñados en las ultimas 24 hs y promedio por vaca
+        - Vacas en ordeñe (VO) activas
+        - Dieta asignada en DelPro
+        - Partos recientes (machos al engorde, hembras al tambo)
+        Y los subira automaticamente a la nube de HJB Gestion.
+
+PASO 3 (Opcional - Para automatizacion 100%):
+        Hacer doble clic sobre:
+        --> Instalar_Tarea_Automatica.bat
+
+        Esto dejara programada la sincronizacion todos los dias a las:
+        - 07:30 (fin del ordenie de la manana)
+        - 18:30 (fin del ordenie de la tarde)
+
+        ¡Y nunca mas tendras que tocar nada!
+=====================================================================
+Plataforma Web: https://hjb-gestion-tester.web.app/inicio
+=====================================================================
