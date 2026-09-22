@@ -821,18 +821,40 @@ export default function TamboPage() {
                       </td>
                       <td>
                         {v.fechaProbableParto ? (
-                          <span style={{ fontSize: "12px", fontWeight: 600, color: "#166534" }}>
-                            📅 {v.fechaProbableParto}
-                          </span>
+                          <div>
+                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#166534" }}>
+                              📅 {v.fechaProbableParto}
+                            </span>
+                            {v.diasParaParto !== undefined && (
+                              <div style={{ fontSize: "10.5px", color: v.diasParaParto <= 21 ? "#b45309" : "#15803d", fontWeight: 700, marginTop: "1px" }}>
+                                {v.diasParaParto <= 0 ? "⚡ En fecha" : `⏳ En ${v.diasParaParto} días`}
+                              </div>
+                            )}
+                          </div>
+                        ) : v.fechaSecadoEstimada ? (
+                          <div>
+                            <span style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Secado sugerido:</span>
+                            <div style={{ fontSize: "11px", fontWeight: 600, color: "#b45309" }}>
+                              🍂 {v.fechaSecadoEstimada}
+                            </div>
+                          </div>
                         ) : (
                           <span style={{ color: "var(--slate-400)", fontSize: "11px" }}>Sin preñez</span>
                         )}
                       </td>
                       <td style={{ textAlign: "right" }}>
                         {v.litrosAyer > 0 ? (
-                          <strong style={{ color: "#15803d", fontSize: "13.5px" }}>
-                            {v.litrosAyer} lts/d
-                          </strong>
+                          <div>
+                            <strong style={{ color: "#15803d", fontSize: "13.5px" }}>
+                              {v.litrosAyer} lts/d
+                            </strong>
+                            {(v.scc || v.grasaPct || v.promedio7d) && (
+                              <div style={{ fontSize: "10px", color: "var(--slate-500)", marginTop: "1px" }} title={`Prom 7d: ${v.promedio7d || "—"} lts | Grasa: ${v.grasaPct || "—"}% | Proteína: ${v.proteinaPct || "—"}% | Células Somáticas: ${v.scc || "—"}`}>
+                                {v.scc ? `🧪 SCC: ${v.scc}` : v.promedio7d ? `📊 7d: ${v.promedio7d} l` : ""}
+                                {v.grasaPct ? ` · ${v.grasaPct}% G` : ""}
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <span style={{ color: "var(--slate-400)" }}>0.0 lts</span>
                         )}

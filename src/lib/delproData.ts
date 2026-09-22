@@ -35,7 +35,16 @@ export interface VacaTamboIndividual {
   diasLactancia: number; // DEL
   diasGestacion?: number;
   fechaProbableParto?: string;
+  diasParaParto?: number; // DaysToCalving oficial DelPro
+  fechaSecadoEstimada?: string; // DateExpectedDryOff oficial DelPro
+  diasParaSecado?: number; // DaysToDryOff oficial DelPro
+  diasAbiertos?: number; // OpenDays oficial DelPro
   litrosAyer: number;
+  promedio7d?: number; // AvgYieldPrev7d
+  scc?: number; // Células somáticas de control lechero
+  grasaPct?: number; // % grasa en leche
+  proteinaPct?: number; // % proteína en leche
+  partoNumero?: number; // LactationNumber
   pesoKg?: number; // Peso corporal actual en kg
   pesoOficialDelPro?: number; // Peso real extraído desde DeLaval DelPro (balanza / pesaje oficial)
   fechaPesajeDelPro?: string; // Fecha en que se pesó en DelPro
@@ -1133,53 +1142,101 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
       const vacasTamboList: VacaTamboIndividual[] = [];
 
       for (const item of parsed.rodeoCompleto) {
-        const rp = `RP-${item.Vaca}`;
-        const grNombre = item.GrupoDelPro || "";
+        const numId = item.OfficialRegNo || item.AnimalNumber || item.Vaca || item.Number;
+        const rp = String(numId).startsWith("RP-") ? String(numId) : `RP-${numId}`;
+        const grNombre = item.NameGroup || item.GroupName || item.GrupoDelPro || "";
         const corralId = parseDelProGrupoToCorralId(grNombre);
 
-        if (corralId) {
+        // Determinación de categoría: si es macho (Sex=1) o tiene grupo de recría/engorde
+        const esMachoRecria = item.Sex === 1 || item.ProductiveStatus === "Male" || corralId !== null;
+
+        if (corralId || (esMachoRecria && !grNombre.includes("ordeño") && !grNombre.includes("punta"))) {
+          const corralAsignado = corralId || "guachera";
           // Animales de Ganadería y Recría / Engorde (Crianza, Recría Machos, Engorde Macho)
           const pesoDelPro = Number(item.PesoBalanza || item.Peso || item.PesoKg || item.pesoActualKg || item.pesoDelPro) || 0;
           const fechaPesaje = item.FechaPesaje || item.Fecha || hoyStr;
           const tienePesoDelPro = pesoDelPro > 0;
 
           const diasEnCorral = Number(item.diasEnCorral) || 15;
-          const calcEstimado = calcularPesoEstimativoVida({ corralId, diasEnCorral });
+          const calcEstimado = calcularPesoEstimativoVida({ corralId: corralAsignado, diasEnCorral });
           const pesoFinal = tienePesoDelPro ? pesoDelPro : calcEstimado.pesoEstimadoKg;
 
           recriaList.push({
             rp,
-            corralId,
+            corralId: corralAsignado,
             pesoActualKg: pesoFinal,
             pesoOficialDelPro: tienePesoDelPro ? pesoDelPro : undefined,
             fechaPesajeDelPro: tienePesoDelPro ? fechaPesaje : undefined,
             origenPeso: tienePesoDelPro ? "delpro_oficial" : "estimado_curva",
             diasEnCorral,
             diasVida: calcEstimado.diasVida,
-            fechaIngresoCorral: item.FechaIngreso || hoyStr,
+            fechaIngresoCorral: item.FechaIngreso || (item.BirthDate ? String(item.BirthDate).slice(0, 10) : hoyStr),
             gdpvKgDia: calcEstimado.gdpvEtapaKgDia,
             origen: tienePesoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "DeLaval DelPro (PC Tambo)",
-            grupoDelPro: grNombre,
+            grupoDelPro: grNombre || "Recría / Engorde",
             listoFaena: pesoFinal >= 370,
           });
-        } else if (grNombre.includes("ordeño") || grNombre.includes("punta") || grNombre.includes("Secas") || grNombre.includes("Preparto")) {
+        } else if (
+          item.ProductiveStatus === "InLactation" ||
+          item.ProductiveStatus === "DryOff" ||
+          grNombre.includes("ordeño") ||
+          grNombre.includes("punta") ||
+          grNombre.includes("Secas") ||
+          grNombre.includes("Preparto")
+        ) {
           // Vacas de Tambo (Ordeñe y Secas)
-          const isOrdenie = grNombre.includes("ordeño") || grNombre.includes("punta");
+          const isSeca = item.ProductiveStatus === "DryOff" || grNombre.includes("Secas") || grNombre.includes("Preparto");
+          const isOrdenie = !isSeca;
           const pesoDelPro = Number(item.PesoBalanza || item.Peso || item.PesoKg || item.pesoActualKg || item.pesoDelPro) || 0;
           const fechaPesaje = item.FechaPesaje || item.Fecha;
           const tienePesoDelPro = pesoDelPro > 0;
 
+          // Estado reproductivo oficial DelPro
+          let reproEstado: "Preñada" | "Vacía" | "Inseminada" = "Preñada";
+          if (item.IsPregnant === 1 || item.IsPregnant === true || item.BreedingState === 6) {
+            reproEstado = "Preñada";
+          } else if (item.IsInseminated === 1 || item.IsInseminated === true || item.BreedingState === 5) {
+            reproEstado = "Inseminada";
+          } else if (item.BreedingState === 4 || item.IsPregnant === 0 || item.IsPregnant === false) {
+            reproEstado = "Vacía";
+          }
+
+          // Días a parto o fecha esperada
+          const daysToCalving = item.DaysToCalving !== undefined && item.DaysToCalving !== null ? Number(item.DaysToCalving) : undefined;
+          const expectedCalvingStr = item.ExpectedCalving
+            ? (item.ExpectedCalving instanceof Date ? item.ExpectedCalving.toLocaleDateString("es-AR") : String(item.ExpectedCalving).slice(0, 10))
+            : undefined;
+
+          // Días a secado o fecha esperada
+          const daysToDryOff = item.DaysToDryOff !== undefined && item.DaysToDryOff !== null ? Number(item.DaysToDryOff) : undefined;
+          const expectedDryOffStr = item.DateExpectedDryOff
+            ? (item.DateExpectedDryOff instanceof Date ? item.DateExpectedDryOff.toLocaleDateString("es-AR") : String(item.DateExpectedDryOff).slice(0, 10))
+            : undefined;
+
+          const diasGestacion = daysToCalving !== undefined ? Math.max(0, 282 - daysToCalving) : (item.diasGestacion || undefined);
+
           vacasTamboList.push({
             rp,
             estadoProductivo: isOrdenie ? "En Ordeñe" : "Seca",
-            estadoReproductivo: "Preñada",
-            diasLactancia: isOrdenie ? 120 : 0,
-            litrosAyer: isOrdenie ? (Number(item.Ayer) || 26.2) : 0,
+            estadoReproductivo: reproEstado,
+            diasLactancia: Number(item.DIM || item.DiasEnLeche) || (isOrdenie ? 120 : 0),
+            diasGestacion,
+            fechaProbableParto: expectedCalvingStr || item.fechaProbableParto,
+            diasParaParto: daysToCalving,
+            fechaSecadoEstimada: expectedDryOffStr,
+            diasParaSecado: daysToDryOff,
+            diasAbiertos: item.OpenDays !== undefined ? Number(item.OpenDays) : undefined,
+            litrosAyer: Number(item.Ayer || item.TotalYield || item.DailyYield || (isOrdenie ? 26.2 : 0)),
+            promedio7d: item.AvgYieldPrev7d ? Number(item.AvgYieldPrev7d) : undefined,
+            scc: item.SCC ? Number(item.SCC) : undefined,
+            grasaPct: item.Fat ? Number(item.Fat) : undefined,
+            proteinaPct: item.Protein ? Number(item.Protein) : undefined,
+            partoNumero: item.LactationNumber ? Number(item.LactationNumber) : undefined,
             pesoKg: tienePesoDelPro ? pesoDelPro : (isOrdenie ? 580 : 610),
             pesoOficialDelPro: tienePesoDelPro ? pesoDelPro : undefined,
             fechaPesajeDelPro: tienePesoDelPro ? fechaPesaje : undefined,
             origenPeso: tienePesoDelPro ? "delpro_oficial" : "estimado_curva",
-            grupoDelPro: grNombre,
+            grupoDelPro: grNombre || (isOrdenie ? "Vacas en ordeño" : "Vacas Secas"),
           });
         }
       }
@@ -1188,18 +1245,26 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
         animalesRecriaExtraidos = recriaList;
       }
 
-      const secasCalc = parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || "").includes("Secas") || (r.GrupoDelPro || "").includes("Preparto")).length;
+      const secasCalc = vacasTamboList.filter(v => v.estadoProductivo === "Seca").length ||
+        parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").includes("Secas") || (r.GrupoDelPro || r.NameGroup || "").includes("Preparto")).length;
       if (secasCalc > 0) vacasSecasCount = secasCalc;
 
-      const vqReposicion = parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || "").includes("Recria Hembras") || (r.GrupoDelPro || "").includes("Vq")).length;
-      const vqPren = parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || "").includes("Vq Preñada")).length;
+      const vqReposicion = parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").includes("Recria Hembras") || (r.GrupoDelPro || r.NameGroup || "").includes("Vq") || r.ProductiveStatus === "Heifer").length;
+      const vqPren = parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").includes("Vq Preñada")).length;
+
+      const preñadasCount = vacasTamboList.length > 0
+        ? vacasTamboList.filter(v => v.estadoReproductivo === "Preñada").length
+        : Math.round((vacasVO + vacasSecasCount) * 0.72);
+      const vaciasCount = vacasTamboList.length > 0
+        ? vacasTamboList.filter(v => v.estadoReproductivo === "Vacía").length
+        : Math.round((vacasVO + vacasSecasCount) * 0.28);
 
       censoExtraido = {
         totalVacasAdultas: vacasVO + vacasSecasCount,
         vacasEnOrdenie: vacasVO,
         vacasSecas: vacasSecasCount,
-        vacasPreniadas: Math.round((vacasVO + vacasSecasCount) * 0.72),
-        vacasVacias: Math.round((vacasVO + vacasSecasCount) * 0.28),
+        vacasPreniadas: preñadasCount,
+        vacasVacias: vaciasCount,
         vaquillonasReposicion: vqReposicion || 178,
         vaquillonasPreniadas: vqPren || 31,
         detalleVacas: vacasTamboList.length > 0 ? vacasTamboList : undefined,
@@ -1221,11 +1286,42 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
         rm3: animalesRecriaExtraidos.filter(a => a.corralId === "rm3").length,
         terminacion: animalesRecriaExtraidos.filter(a => a.corralId === "terminacion").length,
       },
-      partosRecientes: Array.isArray(parsed.partosRecientes) ? parsed.partosRecientes : [],
+      partosRecientes: Array.isArray(parsed.partosRecientes) && parsed.partosRecientes.length > 0
+        ? parsed.partosRecientes
+        : Array.isArray(parsed.calvings)
+        ? parsed.calvings.map((c: any, idx: number) => ({
+            id: `p-delpro-${c.OfficialRegNo || c.AnimalNumber || idx}`,
+            fecha: c.CalvingDate ? (c.CalvingDate instanceof Date ? c.CalvingDate.toLocaleDateString("es-AR") : String(c.CalvingDate).slice(0, 10)) : new Date().toLocaleDateString("es-AR"),
+            rpMadre: `RP-${c.MotherId || c.OfficialRegNo || c.AnimalNumber}`,
+            rpCria: `RP-${c.AnimalNumber || c.OfficialRegNo}`,
+            sexo: (c.Sex === 1 || c.Sexo === "Macho") ? "Macho" : "Hembra",
+            pesoNacimientoKg: Number(c.BirthWeight) || 38,
+            destino: (c.Sex === 1 || c.Sexo === "Macho") ? "Engorde / Novillo (Venta Comercial)" : "Tambo (Vaquillona de Reposición)",
+            estado: "En Guachera",
+            observaciones: `Parto registrado en DeLaval DelPro (Lactancia ${c.LactationNumber || 1})`,
+          }))
+        : [],
       censoRodeoTambo: censoExtraido,
       animalesRecria: animalesRecriaExtraidos,
       traspasosAutomaticos: parsed.traspasosAutomaticos,
-      movimientosCorralDelPro: parsed.movimientosCorralDelPro,
+      movimientosCorralDelPro: Array.isArray(parsed.movimientosCorralDelPro) && parsed.movimientosCorralDelPro.length > 0
+        ? parsed.movimientosCorralDelPro
+        : Array.isArray(parsed.historialCambiosGrupo)
+        ? parsed.historialCambiosGrupo.map((m: any, idx: number) => {
+            const origenId = parseDelProGrupoToCorralId(m.GroupNameOld || "");
+            const destinoId = parseDelProGrupoToCorralId(m.GroupNameNew || m.NameGroup || "");
+            return {
+              id: `mov-delpro-${idx}-${Date.now()}`,
+              fecha: m.DateAndTime ? (m.DateAndTime instanceof Date ? m.DateAndTime.toLocaleDateString("es-AR") : String(m.DateAndTime).slice(0, 10)) : new Date().toLocaleDateString("es-AR"),
+              rpAnimal: `RP-${m.AnimalNumber || m.OfficialRegNo}`,
+              grupoOrigen: m.GroupNameOld || `Grupo ${m.GroupNumberOld}`,
+              grupoDestino: m.GroupNameNew || m.NameGroup || `Grupo ${m.GroupNumberNew}`,
+              corralOrigenId: origenId || undefined,
+              corralDestinoId: destinoId || undefined,
+              motivo: `Cambio de grupo registrado en DeLaval DelPro (${m.GroupNameOld || m.GroupNumberOld} ➔ ${m.GroupNameNew || m.GroupNumberNew})`,
+            };
+          })
+        : [],
     };
 
     const host = parsed.servidorHost || parsed.origenExtraccion || "DESKTOP-9PTRDI9\\DELPRO";

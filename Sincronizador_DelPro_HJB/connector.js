@@ -1,3 +1,8 @@
+// ==========================================================
+//   HJB GESTIÓN - CONECTOR OFICIAL DELAVAL DELPRO (PC TAMBO)
+//   Basado en el motor de consultas nativo DeLaval Analytics
+// ==========================================================
+
 // 1. Forzar IPv4 para evitar esperas en redes con IPv6 inestable
 const dns = require("dns");
 try {
@@ -12,41 +17,50 @@ const sql = require("mssql");
 const fs = require("fs");
 
 const { initializeApp, cert } = require("firebase-admin/app");
-const {
-  getFirestore,
-  FieldValue
-} = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
 const keyPath = process.env.FIREBASE_KEY_PATH || "C:\\HJB\\Secrets\\firebase-hjb-tester.json";
-const serviceAccount = JSON.parse(
-  fs.readFileSync(keyPath, "utf8")
-);
-
-const targetProjectId = process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id || "hjb-gestion-tester";
-
-initializeApp({
-  credential: cert(serviceAccount),
-  projectId: targetProjectId,
-});
-
-const db = getFirestore();
-
-// 3. Activar modo HTTPS REST para mayor compatibilidad con routers rurales/4G
+let serviceAccount = null;
 try {
-  db.settings({ preferRest: true });
-} catch (e) {}
+  serviceAccount = JSON.parse(fs.readFileSync(keyPath, "utf8"));
+} catch (e) {
+  console.warn("[AVISO] No se encontró clave Firebase en:", keyPath);
+}
+
+const targetProjectId = process.env.FIREBASE_PROJECT_ID || serviceAccount?.project_id || "hjb-gestion-tester";
+
+if (serviceAccount) {
+  initializeApp({
+    credential: cert(serviceAccount),
+    projectId: targetProjectId,
+  });
+}
+
+const db = serviceAccount ? getFirestore() : null;
+
+// Activar modo HTTPS REST para mayor compatibilidad con enlaces rurales
+if (db) {
+  try {
+    db.settings({ preferRest: true });
+  } catch (e) {}
+}
 
 const sqlConfig = {
   user: process.env.SQL_USER,
   password: process.env.SQL_PASSWORD,
   server: process.env.SQL_SERVER + "\\" + process.env.SQL_INSTANCE,
-  database: process.env.SQL_DATABASE,
+  database: process.env.SQL_DATABASE || "DDM",
   options: {
     encrypt: false,
     trustServerCertificate: true,
   },
 };
 
+// ==========================================================
+//  CONSULTAS SQL OFICIALES DE DELAVAL DELPRO (DeLaval Analytics)
+// ==========================================================
+
+// A. Producción de Leche Ayer y Promedios Históricos (Caudalímetros DelPro)
 const queryLeche = `
 DECLARE @FechaCorte date;
 SET @FechaCorte = DATEADD(day,-1,CAST(GETDATE() AS date));
@@ -134,7 +148,278 @@ FROM Datos
 ORDER BY Pronostico15 DESC, Vaca;
 `;
 
-const queryTodosLosAnimales = `
+// B. Conteo y Stock Diario por Corral/Grupo (DeLaval q_daily_animal_group_stock)
+const queryStockPorGrupo = `
+SELECT 
+    G.Number AS GroupNumber,
+    G.Name AS GroupName,
+    (SELECT COUNT(*) FROM dbo.BasicAnimal A1 WHERE A1.[Group] = G.OID AND A1.GCRecord IS NULL AND A1.Sex = 2) AS Female,
+    (SELECT COUNT(*) FROM dbo.BasicAnimal A2 WHERE A2.[Group] = G.OID AND A2.GCRecord IS NULL AND A2.Sex = 1) AS Male,
+    (SELECT COUNT(*) FROM dbo.BasicAnimal A5 LEFT JOIN dbo.AnimalExtended AE3 ON A5.OID = AE3.OID LEFT JOIN dbo.AnimalReproductionInfo ARI3 ON AE3.ReproductionInfo = ARI3.OID WHERE A5.[Group] = G.OID AND A5.GCRecord IS NULL AND ARI3.LactationNumber > 0 AND ARI3.IsDryingOff = 0) AS MilkingCow,
+    (SELECT COUNT(*) FROM dbo.BasicAnimal A6 LEFT JOIN dbo.AnimalExtended AE4 ON A6.OID = AE4.OID LEFT JOIN dbo.AnimalReproductionInfo ARI4 ON AE4.ReproductionInfo = ARI4.OID WHERE A6.[Group] = G.OID AND A6.GCRecord IS NULL AND ARI4.BreedingState = 7) AS DryCow,
+    (SELECT COUNT(*) FROM dbo.BasicAnimal A7 LEFT JOIN dbo.AnimalExtended AE5 ON A7.OID = AE5.OID LEFT JOIN dbo.AnimalReproductionInfo ARI5 ON AE5.ReproductionInfo = ARI5.OID WHERE A7.[Group] = G.OID AND A7.GCRecord IS NULL AND ARI5.IsPregnant = 1) AS Pregnant,
+    (SELECT COUNT(*) FROM dbo.BasicAnimal A8 LEFT JOIN dbo.AnimalExtended AE6 ON A8.OID = AE6.OID LEFT JOIN dbo.AnimalReproductionInfo ARI6 ON AE6.ReproductionInfo = ARI6.OID WHERE A8.[Group] = G.OID AND A8.GCRecord IS NULL AND ARI6.BreedingState = 4) AS [Open],
+    (SELECT COUNT(*) FROM dbo.BasicAnimal A9 WHERE A9.[Group] = G.OID AND A9.GCRecord IS NULL) AS TotalAnimals,
+    (SELECT AVG(D.TotalYield) FROM dbo.AnimalDaily D WHERE D.AnimalGroup = G.OID AND D.GCRecord IS NULL AND D.[Date] = CAST(GETDATE() - 1 AS DATE) AND D.TotalYield > 0) AS AVGYield
+FROM dbo.AbstractGroup G
+WHERE G.GCRecord IS NULL
+ORDER BY TotalAnimals DESC;
+`;
+
+// C. Censo Maestro Integral de Animales (DeLaval q_animals)
+const queryAnimalsOficial = `
+DROP TABLE IF EXISTS #BasicAnimalBase;
+DROP TABLE IF EXISTS #PedigreeInfoBase;
+DROP TABLE IF EXISTS #FirstCalving;
+DROP TABLE IF EXISTS #AgeFirstPregnancy;
+DROP TABLE IF EXISTS #AgeFirstInsemination;
+DROP TABLE IF EXISTS #CountAbortions;
+DROP TABLE IF EXISTS #CalvingsKpi;
+DROP TABLE IF EXISTS #DryOffsKpi;
+DROP TABLE IF EXISTS #ExitsInformation;
+DROP TABLE IF EXISTS #LastMilkTest;
+DROP TABLE IF EXISTS #Inseminations;
+DROP TABLE IF EXISTS #Yields7d;
+DROP TABLE IF EXISTS #DIM;
+DROP TABLE IF EXISTS #LastAnimalDailyGroup;
+DROP TABLE IF EXISTS #ResolveGroup;
+DROP TABLE IF EXISTS #HistoryFarmMasterGroup;
+DROP TABLE IF EXISTS #LastGroupHistoryAnimal;
+
+-- Animales Base
+SELECT
+    BA.OID,
+    BA.Number,
+    BA.OfficialRegNo,
+    BA.Sex,
+    BA.BirthDate,
+    BA.TransponderID,
+    BA.ToBeCulled,
+    BA.ExitDate,
+    BA.ExitType,
+    BA.PedigreeInfo,
+    BA.[Group],
+    BA.LatestHistoryIndex,
+    ARI.LactationNumber,
+    ARI.BreedingState,
+    ARI.IsInseminated,
+    ARI.IsPregnant,
+    ARI.IsDryingOff,
+    ALHI.Insemination,
+    ALHI.EffectiveInsemination,
+    CASE 
+        WHEN ARI.LactationNumber > 0 AND ARI.IsDryingOff = 0 THEN 'InLactation'
+        WHEN ARI.LactationNumber > 0 AND ARI.IsDryingOff = 1 THEN 'DryOff'
+        WHEN ARI.LactationNumber = 0 AND ARI.IsDryingOff = 0 THEN 'Heifer'
+        ELSE 'Male'
+    END AS 'ProductiveStatus'
+INTO #BasicAnimalBase
+FROM dbo.BasicAnimal BA
+LEFT JOIN dbo.AnimalLatestHistoryIndex ALHI ON BA.LatestHistoryIndex = ALHI.OID AND ALHI.GCRecord IS NULL
+LEFT JOIN dbo.AnimalDaily AD ON ALHI.AnimalDailyToday = AD.OID AND AD.GCRecord IS NULL
+LEFT JOIN dbo.AnimalReproductionInfo ARI ON BA.OID = ARI.Animal AND ARI.GCRecord IS NULL
+WHERE BA.GCRecord IS NULL
+AND ((BA.Number > 0 AND BA.Number < 999999) OR (BA.Number < 0));
+
+-- Pedigree
+SELECT TOP (100) PERCENT [OID], [MotherId], [FatherId]
+INTO #PedigreeInfoBase
+FROM dbo.PedigreeInfo
+WHERE GCRecord IS NULL;
+
+-- Primer Parto
+WITH Eventos AS (
+    SELECT
+        BA.OID, BA.Number, BA.OfficialRegNo, BA.BirthDate, AAE.DateAndTime, AAE.LactationNumber,
+        DATEDIFF(DAY, BA.BirthDate, AAE.DateAndTime) AS AgeFirstCalving,
+        ROW_NUMBER() OVER (PARTITION BY BA.OID ORDER BY AAE.DateAndTime ASC) AS RN
+    FROM dbo.BasicAnimal BA
+    INNER JOIN dbo.AbstractAnimalEvent AAE ON BA.OID = AAE.BasicAnimal
+    INNER JOIN dbo.XPObjectType XPO ON AAE.ObjectType = XPO.OID
+    WHERE BA.GCRecord IS NULL AND AAE.GCRecord IS NULL
+    AND XPO.TypeName = N'DeLaval.DDM.CommonApp.Module.BasicFeatures.Reproduction.EventCalving'
+    AND AAE.LactationNumber = 1
+)
+SELECT OID, Number, OfficialRegNo, BirthDate, DateAndTime AS FirstCalvingDate, AgeFirstCalving
+INTO #FirstCalving
+FROM Eventos WHERE RN = 1;
+
+-- KPI de Parto (ExpectedCalving, OpenDays, DaysToCalving)
+SELECT BasicAnimal.OID, BasicAnimal.OfficialRegNo, 
+    DATEADD(DAY, RS.ValueInDays, CONVERT(DATETIME, AbstractAnimalEvent.DateAndTime)) AS ExpectedCalving,
+    DATEDIFF(DAY, AnimalReproductionInfo.LastLactationChangeDate, AbstractAnimalEvent.DateAndTime) AS OpenDays,
+    DATEDIFF(DAY, GETDATE(), DATEADD(DAY, RS.ValueInDays, CONVERT(DATETIME, AbstractAnimalEvent.DateAndTime))) AS DaysToCalving
+INTO #CalvingsKpi
+FROM dbo.BasicAnimal
+LEFT JOIN dbo.AnimalReproductionInfo ON BasicAnimal.OID = AnimalReproductionInfo.Animal
+LEFT JOIN dbo.AnimalLatestHistoryIndex ON BasicAnimal.LatestHistoryIndex = AnimalLatestHistoryIndex.OID
+LEFT JOIN dbo.EventInsemination ON AnimalLatestHistoryIndex.EffectiveInsemination = EventInsemination.OID
+LEFT JOIN dbo.AbstractAnimalEvent ON EventInsemination.OID = AbstractAnimalEvent.OID
+CROSS JOIN (SELECT TOP 1 ValueInDays FROM dbo.ReproductionSetting WHERE Parameter = 10) AS RS
+WHERE AnimalReproductionInfo.IsPregnant = 1 
+AND BasicAnimal.GCRecord IS NULL AND AnimalReproductionInfo.GCRecord IS NULL  
+AND AnimalLatestHistoryIndex.GCRecord IS NULL AND AbstractAnimalEvent.GCRecord IS NULL;
+
+-- KPI de Secado (DateExpectedDryOff, DaysToDryOff)
+SELECT BasicAnimal.OID, BasicAnimal.OfficialRegNo, ReproductionSetting_1.ValueInDays AS ValueDaysToDryOff, ReproductionSetting.ValueInDays AS ValueGestationDays, AbstractAnimalEvent.DateAndTime AS DateInseminationEfective,
+    DATEADD(DAY, ReproductionSetting.ValueInDays + (-1 * ReproductionSetting_1.ValueInDays), AbstractAnimalEvent.DateAndTime) AS DateExpectedDryOff,
+    DATEDIFF(DAY, GETDATE(), DATEADD(DAY, ReproductionSetting.ValueInDays + (-1 * ReproductionSetting_1.ValueInDays), AbstractAnimalEvent.DateAndTime)) AS DaysToDryOff
+INTO #DryOffsKpi
+FROM dbo.EventInsemination
+INNER JOIN dbo.AnimalLatestHistoryIndex ON EventInsemination.OID = AnimalLatestHistoryIndex.EffectiveInsemination
+INNER JOIN dbo.AbstractAnimalEvent ON EventInsemination.OID = AbstractAnimalEvent.OID
+RIGHT OUTER JOIN dbo.BasicAnimal
+INNER JOIN dbo.AnimalReproductionInfo ON BasicAnimal.OID = AnimalReproductionInfo.Animal ON AnimalLatestHistoryIndex.OID = BasicAnimal.LatestHistoryIndex, dbo.ReproductionSetting, dbo.ReproductionSetting ReproductionSetting_1
+WHERE (BasicAnimal.Sex = 2)
+AND (AnimalReproductionInfo.LactationNumber > 0)
+AND (BasicAnimal.ExitType IS NULL)
+AND (NOT (AnimalLatestHistoryIndex.EffectiveInsemination IS NULL))
+AND (ReproductionSetting_1.Parameter = 7)
+AND (ReproductionSetting.Parameter = 10)
+AND (AnimalReproductionInfo.IsDryingOff = 0)
+AND (AnimalReproductionInfo.IsPregnant = 1)
+AND (BasicAnimal.GCRecord IS NULL)
+AND (AnimalReproductionInfo.GCRecord IS NULL);
+
+-- Último Control Lechero (SCC, Grasa, Proteína)
+SELECT 
+    T.BasicAnimalOID AS OID, T.OfficialRegNo, T.Number, T.SCC, T.YieldMilkTest, T.Fat, T.Protein, T.DateAndTime AS DateLastMilkTest
+INTO #LastMilkTest
+FROM (
+    SELECT 
+        BasicAnimal.OID AS BasicAnimalOID, BasicAnimal.OfficialRegNo, BasicAnimal.Number,
+        MilkTest.OID AS MilkTestOID, MilkTest.Yield AS YieldMilkTest, MilkTest.SCC, MilkTest.Fat, MilkTest.Protein, AnimalHistoricalData.DateAndTime,
+        ROW_NUMBER() OVER (PARTITION BY BasicAnimal.OID ORDER BY AnimalHistoricalData.DateAndTime DESC) AS RowNum
+    FROM dbo.MilkTest
+    INNER JOIN dbo.AnimalHistoricalData ON MilkTest.OID = AnimalHistoricalData.OID
+    INNER JOIN dbo.BasicAnimal ON AnimalHistoricalData.BasicAnimal = BasicAnimal.OID
+    WHERE BasicAnimal.GCRecord IS NULL AND AnimalHistoricalData.GCRecord IS NULL
+) AS T WHERE T.RowNum = 1;
+
+-- Promedio Leche 7 días
+SELECT dbo.BasicAnimal.OID, dbo.BasicAnimal.OfficialRegNo, AVG(dbo.AnimalDaily.TotalYield) AS AvgYieldPrev7d
+INTO #Yields7d
+FROM dbo.AnimalDaily RIGHT OUTER JOIN dbo.BasicAnimal ON dbo.AnimalDaily.BasicAnimal = dbo.BasicAnimal.OID
+WHERE dbo.AnimalDaily.Date >= DATEADD(DAY, -8, GETDATE()) AND dbo.AnimalDaily.IsYieldValid = 1
+GROUP BY dbo.BasicAnimal.OID, dbo.BasicAnimal.OfficialRegNo;
+
+-- Días en Leche (DIM)
+SELECT 
+    TOP (100) PERCENT dbo.BasicAnimal.OID, dbo.BasicAnimal.Number, dbo.BasicAnimal.OfficialRegNo,
+    CASE 
+        WHEN AbstractAnimalEvent_1.DateAndTime IS NULL THEN DATEDIFF(DAY, AbstractAnimalEvent_2.DateAndTime, GETDATE())
+        ELSE DATEDIFF(DAY, AbstractAnimalEvent_2.DateAndTime, AbstractAnimalEvent_1.DateAndTime)
+    END AS DIM
+INTO #DIM
+FROM dbo.BasicAnimal 
+LEFT OUTER JOIN dbo.AnimalLatestHistoryIndex ON dbo.BasicAnimal.OID = dbo.AnimalLatestHistoryIndex.Animal 
+LEFT OUTER JOIN dbo.AbstractAnimalEvent AS AbstractAnimalEvent_1 ON dbo.AnimalLatestHistoryIndex.DryOff = AbstractAnimalEvent_1.OID 
+LEFT OUTER JOIN dbo.AbstractAnimalEvent AS AbstractAnimalEvent_2 ON dbo.AnimalLatestHistoryIndex.Calving = AbstractAnimalEvent_2.OID
+WHERE BasicAnimal.GCRecord IS NULL;
+
+-- Grupos y Corrales Actuales
+SELECT 
+    BA.OID, BA.Number, BA.OfficialRegNo, AG.Number AS GroupNumber, AG.Name AS NameGroup
+INTO #ResolveGroup
+FROM dbo.BasicAnimal BA
+LEFT JOIN dbo.AbstractGroup AG ON BA.[Group] = AG.OID
+WHERE BA.GCRecord IS NULL;
+
+-- SELECT FINAL MAESTRO DELAVAL
+SELECT
+    BAB.Number AS AnimalNumber,
+    BAB.OfficialRegNo,
+    BAB.Sex,
+    CONVERT(varchar(10), BAB.BirthDate, 120) AS BirthDate,
+    BAB.TransponderID,
+    BAB.ToBeCulled,
+    BAB.LactationNumber,
+    PIB.MotherId,
+    BAB.BreedingState,
+    BAB.IsInseminated,
+    BAB.IsPregnant,
+    BAB.IsDryingOff,
+    BAB.ProductiveStatus,
+    LMT.YieldMilkTest,
+    LMT.SCC,
+    LMT.Fat,
+    LMT.Protein,
+    CONVERT(varchar(10), CKPI.ExpectedCalving, 120) AS ExpectedCalving,
+    CKPI.DaysToCalving,
+    CKPI.OpenDays,
+    CONVERT(varchar(10), DOKPI.DateExpectedDryOff, 120) AS DateExpectedDryOff,
+    DOKPI.DaysToDryOff,
+    RG.NameGroup,
+    RG.GroupNumber,
+    FC.AgeFirstCalving,
+    Y7D.AvgYieldPrev7d,
+    DIM.DIM
+FROM #BasicAnimalBase BAB
+LEFT JOIN #PedigreeInfoBase PIB ON BAB.PedigreeInfo = PIB.OID
+LEFT JOIN #LastMilkTest LMT ON BAB.OID = LMT.OID
+LEFT JOIN #FirstCalving FC ON BAB.OID = FC.OID
+LEFT JOIN #CalvingsKpi CKPI ON BAB.OID = CKPI.OID
+LEFT JOIN #DryOffsKpi DOKPI ON BAB.OID = DOKPI.OID
+LEFT JOIN #Yields7d Y7D ON BAB.OID = Y7D.OID
+LEFT JOIN #DIM DIM ON BAB.OID = DIM.OID
+LEFT JOIN #ResolveGroup RG ON BAB.OID = RG.OID
+ORDER BY BAB.Number, BAB.OfficialRegNo;
+`;
+
+// D. Trazabilidad de Traspasos de Grupo / Corral (DeLaval q_last_history_group)
+const queryHistorialGrupos = `
+WITH CTE AS (
+    SELECT
+        BA.Number AS AnimalNumber,
+        BA.OfficialRegNo,
+        AAE.DateAndTime,
+        AG2.Number AS GroupNumberOld,
+        AG2.Name AS GroupNameOld,
+        AG1.Number AS GroupNumberNew,
+        AG1.Name AS GroupNameNew,
+        ROW_NUMBER() OVER (
+            PARTITION BY BA.OfficialRegNo
+            ORDER BY AAE.DateAndTime DESC
+        ) AS rn
+    FROM dbo.BasicAnimal AS BA
+    INNER JOIN dbo.AbstractAnimalEvent AS AAE ON BA.OID = AAE.BasicAnimal
+    INNER JOIN dbo.EventGroupChange AS EGC ON AAE.OID = EGC.OID
+    LEFT JOIN dbo.AbstractGroup AS AG2 ON EGC.OldGroup = AG2.OID
+    LEFT JOIN dbo.AbstractGroup AS AG1 ON EGC.NewGroup = AG1.OID
+    WHERE (AG2.Number IS NOT NULL OR AG1.Number IS NOT NULL)
+)
+SELECT
+    AnimalNumber,
+    OfficialRegNo,
+    CONVERT(varchar(10), DateAndTime, 120) AS DateAndTime,
+    GroupNumberOld,
+    GroupNameOld,
+    GroupNumberNew,
+    GroupNameNew
+FROM CTE
+WHERE rn = 1
+ORDER BY DateAndTime DESC;
+`;
+
+// E. Registro de Partos y Nacimientos (DeLaval q_calvings)
+const queryPartos = `
+SELECT
+    BA.OfficialRegNo,
+    BA.Number AS AnimalNumber,
+    AAE.LactationNumber,
+    CONVERT(varchar(10), AAE.DateAndTime, 120) AS CalvingDate,
+    BA.Sex,
+    PIB.MotherId
+FROM dbo.AbstractAnimalEvent AAE
+INNER JOIN dbo.BasicAnimal BA ON AAE.BasicAnimal = BA.OID
+INNER JOIN dbo.EventCalving EC ON AAE.OID = EC.OID
+LEFT JOIN dbo.PedigreeInfo PIB ON BA.PedigreeInfo = PIB.OID
+WHERE BA.GCRecord IS NULL AND AAE.GCRecord IS NULL
+ORDER BY AAE.DateAndTime DESC;
+`;
+
+// F. Fallback básico de rodeo completo si q_animals requiere tablas adicionales
+const queryTodosLosAnimalesFallback = `
 SELECT 
     a.Number AS Vaca,
     g.Oid AS GroupOid,
@@ -147,17 +432,9 @@ WHERE a.IsExited = 0 AND a.IsCulled = 0
 ORDER BY g.Oid, a.Number;
 `;
 
-const queryGrupos = `
-SELECT 
-    g.Oid AS GroupOid,
-    g.Name AS GroupName,
-    COUNT(a.Oid) AS CantidadAnimales
-FROM dbo.AbstractGroup g WITH (NOLOCK)
-LEFT JOIN dbo.AnimalData a WITH (NOLOCK) 
-    ON a.GroupOid = g.Oid AND a.IsExited = 0 AND a.IsCulled = 0
-GROUP BY g.Oid, g.Name
-ORDER BY CantidadAnimales DESC, g.Oid;
-`;
+// ==========================================================
+//  EJECUCIÓN PRINCIPAL DEL CONECTOR
+// ==========================================================
 
 async function ejecutar() {
   let pool;
@@ -168,7 +445,7 @@ async function ejecutar() {
     const userName = sqlConfig.user;
 
     console.log("==========================================================");
-    console.log("  HJB GESTION - CONECTOR DELAVAL DELPRO (PC TAMBO)");
+    console.log("  HJB GESTION - CONECTOR DELAVAL DELPRO (MOTOR ANALYTICS)");
     console.log("==========================================================");
     console.log(`[SQL DELPRO]      Conectando a ${serverInstance} [${databaseName}]...`);
     console.log(`[MODO OPERATIVO]  SOLO LECTURA (Usuario: ${userName})`);
@@ -176,29 +453,28 @@ async function ejecutar() {
     pool = await sql.connect(sqlConfig);
     console.log("[SQL DELPRO]      Conexion SQL OK.");
 
-    // A. Descubrir Grupos / Corrales de DelPro
-    const resGrupos = await pool.request().query(queryGrupos);
-    console.log("");
-    console.log("----------------------------------------------------------");
-    console.log("  GRUPOS / CORRALES REGISTRADOS EN DELPRO:");
-    console.log("----------------------------------------------------------");
-    resGrupos.recordset.forEach(gr => {
-      console.log(`  * ID ${gr.GroupOid}: "${gr.GroupName}" -> ${gr.CantidadAnimales} animales`);
-    });
-    console.log("----------------------------------------------------------");
-    console.log("");
+    // 1. Grupos y Distribución de Stock (q_daily_animal_group_stock)
+    let resStockGrupos = [];
+    try {
+      const resG = await pool.request().query(queryStockPorGrupo);
+      resStockGrupos = resG.recordset;
+      console.log("");
+      console.log("----------------------------------------------------------");
+      console.log("  STOCK Y DISTRIBUCION POR GRUPO / CORRAL (DELPRO):");
+      console.log("----------------------------------------------------------");
+      resStockGrupos.forEach(gr => {
+        console.log(`  * ID ${gr.GroupNumber}: "${gr.GroupName}" -> Total: ${gr.TotalAnimals} (Ordeñe: ${gr.MilkingCow || 0} | Secas: ${gr.DryCow || 0} | Preñadas: ${gr.Pregnant || 0})`);
+      });
+      console.log("----------------------------------------------------------");
+    } catch (errG) {
+      console.warn("[AVISO GRUPOS]   No se pudo ejecutar stock detallado por grupo:", errG.message);
+    }
 
-    // B. Extraer Producción de Vacas en Ordeñe
+    // 2. Producción de Leche Ayer y Promedio (Caudalímetros)
     const resLeche = await pool.request().query(queryLeche);
     const totalVacasLeche = resLeche.recordset.length;
     console.log(`[TAMBO ORDEÑE]   ${totalVacasLeche} vacas en ordeñe (Grupos 2 y 1019)`);
 
-    // C. Extraer Censo Total de Animales (Tambo + Ganadería + Recría)
-    const resTodos = await pool.request().query(queryTodosLosAnimales);
-    const totalRodeoCompleto = resTodos.recordset.length;
-    console.log(`[RODEO COMPLETO]  ${totalRodeoCompleto} animales activos en total en el campo`);
-
-    // D. Calcular métricas para el Dashboard
     let fechaDatosTexto = "";
     if (resLeche.recordset.length > 0 && resLeche.recordset[0].FechaDatos) {
       const f0 = resLeche.recordset[0].FechaDatos;
@@ -207,15 +483,51 @@ async function ejecutar() {
 
     const litrosTotales = resLeche.recordset.reduce((acc, f) => acc + (Number(f.Ayer) || 0), 0);
     const promVO = totalVacasLeche > 0 ? (litrosTotales / totalVacasLeche) : 0;
-
     console.log(`[PRODUCCION AYER] ${litrosTotales.toFixed(1)} lts totales | Promedio: ${promVO.toFixed(2)} lts/vaca`);
 
-    // E. Guardar Respaldo Local Integral (Tambo + Ganadería) en JSON
+    // 3. Censo Maestro Integral de Animales (DeLaval q_animals)
+    let rodeoCompleto = [];
+    try {
+      console.log("[CENSO DELPRO]    Extrayendo censo integral con métricas reproductivas (q_animals)...");
+      const resAnimals = await pool.request().query(queryAnimalsOficial);
+      rodeoCompleto = resAnimals.recordset;
+      console.log(`[CENSO DELPRO]    OK: ${rodeoCompleto.length} animales procesados con días a parto y celo.`);
+    } catch (errAnimals) {
+      console.warn("[AVISO CENSO]    Error ejecutando q_animals completo:", errAnimals.message);
+      console.log("[FALLBACK CENSO]  Ejecutando consulta base de AnimalData...");
+      const resFallback = await pool.request().query(queryTodosLosAnimalesFallback);
+      rodeoCompleto = resFallback.recordset;
+      console.log(`[FALLBACK CENSO]  ${rodeoCompleto.length} animales extraídos.`);
+    }
+
+    // 4. Trazabilidad de Traspasos de Corrales (DeLaval q_last_history_group)
+    let historialCambiosGrupo = [];
+    try {
+      console.log("[MOVIMIENTOS]     Consultando historial de cambios de grupo (q_last_history_group)...");
+      const resMov = await pool.request().query(queryHistorialGrupos);
+      historialCambiosGrupo = resMov.recordset;
+      console.log(`[MOVIMIENTOS]     ${historialCambiosGrupo.length} movimientos de corral detectados.`);
+    } catch (errMov) {
+      console.warn("[AVISO MOVIM]     No se pudo extraer historial de grupos:", errMov.message);
+    }
+
+    // 5. Registro de Partos Recientes (DeLaval q_calvings)
+    let partosRecientes = [];
+    try {
+      console.log("[PARTOS DELPRO]   Consultando registro oficial de partos (q_calvings)...");
+      const resPartos = await pool.request().query(queryPartos);
+      partosRecientes = resPartos.recordset.slice(0, 30);
+      console.log(`[PARTOS DELPRO]   ${partosRecientes.length} partos históricos/recientes encontrados.`);
+    } catch (errPartos) {
+      console.warn("[AVISO PARTOS]    No se pudo extraer partos:", errPartos.message);
+    }
+
+    // 6. Consolidar Respaldo Local (delpro_sync.json)
     const rutaJsonLocal = path.resolve(__dirname, "delpro_sync.json");
     const copiaLocal = {
       fechaSincronizacion: new Date().toISOString(),
       fechaDatos: fechaDatosTexto,
-      origenExtraccion: "Microsoft SQL Server (DeLaval DelPro)",
+      origenExtraccion: "Microsoft SQL Server (DeLaval Analytics / DDM)",
       servidorHost: serverInstance,
       baseDatosSql: databaseName,
       kpisProduccion: {
@@ -223,88 +535,58 @@ async function ejecutar() {
         vacasEnOrdenie: totalVacasLeche,
         litrosPromedioVO: Number(promVO.toFixed(2)),
       },
-      gruposDelPro: resGrupos.recordset,
+      stockCorrales: resStockGrupos,
       vacasEnOrdenie: resLeche.recordset,
-      rodeoCompleto: resTodos.recordset,
+      rodeoCompleto: rodeoCompleto,
+      historialCambiosGrupo: historialCambiosGrupo,
+      calvings: partosRecientes,
     };
     fs.writeFileSync(rutaJsonLocal, JSON.stringify(copiaLocal, null, 2), "utf8");
-    console.log(`[RESPALDO LOCAL]  delpro_sync.json guardado (${totalRodeoCompleto} animales totales)`);
+    console.log(`[RESPALDO LOCAL]  delpro_sync.json guardado (${rodeoCompleto.length} animales totales)`);
 
-    // F. Preparar Lote para Firestore
-    console.log(`[FIREBASE]        Preparando sincronizacion a Firestore (${targetProjectId})...`);
-    const batch = db.batch();
+    // 7. Transmisión a Firebase en 1 Sola Escritura de Lote (Cero Cuota Excedida)
+    if (db) {
+      console.log(`[FIREBASE]        Transmitiendo paquete consolidado a Firestore (${targetProjectId})...`);
+      const refTablero = db.collection("delpro").doc("sincronizacion_actual");
 
-    // 1) Actualizar resumen principal de Tambo y Dashboard
-    const refTablero = db.collection("delpro").doc("sincronizacion_actual");
-    batch.set(
-      refTablero,
-      {
-        estadoConexion: "conectado",
-        fechaSincronizacion: new Date().toISOString(),
-        servidorHost: serverInstance,
-        baseDatosSql: databaseName,
-        litrosTotalesDia: Number(litrosTotales.toFixed(1)),
-        vacasEnOrdeñe: totalVacasLeche,
-        litrosPromedioVO: Number(promVO.toFixed(2)),
-        totalRodeoGeneral: totalRodeoCompleto,
-        mensajeEstado: `Sincronizado desde DelPro (${serverInstance})`,
-        fechaDatos: fechaDatosTexto,
-      },
-      { merge: true }
-    );
+      try {
+        await refTablero.set(
+          {
+            estadoConexion: "conectado",
+            fechaSincronizacion: new Date().toISOString(),
+            servidorHost: serverInstance,
+            baseDatosSql: databaseName,
+            litrosTotalesDia: Number(litrosTotales.toFixed(1)),
+            vacasEnOrdeñe: totalVacasLeche,
+            litrosPromedioVO: Number(promVO.toFixed(2)),
+            totalRodeoGeneral: rodeoCompleto.length,
+            mensajeEstado: `Sincronizado desde DelPro Analytics (${serverInstance})`,
+            fechaDatos: fechaDatosTexto,
+            payloadJson: JSON.stringify(copiaLocal), // Envía TODO el rodeo en 1 sola escritura
+          },
+          { merge: true }
+        );
 
-    // 2) Actualizar vacas de ordeñe individuales en delpro_animales
-    for (const fila of resLeche.recordset) {
-      const fechaStr = fila.FechaDatos instanceof Date
-        ? fila.FechaDatos.toISOString().slice(0, 10)
-        : String(fila.FechaDatos || "").slice(0, 10);
+        const ahora = new Date();
+        const fechaHoraSync = ahora.toLocaleString("es-AR", {
+          timeZone: "America/Argentina/Buenos_Aires",
+          hour12: false,
+        });
 
-      const ref = db.collection("delpro_animales").doc(String(fila.Vaca));
-      batch.set(
-        ref,
-        {
-          vaca: fila.Vaca,
-          rodeo: fila.Rodeo,
-          diasEnLeche: fila.DiasEnLeche,
-          lactancia: fila.Lactancia,
-          ayer: fila.Ayer,
-          prom7: fila.Prom7,
-          prom14: fila.Prom14,
-          prom21: fila.Prom21,
-          pronostico15: fila.Pronostico15,
-          controlDato: fila.ControlDato,
-          fechaDatos: fechaStr,
-          actualizadoEn: FieldValue.serverTimestamp(),
-          origen: "DelPro",
-        },
-        { merge: true }
-      );
-    }
-
-    // G. Transmitir a Firestore
-    console.log(`[FIREBASE]        Transmitiendo via HTTPS REST a Google...`);
-    try {
-      await batch.commit();
-
-      const ahora = new Date();
-      const fechaHoraSync = ahora.toLocaleString("es-AR", {
-        timeZone: "America/Argentina/Buenos_Aires",
-        hour12: false,
-      });
-
-      console.log("[FIREBASE]        Conexion y subida Firebase OK.");
-      console.log(`[TABLERO HJB]     Dashboard y Tambo actualizados con ${litrosTotales.toFixed(1)} lts`);
-      console.log(`[FECHA DATOS]     ${fechaDatosTexto} (formato texto YYYY-MM-DD)`);
-      console.log(`[HORA SYNC]       ${fechaHoraSync}`);
-    } catch (errFirebase) {
-      if (errFirebase.message && (errFirebase.message.includes("Quota exceeded") || errFirebase.message.includes("429"))) {
-        console.log("");
-        console.log("[AVISO NUBE]      Cuota gratuita de Google alcanzada por hoy (20.000 escrituras).");
-        console.log("[AVISO NUBE]      Se reinicia automaticamente a las 04:00 AM (o al pasar a plan Blaze).");
-        console.log("[RESPALDO LOCAL]  Los datos estan 100% seguros y guardados en delpro_sync.json.");
-      } else {
-        throw errFirebase;
+        console.log("[FIREBASE]        Subida Firebase OK (1 sola operacion de escritura, cuota protegida).");
+        console.log(`[TABLERO HJB]     Dashboard y Tambo actualizados con ${litrosTotales.toFixed(1)} lts`);
+        console.log(`[FECHA DATOS]     ${fechaDatosTexto} (formato texto YYYY-MM-DD)`);
+        console.log(`[HORA SYNC]       ${fechaHoraSync}`);
+      } catch (errFirebase) {
+        if (errFirebase.message && (errFirebase.message.includes("Quota exceeded") || errFirebase.message.includes("429"))) {
+          console.log("");
+          console.log("[AVISO NUBE]      Cuota diaria de Google alcanzada. Los datos locales estan seguros.");
+        } else {
+          console.error("[ERROR FIREBASE]  ", errFirebase.message);
+        }
       }
+    } else {
+      console.log("[FIREBASE]        Modo sin credenciales activas. Respaldo local generado con exito.");
     }
 
     console.log("[ESTADO DELPRO]   SIN MODIFICACIONES (estrictamente solo lectura)");
