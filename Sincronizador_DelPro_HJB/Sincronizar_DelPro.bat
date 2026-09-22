@@ -1,15 +1,13 @@
 @echo off
-title HJB Gestion - Sincronizador DeLaval DelPro
+title HJB Gestion - Sincronizador DeLaval DelPro (PC Tambo)
 color 0A
 echo =====================================================================
-echo   HJB GESTION - SINCRONIZADOR DE DATOS DELAVAL DELPRO (SQL SERVER)
+echo   HJB GESTION - CONECTOR DELAVAL DELPRO (DESKTOP-9PTRDI9\DELPRO)
 echo =====================================================================
 echo.
-echo Conectando con DeLaval DelPro FarmManager en esta computadora...
-echo.
 
-cd /d "%~dp0"
-powershell -ExecutionPolicy Bypass -NoProfile -File ".\extraer_delpro.ps1" %*
+cd /d "C:\HJB\Connector"
+node "C:\HJB\Connector\connector.js" %*
 
 echo.
 echo =====================================================================

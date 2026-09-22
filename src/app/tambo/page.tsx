@@ -22,6 +22,7 @@ import {
   getCensoRodeoTambo,
   CensoRodeoTambo,
   VacaTamboIndividual,
+  importarPayloadDesdeJson,
 } from "@/lib/delproData";
 
 export default function TamboPage() {
@@ -277,6 +278,50 @@ export default function TamboPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <label
+                className="secondaryBtn"
+                style={{
+                  fontSize: "12px",
+                  padding: "6px 12px",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: "#f0fdf4",
+                  borderColor: "#86efac",
+                  color: "#166534",
+                  fontWeight: 600,
+                }}
+                title="Cargar archivo delpro_sync.json extraído de la PC del tambo"
+              >
+                📂 Cargar delpro_sync.json
+                <input
+                  type="file"
+                  accept=".json"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      const text = ev.target?.result as string;
+                      if (text) {
+                        const res = importarPayloadDesdeJson(text);
+                        if (res.success && res.config) {
+                          setDelproConfig(res.config);
+                          setCensoRodeo(getCensoRodeoTambo());
+                          setFeedback("✓ Sincronización exitosa con DelPro: " + res.mensaje);
+                          setTimeout(() => setFeedback(null), 8000);
+                        } else {
+                          alert("Error al cargar: " + res.mensaje);
+                        }
+                      }
+                    };
+                    reader.readAsText(file);
+                  }}
+                />
+              </label>
+
               <Link
                 href="/inicio"
                 className="secondaryBtn"

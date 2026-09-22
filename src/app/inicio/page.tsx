@@ -564,20 +564,20 @@ export default function InicioPage() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <span style={{ fontSize: "12px", fontWeight: 800, color: "#166534", textTransform: "uppercase" }}>
-              🥛 Lechería (Tambo)
+              🥛 Producción Tambo (DeLaval DelPro)
             </span>
             <Link href="/tambo" style={{ fontSize: "11.5px", color: "#16a34a", fontWeight: 700, textDecoration: "none" }}>
               Ver tambo →
             </Link>
           </div>
           <div style={{ fontSize: "28px", fontWeight: 900, color: "#15803d", marginTop: "4px" }}>
-            {litrosLibresPorVO} Litros Libres
+            {litrosTotalesDia.toLocaleString("es-AR")} lts/día
           </div>
-          <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "4px" }}>
-            Ganancia neta: <strong>+${(gananciaPesosRodeoDia / 1000).toLocaleString("es-AR", { maximumFractionDigits: 0 })}k / día</strong> (Margen {margenNetoPct}%)
+          <div style={{ fontSize: "13px", color: "var(--slate-700)", marginTop: "4px", fontWeight: 700 }}>
+            {vacasVO} vacas ordeñadas · Promedio: {litrosPromedioVO} lts/VO
           </div>
-          <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
-            Producción DelPro: {litrosTotalesDia.toLocaleString("es-AR")} lts/d · {vacasVO} VO @ ${precioLitroLeche}/lt
+          <div style={{ fontSize: "11.5px", color: "var(--slate-500)", marginTop: "4px" }}>
+            Margen neto: <strong>{litrosLibresPorVO} lts libres/VO</strong> (+${(gananciaPesosRodeoDia / 1000).toLocaleString("es-AR", { maximumFractionDigits: 0 })}k / día)
           </div>
         </div>
 
