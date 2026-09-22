@@ -28,6 +28,13 @@ import {
   getDelProConfig,
   DelProConfig,
   HJB_DELPRO_SYNC_EVENT,
+  AnimalRecriaIndividual,
+  TraspasoCorralRegistro,
+  getAnimalesRecria,
+  saveAnimalesRecria,
+  getTraspasosCorrales,
+  saveTraspasosCorrales,
+  evaluarYEjecutarTraspasosAutomaticos,
 } from "@/lib/delproData";
 
 export default function GanaderiaPage() {
@@ -38,6 +45,13 @@ export default function GanaderiaPage() {
   const [ventas, setVentas] = useState<FichaVentaFrigorifico[]>([]);
   const [partosDelPro, setPartosDelPro] = useState(() => getPartosRecientesDelPro());
   const [delproConfig, setDelproConfig] = useState<DelProConfig>(() => getDelProConfig());
+  const [animalesRecria, setAnimalesRecria] = useState<AnimalRecriaIndividual[]>(() => getAnimalesRecria());
+  const [traspasosCorrales, setTraspasosCorrales] = useState<TraspasoCorralRegistro[]>(() => getTraspasosCorrales());
+  const [filtroRecriaCorral, setFiltroRecriaCorral] = useState<string>("todos");
+  const [filtroRecriaBusqueda, setFiltroRecriaBusqueda] = useState<string>("");
+  const [paginaRecria, setPaginaRecria] = useState<number>(1);
+  const [busquedaAnimalModal, setBusquedaAnimalModal] = useState<string>("");
+  const [mostrarHistorialTraspasos, setMostrarHistorialTraspasos] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   // Ficha Técnica Dedicada del Corral (Modal Enfocado)
@@ -97,6 +111,53 @@ export default function GanaderiaPage() {
     setVentas(getVentas());
     setPartosDelPro(getPartosRecientesDelPro());
     setDelproConfig(getDelProConfig());
+    setAnimalesRecria(getAnimalesRecria());
+    setTraspasosCorrales(getTraspasosCorrales());
+  }
+
+  function handleEjecutarTraspasosAutomaticos() {
+    const res = evaluarYEjecutarTraspasosAutomaticos(animalesRecria);
+    setAnimalesRecria(res.animalesActualizados);
+    saveAnimalesRecria(res.animalesActualizados);
+
+    if (res.traspasosRealizados.length > 0) {
+      const nuevoHistorial = [...res.traspasosRealizados, ...traspasosCorrales].slice(0, 50);
+      setTraspasosCorrales(nuevoHistorial);
+      saveTraspasosCorrales(nuevoHistorial);
+      triggerFeedback(`✓ ¡Traspasos ejecutados! Se movieron ${res.traspasosRealizados.length} terneros a su siguiente corral según escala HJB.`);
+    } else {
+      triggerFeedback("✓ Todos los terneros se encuentran actualmente en el corral adecuado según su peso y estadía.");
+    }
+  }
+
+  function handleTraspasarAnimalManual(rp: string, nuevoCorral: EtapaCorralId) {
+    const animal = animalesRecria.find((a) => a.rp === rp);
+    if (!animal) return;
+    const origen = animal.corralId;
+    const hoy = new Date().toLocaleDateString("es-AR");
+    const actualizado: AnimalRecriaIndividual = {
+      ...animal,
+      corralId: nuevoCorral,
+      diasEnCorral: 0,
+      fechaIngresoCorral: hoy,
+      listoFaena: nuevoCorral === "terminacion" && animal.pesoActualKg >= 370,
+    };
+    const listaActualizada = animalesRecria.map((a) => (a.rp === rp ? actualizado : a));
+    const nuevoTraspaso: TraspasoCorralRegistro = {
+      id: `tr-man-${Date.now()}`,
+      fecha: hoy,
+      rpAnimal: rp,
+      corralOrigen: origen,
+      corralDestino: nuevoCorral,
+      pesoAlTraspaso: animal.pesoActualKg,
+      motivo: `Traspaso manual por operador (${origen.toUpperCase()} ➔ ${nuevoCorral.toUpperCase()})`,
+    };
+    const nuevoHist = [nuevoTraspaso, ...traspasosCorrales].slice(0, 50);
+    setAnimalesRecria(listaActualizada);
+    saveAnimalesRecria(listaActualizada);
+    setTraspasosCorrales(nuevoHist);
+    saveTraspasosCorrales(nuevoHist);
+    triggerFeedback(`Animal ${rp} trasladado a ${nuevoCorral.toUpperCase()}.`);
   }
 
   useEffect(() => {
@@ -660,6 +721,497 @@ export default function GanaderiaPage() {
               );
             })}
           </div>
+
+          {/* ========================================================================= */}
+          {/* MOTOR DE TRASPASOS AUTOMÁTICOS DE CORRALES (ESCALA HJB)                   */}
+          {/* ========================================================================= */}
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid var(--line)",
+              borderRadius: "12px",
+              padding: "18px 20px",
+              boxShadow: "var(--shadow-sm)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                gap: "14px",
+                marginBottom: "16px",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "20px" }}>🔄</span>
+                  <h3 style={{ fontSize: "16px", margin: 0, fontWeight: 800, color: "var(--slate-950)" }}>
+                    Motor de Traspasos Automáticos entre Corrales de Recría (Escala HJB)
+                  </h3>
+                  <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+                    100% Automatizado
+                  </span>
+                </div>
+                <p className="muted" style={{ fontSize: "12.5px", margin: 0, maxWidth: "750px" }}>
+                  Evalúa periódicamente el peso individual por caravana y días en corral. Cuando un ternero supera el umbral biológico o tiempo de desleche, el sistema ejecuta el traspaso automático a la etapa siguiente y recalcula las dietas.
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="ghostButton"
+                  onClick={() => setMostrarHistorialTraspasos(!mostrarHistorialTraspasos)}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 12px" }}
+                >
+                  <span>📜</span>
+                  <span>{mostrarHistorialTraspasos ? "Ocultar Historial" : `Ver Historial (${traspasosCorrales.length})`}</span>
+                </button>
+                <button
+                  type="button"
+                  className="primaryButton"
+                  onClick={handleEjecutarTraspasosAutomaticos}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 14px", background: "#166534" }}
+                >
+                  <span>⚡</span>
+                  <span>Evaluar y Ejecutar Traspasos de Escala</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Escala HJB Visual Pipeline */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                gap: "10px",
+                background: "#f8fafc",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#0284c7" }}>1. GUACHERA ➔ RM1</div>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 80 kg ó 60 d</div>
+                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Desleche & arranque</div>
+              </div>
+              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#16a34a" }}>2. RM1 ➔ RM2</div>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 120 kg</div>
+                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Desarrollo inicial</div>
+              </div>
+              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#d97706" }}>3. RM2 ➔ RM3</div>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 170 kg</div>
+                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Crecimiento medio</div>
+              </div>
+              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#7c3aed" }}>4. RM3 ➔ TERMINACIÓN</div>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 270 kg</div>
+                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Entrada engorde intensivo</div>
+              </div>
+              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#dc2626" }}>5. TERMINACIÓN ➔ FAENA</div>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 370 kg</div>
+                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Venta a Frigorífico</div>
+              </div>
+            </div>
+
+            {/* Historial Desplegable */}
+            {mostrarHistorialTraspasos && (
+              <div style={{ marginTop: "14px", borderTop: "1px solid var(--line)", paddingTop: "14px" }}>
+                <h4 style={{ fontSize: "13.5px", margin: "0 0 8px 0", fontWeight: 700, color: "var(--slate-800)" }}>
+                  Últimos Traspasos Automáticos Registrados ({traspasosCorrales.length})
+                </h4>
+                {traspasosCorrales.length === 0 ? (
+                  <div style={{ padding: "12px", color: "var(--slate-500)", fontSize: "12px" }}>
+                    No hay traspasos registrados aún.
+                  </div>
+                ) : (
+                  <div className="tableWrap" style={{ maxHeight: "220px", overflowY: "auto" }}>
+                    <table className="dataTable">
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>Animal (Caravana / RP)</th>
+                          <th>Traspaso</th>
+                          <th style={{ textAlign: "right" }}>Peso al Traspaso</th>
+                          <th>Motivo / Regla</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {traspasosCorrales.map((tr) => (
+                          <tr key={tr.id}>
+                            <td>{tr.fecha}</td>
+                            <td>
+                              <strong style={{ fontFamily: "monospace" }}>{tr.rpAnimal}</strong>
+                            </td>
+                            <td>
+                              <span className="pill badgeSlate" style={{ textTransform: "uppercase", fontSize: "11px" }}>
+                                {tr.corralOrigen} ➔ {tr.corralDestino}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <strong>{tr.pesoAlTraspaso} kg</strong>
+                            </td>
+                            <td style={{ fontSize: "12px", color: "var(--slate-600)" }}>{tr.motivo}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ========================================================================= */}
+          {/* TABLA DE TRAZABILIDAD INDIVIDUAL Y CENSO DE TERNEROS POR CARAVANA / RP     */}
+          {/* ========================================================================= */}
+          {(() => {
+            const animalesFiltrados = animalesRecria.filter((a) => {
+              const cumpleCorral =
+                filtroRecriaCorral === "todos"
+                  ? true
+                  : filtroRecriaCorral === "faena"
+                  ? a.listoFaena
+                  : a.corralId === filtroRecriaCorral;
+              const cumpleRP = filtroRecriaBusqueda.trim() === "" || a.rp.toLowerCase().includes(filtroRecriaBusqueda.toLowerCase());
+              return cumpleCorral && cumpleRP;
+            });
+
+            const porPagina = 15;
+            const totalPaginas = Math.ceil(animalesFiltrados.length / porPagina) || 1;
+            const paginaValida = Math.min(paginaRecria, totalPaginas);
+            const animalesPaginados = animalesFiltrados.slice((paginaValida - 1) * porPagina, paginaValida * porPagina);
+
+            const countGuachera = animalesRecria.filter((a) => a.corralId === "guachera").length;
+            const countRm1 = animalesRecria.filter((a) => a.corralId === "rm1").length;
+            const countRm2 = animalesRecria.filter((a) => a.corralId === "rm2").length;
+            const countRm3 = animalesRecria.filter((a) => a.corralId === "rm3").length;
+            const countTerminacion = animalesRecria.filter((a) => a.corralId === "terminacion").length;
+            const countFaena = animalesRecria.filter((a) => a.listoFaena).length;
+
+            return (
+              <div
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid var(--line)",
+                  borderRadius: "12px",
+                  padding: "18px 20px",
+                  boxShadow: "var(--shadow-sm)",
+                }}
+              >
+                {/* Header y Filtros */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "16px",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <h3 style={{ fontSize: "16px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span>🏷️</span>
+                      <span>Trazabilidad Individual de Animales por Caravana / RP ({animalesRecria.length} cabezas)</span>
+                    </h3>
+                    <p className="muted" style={{ fontSize: "12px", margin: "2px 0 0 0" }}>
+                      Registro individual por caravana, corral asignado, peso actual, ganancia diaria y alertas de traspaso.
+                    </p>
+                  </div>
+
+                  {/* Buscador de RP */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <input
+                      type="text"
+                      placeholder="🔍 Buscar RP (ej: RP-8750)..."
+                      value={filtroRecriaBusqueda}
+                      onChange={(e) => {
+                        setFiltroRecriaBusqueda(e.target.value);
+                        setPaginaRecria(1);
+                      }}
+                      style={{
+                        padding: "6px 12px",
+                        fontSize: "12.5px",
+                        borderRadius: "6px",
+                        border: "1px solid var(--line)",
+                        width: "220px",
+                      }}
+                    />
+                    {filtroRecriaBusqueda && (
+                      <button
+                        type="button"
+                        className="ghostButton"
+                        onClick={() => setFiltroRecriaBusqueda("")}
+                        style={{ padding: "6px 10px", fontSize: "12px" }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Filtros por Corral */}
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "14px" }}>
+                  <button
+                    type="button"
+                    onClick={() => { setFiltroRecriaCorral("todos"); setPaginaRecria(1); }}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: filtroRecriaCorral === "todos" ? "#0f172a" : "#f1f5f9",
+                      color: filtroRecriaCorral === "todos" ? "#ffffff" : "#475569",
+                    }}
+                  >
+                    Todos ({animalesRecria.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setFiltroRecriaCorral("guachera"); setPaginaRecria(1); }}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: filtroRecriaCorral === "guachera" ? "#0284c7" : "#f1f5f9",
+                      color: filtroRecriaCorral === "guachera" ? "#ffffff" : "#475569",
+                    }}
+                  >
+                    🍼 Guachera ({countGuachera})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setFiltroRecriaCorral("rm1"); setPaginaRecria(1); }}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: filtroRecriaCorral === "rm1" ? "#16a34a" : "#f1f5f9",
+                      color: filtroRecriaCorral === "rm1" ? "#ffffff" : "#475569",
+                    }}
+                  >
+                    🌱 RM1 ({countRm1})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setFiltroRecriaCorral("rm2"); setPaginaRecria(1); }}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: filtroRecriaCorral === "rm2" ? "#d97706" : "#f1f5f9",
+                      color: filtroRecriaCorral === "rm2" ? "#ffffff" : "#475569",
+                    }}
+                  >
+                    🌿 RM2 ({countRm2})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setFiltroRecriaCorral("rm3"); setPaginaRecria(1); }}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: filtroRecriaCorral === "rm3" ? "#7c3aed" : "#f1f5f9",
+                      color: filtroRecriaCorral === "rm3" ? "#ffffff" : "#475569",
+                    }}
+                  >
+                    🌾 RM3 ({countRm3})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setFiltroRecriaCorral("terminacion"); setPaginaRecria(1); }}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: filtroRecriaCorral === "terminacion" ? "#dc2626" : "#f1f5f9",
+                      color: filtroRecriaCorral === "terminacion" ? "#ffffff" : "#475569",
+                    }}
+                  >
+                    🥩 Terminación ({countTerminacion})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setFiltroRecriaCorral("faena"); setPaginaRecria(1); }}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: filtroRecriaCorral === "faena" ? "#15803d" : "#f1f5f9",
+                      color: filtroRecriaCorral === "faena" ? "#ffffff" : "#475569",
+                    }}
+                  >
+                    🎯 Listos p/ Faena ({countFaena})
+                  </button>
+                </div>
+
+                {/* Tabla de Animales */}
+                <div className="tableWrap">
+                  <table className="dataTable">
+                    <thead>
+                      <tr>
+                        <th>Caravana / RP</th>
+                        <th>Corral Actual</th>
+                        <th style={{ textAlign: "right" }}>Peso Actual</th>
+                        <th style={{ textAlign: "right" }}>Ganancia (GDPV)</th>
+                        <th style={{ textAlign: "right" }}>Días en Corral</th>
+                        <th>Fecha Ingreso</th>
+                        <th>Estado / Próximo Traspaso</th>
+                        <th style={{ textAlign: "center" }}>Traspaso Manual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {animalesPaginados.map((a) => {
+                        const corralObj = corrales.find((c) => c.id === a.corralId);
+                        const superaCorte =
+                          (a.corralId === "guachera" && (a.pesoActualKg >= 80 || a.diasEnCorral >= 60)) ||
+                          (a.corralId === "rm1" && a.pesoActualKg >= 120) ||
+                          (a.corralId === "rm2" && a.pesoActualKg >= 170) ||
+                          (a.corralId === "rm3" && a.pesoActualKg >= 270) ||
+                          (a.corralId === "terminacion" && a.pesoActualKg >= 370);
+
+                        return (
+                          <tr key={a.rp}>
+                            <td>
+                              <strong style={{ fontFamily: "monospace", fontSize: "13.5px" }}>{a.rp}</strong>
+                              <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{a.origen}</div>
+                            </td>
+                            <td>
+                              <span
+                                className="pill"
+                                style={{
+                                  background: "#f1f5f9",
+                                  color: corralObj?.color || "#0f172a",
+                                  fontWeight: 700,
+                                  fontSize: "11.5px",
+                                }}
+                              >
+                                {corralObj?.icono} {corralObj?.nombreCorto || a.corralId.toUpperCase()}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <strong style={{ fontSize: "13.5px", color: "#0f172a" }}>{a.pesoActualKg} kg</strong>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <span className="pill badgeGreen">+{a.gdpvKgDia} kg/d</span>
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <strong>{a.diasEnCorral} d</strong>
+                            </td>
+                            <td style={{ fontSize: "12px" }}>{a.fechaIngresoCorral}</td>
+                            <td>
+                              {a.listoFaena ? (
+                                <span className="pill badgeGreen" style={{ fontWeight: 800 }}>🥩 Listo Faena (≥370 kg)</span>
+                              ) : superaCorte ? (
+                                <span className="pill badgeAmber" style={{ fontWeight: 700 }}>⚡ Cumple corte de traspaso</span>
+                              ) : (
+                                <span className="pill badgeSlate" style={{ fontSize: "11.5px" }}>
+                                  Meta: {corralObj?.pesoObjetivoKg} kg ({Math.max(0, Math.round((corralObj?.pesoObjetivoKg || 0) - a.pesoActualKg))} kg faltantes)
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ textAlign: "center" }}>
+                              <select
+                                defaultValue=""
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleTraspasarAnimalManual(a.rp, e.target.value as EtapaCorralId);
+                                  }
+                                }}
+                                style={{
+                                  padding: "3px 8px",
+                                  fontSize: "11.5px",
+                                  borderRadius: "5px",
+                                  border: "1px solid var(--line)",
+                                  cursor: "pointer",
+                                  background: "#f8fafc",
+                                }}
+                              >
+                                <option value="" disabled>Mover a...</option>
+                                {corrales.filter((c) => c.id !== a.corralId).map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.icono} {c.nombreCorto}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Paginación */}
+                {totalPaginas > 1 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginTop: "14px",
+                      paddingTop: "12px",
+                      borderTop: "1px solid var(--line)",
+                      fontSize: "12.5px",
+                      color: "var(--slate-600)",
+                    }}
+                  >
+                    <span>
+                      Mostrando {animalesPaginados.length} de {animalesFiltrados.length} animales (Página {paginaValida} de {totalPaginas})
+                    </span>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        type="button"
+                        className="ghostButton"
+                        disabled={paginaValida <= 1}
+                        onClick={() => setPaginaRecria((p) => Math.max(1, p - 1))}
+                        style={{ padding: "4px 10px", fontSize: "12px" }}
+                      >
+                        ◀ Anterior
+                      </button>
+                      <button
+                        type="button"
+                        className="ghostButton"
+                        disabled={paginaValida >= totalPaginas}
+                        onClick={() => setPaginaRecria((p) => Math.min(totalPaginas, p + 1))}
+                        style={{ padding: "4px 10px", fontSize: "12px" }}
+                      >
+                        Siguiente ▶
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1591,6 +2143,133 @@ export default function GanaderiaPage() {
                   </div>
                 )}
               </div>
+
+              {/* 5. ANIMALES INDIVIDUALES EN ESTE CORRAL POR CARAVANA / RP */}
+              {(() => {
+                const animalesCorral = animalesRecria.filter((a) => a.corralId === corralModalSeleccionado.id);
+                const animalesFiltrados = busquedaAnimalModal.trim()
+                  ? animalesCorral.filter((a) => a.rp.toLowerCase().includes(busquedaAnimalModal.toLowerCase()))
+                  : animalesCorral;
+
+                return (
+                  <div style={{ background: "#ffffff", border: "1px solid var(--line)", borderRadius: "10px", padding: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+                      <div>
+                        <h3 style={{ fontSize: "14.5px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>🏷️</span>
+                          <span>Animales Individuales en este Corral por Caravana / RP ({animalesCorral.length} cab.)</span>
+                        </h3>
+                        <p className="muted" style={{ fontSize: "12px", margin: "2px 0 0 0" }}>
+                          Identificación unívoca extraída de DeLaval DelPro y seguimiento individual de ganancia diaria.
+                        </p>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <input
+                          type="text"
+                          placeholder="Buscar RP (ej: RP-8750)..."
+                          value={busquedaAnimalModal}
+                          onChange={(e) => setBusquedaAnimalModal(e.target.value)}
+                          style={{
+                            padding: "5px 10px",
+                            fontSize: "12px",
+                            borderRadius: "6px",
+                            border: "1px solid var(--line)",
+                            width: "180px",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {animalesFiltrados.length === 0 ? (
+                      <div style={{ padding: "18px", textAlign: "center", color: "var(--slate-500)", background: "#f8fafc", borderRadius: "8px", fontSize: "13px" }}>
+                        {animalesCorral.length === 0 ? "No hay terneros individuales en este corral actualmente." : "No se encontraron animales con el RP buscado."}
+                      </div>
+                    ) : (
+                      <div className="tableWrap" style={{ maxHeight: "300px", overflowY: "auto" }}>
+                        <table className="dataTable">
+                          <thead>
+                            <tr>
+                              <th>Caravana / RP</th>
+                              <th style={{ textAlign: "right" }}>Peso Actual</th>
+                              <th style={{ textAlign: "right" }}>Ganancia (GDPV)</th>
+                              <th style={{ textAlign: "right" }}>Días en Corral</th>
+                              <th>Fecha Ingreso</th>
+                              <th>Condición / Traspaso</th>
+                              <th style={{ textAlign: "center" }}>Traspasar</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {animalesFiltrados.map((a) => {
+                              const superaCorte =
+                                (a.corralId === "guachera" && (a.pesoActualKg >= 80 || a.diasEnCorral >= 60)) ||
+                                (a.corralId === "rm1" && a.pesoActualKg >= 120) ||
+                                (a.corralId === "rm2" && a.pesoActualKg >= 170) ||
+                                (a.corralId === "rm3" && a.pesoActualKg >= 270) ||
+                                (a.corralId === "terminacion" && a.pesoActualKg >= 370);
+
+                              return (
+                                <tr key={a.rp}>
+                                  <td>
+                                    <strong style={{ fontFamily: "monospace", fontSize: "13px" }}>{a.rp}</strong>
+                                    <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{a.origen}</div>
+                                  </td>
+                                  <td style={{ textAlign: "right" }}>
+                                    <strong style={{ fontSize: "13px", color: "#0f172a" }}>{a.pesoActualKg} kg</strong>
+                                  </td>
+                                  <td style={{ textAlign: "right" }}>
+                                    <span className="pill badgeGreen">+{a.gdpvKgDia} kg/d</span>
+                                  </td>
+                                  <td style={{ textAlign: "right" }}>
+                                    <strong>{a.diasEnCorral} d</strong>
+                                  </td>
+                                  <td style={{ fontSize: "12px" }}>{a.fechaIngresoCorral}</td>
+                                  <td>
+                                    {a.listoFaena ? (
+                                      <span className="pill badgeGreen" style={{ fontWeight: 800 }}>🥩 Listo Faena (≥370 kg)</span>
+                                    ) : superaCorte ? (
+                                      <span className="pill badgeAmber" style={{ fontWeight: 700 }}>⚡ Cumple corte de traspaso</span>
+                                    ) : (
+                                      <span className="pill badgeSlate" style={{ fontSize: "11.5px" }}>
+                                        Faltan {Math.max(0, Math.round(corralModalSeleccionado.pesoObjetivoKg - a.pesoActualKg))} kg
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td style={{ textAlign: "center" }}>
+                                    <select
+                                      defaultValue=""
+                                      onChange={(e) => {
+                                        if (e.target.value) {
+                                          handleTraspasarAnimalManual(a.rp, e.target.value as EtapaCorralId);
+                                        }
+                                      }}
+                                      style={{
+                                        padding: "3px 6px",
+                                        fontSize: "11px",
+                                        borderRadius: "5px",
+                                        border: "1px solid var(--line)",
+                                        cursor: "pointer",
+                                        background: "#f8fafc",
+                                      }}
+                                    >
+                                      <option value="" disabled>Mover a...</option>
+                                      {corrales.filter((c) => c.id !== a.corralId).map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                          {c.icono} {c.nombreCorto}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Footer del Modal */}

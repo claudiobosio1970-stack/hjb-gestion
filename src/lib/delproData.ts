@@ -28,6 +28,48 @@ export interface PartoDelPro {
   observaciones?: string;
 }
 
+export interface VacaTamboIndividual {
+  rp: string;
+  estadoProductivo: "En Ordeñe" | "Seca";
+  estadoReproductivo: "Preñada" | "Vacía" | "Inseminada";
+  diasLactancia: number; // DEL
+  diasGestacion?: number;
+  fechaProbableParto?: string;
+  litrosAyer: number;
+}
+
+export interface CensoRodeoTambo {
+  totalVacasAdultas: number;
+  vacasEnOrdenie: number;
+  vacasSecas: number;
+  vacasPreniadas: number;
+  vacasVacias: number;
+  vaquillonasReposicion: number;
+  vaquillonasPreniadas: number;
+  detalleVacas?: VacaTamboIndividual[];
+}
+
+export interface AnimalRecriaIndividual {
+  rp: string;
+  corralId: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
+  pesoActualKg: number;
+  diasEnCorral: number;
+  fechaIngresoCorral: string;
+  gdpvKgDia: number;
+  origen: string;
+  listoFaena?: boolean;
+}
+
+export interface TraspasoCorralRegistro {
+  id: string;
+  fecha: string;
+  rpAnimal: string;
+  corralOrigen: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
+  corralDestino: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
+  pesoAlTraspaso: number;
+  motivo: string;
+}
+
 export interface DelProSyncPayload {
   fechaSincronizacion: string;
   litrosTotalesDia: number; // Litros totales medidos por caudalímetros DelPro / tanque
@@ -51,6 +93,9 @@ export interface DelProSyncPayload {
     terminacion: number;
   };
   hembrasEnReposicionTambo?: number; // Vaquillonas y terneras que van exclusivamente al Tambo
+  censoRodeoTambo?: CensoRodeoTambo;
+  animalesRecria?: AnimalRecriaIndividual[];
+  traspasosAutomaticos?: TraspasoCorralRegistro[];
 }
 
 export interface DelProConfig {
@@ -65,7 +110,125 @@ export interface DelProConfig {
 }
 
 const STORAGE_DELPRO_CONFIG = "hjb_delpro_integration_config_v01";
+const STORAGE_ANIMALES_RECRIA = "hjb_delpro_animales_recria_v01";
+const STORAGE_TRASPASOS_CORRALES = "hjb_delpro_traspasos_corrales_v01";
 export const HJB_DELPRO_SYNC_EVENT = "hjb_delpro_sync_event";
+
+export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
+  const vacas: VacaTamboIndividual[] = [];
+  // 187 vacas en lactancia activa (VO)
+  for (let i = 1; i <= 187; i++) {
+    const rpNum = 3000 + i * 7;
+    const del = 30 + ((i * 17) % 270);
+    const isPreniada = (i % 4 !== 0); // 75% preñadas
+    const diasGest = isPreniada ? 40 + ((i * 23) % 220) : undefined;
+    const lts = Number((22.0 + ((i * 13) % 150) / 10).toFixed(1));
+    const fechaPartoProb = diasGest
+      ? new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR")
+      : undefined;
+
+    vacas.push({
+      rp: `RP-${rpNum}`,
+      estadoProductivo: "En Ordeñe",
+      estadoReproductivo: isPreniada ? "Preñada" : (i % 2 === 0 ? "Inseminada" : "Vacía"),
+      diasLactancia: del,
+      diasGestacion: diasGest,
+      fechaProbableParto: fechaPartoProb,
+      litrosAyer: lts,
+    });
+  }
+  // 25 vacas secas preparto
+  for (let i = 1; i <= 25; i++) {
+    const rpNum = 4400 + i * 5;
+    const diasGest = 220 + (i * 2);
+    const fechaPartoProb = new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR");
+
+    vacas.push({
+      rp: `RP-${rpNum}`,
+      estadoProductivo: "Seca",
+      estadoReproductivo: "Preñada",
+      diasLactancia: 0,
+      diasGestacion: diasGest,
+      fechaProbableParto: fechaPartoProb,
+      litrosAyer: 0,
+    });
+  }
+  return vacas;
+}
+
+export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
+  const animales: AnimalRecriaIndividual[] = [];
+  // Guachera: 24 animales (38 a 79 kg)
+  for (let i = 1; i <= 24; i++) {
+    const peso = Number((42.0 + (i * 1.5)).toFixed(1));
+    animales.push({
+      rp: `RP-${8800 + i}`,
+      corralId: "guachera",
+      pesoActualKg: peso,
+      diasEnCorral: 10 + i * 2,
+      fechaIngresoCorral: new Date(Date.now() - (10 + i * 2) * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: 0.62,
+      origen: "Nacimiento Tambo HJB",
+    });
+  }
+  // RM1: 22 animales (80 a 119 kg)
+  for (let i = 1; i <= 22; i++) {
+    const peso = Number((82.0 + (i * 1.7)).toFixed(1));
+    animales.push({
+      rp: `RP-${8750 + i}`,
+      corralId: "rm1",
+      pesoActualKg: peso,
+      diasEnCorral: 12 + i * 2,
+      fechaIngresoCorral: new Date(Date.now() - (12 + i * 2) * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: 1.29,
+      origen: "Pase desde Guachera",
+    });
+  }
+  // RM2: 28 animales (120 a 169 kg)
+  for (let i = 1; i <= 28; i++) {
+    const peso = Number((122.0 + (i * 1.65)).toFixed(1));
+    animales.push({
+      rp: `RP-${8700 + i}`,
+      corralId: "rm2",
+      pesoActualKg: peso,
+      diasEnCorral: 15 + i * 2,
+      fechaIngresoCorral: new Date(Date.now() - (15 + i * 2) * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: 0.93,
+      origen: "Pase desde RM1",
+    });
+  }
+  // RM3: 30 animales (170 a 269 kg)
+  for (let i = 1; i <= 30; i++) {
+    const peso = Number((172.0 + (i * 3.2)).toFixed(1));
+    animales.push({
+      rp: `RP-${8650 + i}`,
+      corralId: "rm3",
+      pesoActualKg: peso,
+      diasEnCorral: 20 + i * 3,
+      fechaIngresoCorral: new Date(Date.now() - (20 + i * 3) * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: 0.83,
+      origen: "Pase desde RM2",
+    });
+  }
+  // Terminación: 26 animales (270 a 415 kg)
+  for (let i = 1; i <= 26; i++) {
+    const peso = Number((280.0 + (i * 5.0)).toFixed(1));
+    animales.push({
+      rp: `RP-${8600 + i}`,
+      corralId: "terminacion",
+      pesoActualKg: peso,
+      diasEnCorral: 15 + i * 2,
+      fechaIngresoCorral: new Date(Date.now() - (15 + i * 2) * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: 1.49,
+      origen: "Pase desde RM3",
+      listoFaena: peso >= 370,
+    });
+  }
+  return animales;
+}
+
+const defaultVacas = generateDefaultVacasTambo();
+const defaultAnimales = generateDefaultAnimalesRecria();
 
 // Datos por defecto mientras se completa la vinculación con DelPro
 export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
@@ -98,6 +261,46 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       rm3: 30,
       terminacion: 26, // Solo machos van a venta comercial / faena
     },
+    censoRodeoTambo: {
+      totalVacasAdultas: 212,
+      vacasEnOrdenie: 187,
+      vacasSecas: 25,
+      vacasPreniadas: 142,
+      vacasVacias: 45,
+      vaquillonasReposicion: 48,
+      vaquillonasPreniadas: 22,
+      detalleVacas: defaultVacas,
+    },
+    animalesRecria: defaultAnimales,
+    traspasosAutomaticos: [
+      {
+        id: "tr-hist-1",
+        fecha: "18/09/26",
+        rpAnimal: "RP-8749",
+        corralOrigen: "rm1",
+        corralDestino: "rm2",
+        pesoAlTraspaso: 121.5,
+        motivo: "Alcanzó 121.5 kg (Corte 120 kg RM1 -> RM2)",
+      },
+      {
+        id: "tr-hist-2",
+        fecha: "15/09/26",
+        rpAnimal: "RP-8699",
+        corralOrigen: "rm2",
+        corralDestino: "rm3",
+        pesoAlTraspaso: 172.0,
+        motivo: "Alcanzó 172.0 kg (Corte 170 kg RM2 -> RM3)",
+      },
+      {
+        id: "tr-hist-3",
+        fecha: "10/09/26",
+        rpAnimal: "RP-8649",
+        corralOrigen: "rm3",
+        corralDestino: "terminacion",
+        pesoAlTraspaso: 274.0,
+        motivo: "Alcanzó 274.0 kg (Corte 270 kg RM3 -> Terminación)",
+      },
+    ],
     partosRecientes: [
       {
         id: "p-26-0901",
@@ -148,11 +351,145 @@ export function getDelProConfig(): DelProConfig {
       datosSincronizados: {
         ...DELPRO_CONFIG_DEFAULT.datosSincronizados,
         ...(parsed.datosSincronizados || {}),
+        censoRodeoTambo: parsed.datosSincronizados?.censoRodeoTambo || DELPRO_CONFIG_DEFAULT.datosSincronizados.censoRodeoTambo,
+        animalesRecria: parsed.datosSincronizados?.animalesRecria || DELPRO_CONFIG_DEFAULT.datosSincronizados.animalesRecria,
+        traspasosAutomaticos: parsed.datosSincronizados?.traspasosAutomaticos || DELPRO_CONFIG_DEFAULT.datosSincronizados.traspasosAutomaticos,
       },
     };
   } catch {
     return DELPRO_CONFIG_DEFAULT;
   }
+}
+
+export function getAnimalesRecria(): AnimalRecriaIndividual[] {
+  if (typeof window === "undefined") return defaultAnimales;
+  try {
+    const raw = localStorage.getItem(STORAGE_ANIMALES_RECRIA);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return getDelProConfig().datosSincronizados.animalesRecria || defaultAnimales;
+}
+
+export function saveAnimalesRecria(animales: AnimalRecriaIndividual[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_ANIMALES_RECRIA, JSON.stringify(animales));
+}
+
+export function getTraspasosCorrales(): TraspasoCorralRegistro[] {
+  if (typeof window === "undefined") return DELPRO_CONFIG_DEFAULT.datosSincronizados.traspasosAutomaticos || [];
+  try {
+    const raw = localStorage.getItem(STORAGE_TRASPASOS_CORRALES);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return getDelProConfig().datosSincronizados.traspasosAutomaticos || [];
+}
+
+export function saveTraspasosCorrales(traspasos: TraspasoCorralRegistro[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_TRASPASOS_CORRALES, JSON.stringify(traspasos));
+}
+
+export function getCensoRodeoTambo(): CensoRodeoTambo {
+  const config = getDelProConfig();
+  if (config.datosSincronizados.censoRodeoTambo) {
+    return config.datosSincronizados.censoRodeoTambo;
+  }
+  return {
+    totalVacasAdultas: 212,
+    vacasEnOrdenie: config.datosSincronizados.vacasEnOrdeñe,
+    vacasSecas: config.datosSincronizados.vacasSecasPreparto || 25,
+    vacasPreniadas: 142,
+    vacasVacias: 45,
+    vaquillonasReposicion: config.datosSincronizados.hembrasEnReposicionTambo || 48,
+    vaquillonasPreniadas: 22,
+    detalleVacas: defaultVacas,
+  };
+}
+
+/**
+ * Motor de Traspasos Automáticos entre Corrales de Recría según peso y días (Escala HJB)
+ */
+export function evaluarYEjecutarTraspasosAutomaticos(
+  animalesActuales: AnimalRecriaIndividual[]
+): {
+  animalesActualizados: AnimalRecriaIndividual[];
+  traspasosRealizados: TraspasoCorralRegistro[];
+  resumenPorCorral: { guachera: number; rm1: number; rm2: number; rm3: number; terminacion: number };
+} {
+  const hoy = new Date().toLocaleDateString("es-AR");
+  const traspasos: TraspasoCorralRegistro[] = [];
+  const actualizados: AnimalRecriaIndividual[] = [];
+
+  for (const a of animalesActuales) {
+    let nuevoCorral: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion" = a.corralId;
+    let motivo = "";
+
+    // 1. Guachera -> RM1: corte 80 kg o 60 días
+    if (a.corralId === "guachera" && (a.pesoActualKg >= 80 || a.diasEnCorral >= 60)) {
+      nuevoCorral = "rm1";
+      motivo = `Alcanzó ${a.pesoActualKg} kg / desleche (Corte 80 kg Guachera -> RM1)`;
+    }
+    // 2. RM1 -> RM2: corte 120 kg
+    else if (a.corralId === "rm1" && a.pesoActualKg >= 120) {
+      nuevoCorral = "rm2";
+      motivo = `Alcanzó ${a.pesoActualKg} kg (Corte 120 kg RM1 -> RM2)`;
+    }
+    // 3. RM2 -> RM3: corte 170 kg
+    else if (a.corralId === "rm2" && a.pesoActualKg >= 170) {
+      nuevoCorral = "rm3";
+      motivo = `Alcanzó ${a.pesoActualKg} kg (Corte 170 kg RM2 -> RM3)`;
+    }
+    // 4. RM3 -> Terminación: corte 270 kg
+    else if (a.corralId === "rm3" && a.pesoActualKg >= 270) {
+      nuevoCorral = "terminacion";
+      motivo = `Alcanzó ${a.pesoActualKg} kg (Corte 270 kg RM3 -> Terminación)`;
+    }
+
+    if (nuevoCorral !== a.corralId) {
+      traspasos.push({
+        id: `tr-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        fecha: hoy,
+        rpAnimal: a.rp,
+        corralOrigen: a.corralId,
+        corralDestino: nuevoCorral,
+        pesoAlTraspaso: a.pesoActualKg,
+        motivo,
+      });
+
+      actualizados.push({
+        ...a,
+        corralId: nuevoCorral,
+        diasEnCorral: 0,
+        fechaIngresoCorral: hoy,
+        listoFaena: nuevoCorral === "terminacion" && a.pesoActualKg >= 370,
+      });
+    } else {
+      actualizados.push({
+        ...a,
+        listoFaena: a.corralId === "terminacion" && a.pesoActualKg >= 370,
+      });
+    }
+  }
+
+  const resumen = {
+    guachera: actualizados.filter((x) => x.corralId === "guachera").length,
+    rm1: actualizados.filter((x) => x.corralId === "rm1").length,
+    rm2: actualizados.filter((x) => x.corralId === "rm2").length,
+    rm3: actualizados.filter((x) => x.corralId === "rm3").length,
+    terminacion: actualizados.filter((x) => x.corralId === "terminacion").length,
+  };
+
+  return {
+    animalesActualizados: actualizados,
+    traspasosRealizados: traspasos,
+    resumenPorCorral: resumen,
+  };
 }
 
 let isDelProFirestoreSyncInitialized = false;
@@ -183,6 +520,9 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
           vacasEnOrdeñe: Number(data.vacasEnOrdeñe ?? payload?.vacasEnOrdeñe ?? current.datosSincronizados.vacasEnOrdeñe),
           litrosPromedioVO: Number(data.litrosPromedioVO ?? payload?.litrosPromedioVO ?? current.datosSincronizados.litrosPromedioVO),
           fechaSincronizacion: data.fechaSincronizacion || current.ultimaSincronizacion || new Date().toISOString(),
+          censoRodeoTambo: payload?.censoRodeoTambo || current.datosSincronizados.censoRodeoTambo,
+          animalesRecria: payload?.animalesRecria || current.datosSincronizados.animalesRecria,
+          traspasosAutomaticos: payload?.traspasosAutomaticos || current.datosSincronizados.traspasosAutomaticos,
         };
 
         const updatedConfig = propagarDatosDelProATodoElSistema(payloadData, {
@@ -292,13 +632,29 @@ export function propagarDatosDelProATodoElSistema(
     actualizadoPor: "DeLaval DelPro (Sincronización Automática)",
   });
 
-  // 2. Sincronizar Módulo Ganadería (Machos a recría, hembras a reposición tambo)
+  // 2. Procesar animales de recría y ejecutar traspasos automáticos si corresponde
+  let animalesActuales = mergedDatos.animalesRecria || getAnimalesRecria();
+  const resultadoTraspasos = evaluarYEjecutarTraspasosAutomaticos(animalesActuales);
+  saveAnimalesRecria(resultadoTraspasos.animalesActualizados);
+
+  if (resultadoTraspasos.traspasosRealizados.length > 0) {
+    const historialActual = getTraspasosCorrales();
+    const nuevoHistorial = [...resultadoTraspasos.traspasosRealizados, ...historialActual].slice(0, 50);
+    saveTraspasosCorrales(nuevoHistorial);
+    mergedDatos.traspasosAutomaticos = nuevoHistorial;
+  } else if (!mergedDatos.traspasosAutomaticos) {
+    mergedDatos.traspasosAutomaticos = getTraspasosCorrales();
+  }
+  mergedDatos.animalesRecria = resultadoTraspasos.animalesActualizados;
+  mergedDatos.machosEnRecriaEngorde = resultadoTraspasos.resumenPorCorral;
+
+  // 3. Sincronizar Módulo Ganadería (Machos a recría, hembras a reposición tambo)
   sincronizarGanaderiaDesdeDelPro(
     mergedDatos.machosEnRecriaEngorde,
     mergedDatos.partosRecientes
   );
 
-  // 3. Guardar estado y configuración DelPro
+  // 4. Guardar estado y configuración DelPro
   const updatedConfig = saveDelProConfig({
     estadoConexion: metadatos?.estadoConexion || "conectado",
     tipoConexion: "sql_server",
@@ -338,6 +694,9 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
       hembrasEnReposicionTambo: parsed.hembrasEnReposicionTambo,
       machosEnRecriaEngorde: parsed.machosEnRecriaEngorde,
       partosRecientes: Array.isArray(parsed.partosRecientes) ? parsed.partosRecientes : [],
+      censoRodeoTambo: parsed.censoRodeoTambo,
+      animalesRecria: parsed.animalesRecria,
+      traspasosAutomaticos: parsed.traspasosAutomaticos,
     };
 
     const host = parsed.servidorHost || parsed.origenExtraccion || "SQL Server Local";
@@ -389,4 +748,27 @@ SELECT TOP 20
 FROM Calving c WITH (NOLOCK)
 JOIN Animal m WITH (NOLOCK) ON c.MotherAnimalOID = m.OID
 LEFT JOIN Animal k WITH (NOLOCK) ON c.CalfAnimalOID = k.OID
-ORDER BY c.EventDate DESC;`;
+ORDER BY c.EventDate DESC;
+
+-- 3. CENSO DEL RODEO Y ESTADO REPRODUCTIVO INDIVIDUAL (RP / CARAVANA)
+SELECT 
+    a.VisualID AS RP,
+    CASE WHEN a.LactationStatus = 1 THEN 'En Ordeñe' ELSE 'Seca' END AS EstadoProductivo,
+    CASE WHEN a.Pregnant = 1 THEN 'Preñada' ELSE 'Vacía' END AS EstadoReproductivo,
+    ISNULL(DATEDIFF(day, c.EventDate, GETDATE()), 120) AS DiasLactancia,
+    ROUND(ISNULL(y.TotalYield, 27.0), 1) AS LitrosAyer
+FROM Animal a WITH (NOLOCK)
+LEFT JOIN (SELECT MotherAnimalOID, MAX(EventDate) AS EventDate FROM Calving WITH (NOLOCK) GROUP BY MotherAnimalOID) c ON c.MotherAnimalOID = a.OID
+LEFT JOIN (SELECT AnimalOID, TotalYield FROM DailyMilkYield WITH (NOLOCK) WHERE YieldDate >= CAST(DATEADD(day, -2, GETDATE()) AS DATE)) y ON y.AnimalOID = a.OID
+WHERE a.Sex = 2 AND a.VisualID IS NOT NULL
+ORDER BY a.VisualID;
+
+-- 4. TERNEROS EN RECRÍA Y ENGORDE (INDIVIDUAL POR CARAVANA / RP)
+SELECT 
+    a.VisualID AS RP,
+    ISNULL(w.Weight, 120.0) AS PesoActualKg,
+    DATEDIFF(day, a.BirthDate, GETDATE()) AS DiasVida
+FROM Animal a WITH (NOLOCK)
+LEFT JOIN (SELECT AnimalOID, MAX(Weight) AS Weight FROM WeightEvent WITH (NOLOCK) GROUP BY AnimalOID) w ON w.AnimalOID = a.OID
+WHERE a.Sex = 1 AND a.VisualID IS NOT NULL
+ORDER BY a.VisualID;`;

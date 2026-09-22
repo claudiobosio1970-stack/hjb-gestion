@@ -82,7 +82,116 @@ function Send-ToFirestoreCloud($payloadObject, [string]$jsonString) {
     }
 }
 
-# 4. MODO SIMULACION / PRUEBA LOCAL (SI NO HAY SQL SERVER EN ESTA MAQUINA)
+# 4. Funciones Generadoras de Rodeo y Trazabilidad Individual HJB
+function New-DefaultVacasTambo() {
+    $vacas = @()
+    for ($i = 1; $i -le 187; $i++) {
+        $rpNum = 3000 + ($i * 7)
+        $del = 30 + (($i * 17) % 270)
+        $isPren = ($i % 4 -ne 0)
+        $diasGest = $null
+        $fParto = $null
+        if ($isPren) {
+            $diasGest = 40 + (($i * 23) % 220)
+            $fParto = (Get-Date).AddDays(282 - $diasGest).ToString("dd/MM/yy")
+        }
+        $lts = [math]::Round(22.0 + (($i * 13) % 150) / 10, 1)
+        $estRep = if ($isPren) { "Preñada" } elseif ($i % 2 -eq 0) { "Inseminada" } else { "Vacía" }
+
+        $vacas += [ordered]@{
+            "rp" = ("RP-" + $rpNum)
+            "estadoProductivo" = "En Ordeñe"
+            "estadoReproductivo" = $estRep
+            "diasLactancia" = $del
+            "diasGestacion" = $diasGest
+            "fechaProbableParto" = $fParto
+            "litrosAyer" = $lts
+        }
+    }
+    for ($i = 1; $i -le 25; $i++) {
+        $rpNum = 4400 + ($i * 5)
+        $diasGest = 220 + ($i * 2)
+        $fParto = (Get-Date).AddDays(282 - $diasGest).ToString("dd/MM/yy")
+        $vacas += [ordered]@{
+            "rp" = ("RP-" + $rpNum)
+            "estadoProductivo" = "Seca"
+            "estadoReproductivo" = "Preñada"
+            "diasLactancia" = 0
+            "diasGestacion" = $diasGest
+            "fechaProbableParto" = $fParto
+            "litrosAyer" = 0.0
+        }
+    }
+    return $vacas
+}
+
+function New-DefaultAnimalesRecria() {
+    $animales = @()
+    for ($i = 1; $i -le 24; $i++) {
+        $animales += [ordered]@{
+            "rp" = ("RP-" + (8800 + $i))
+            "corralId" = "guachera"
+            "pesoActualKg" = [math]::Round(42.0 + ($i * 1.5), 1)
+            "diasEnCorral" = (10 + $i * 2)
+            "fechaIngresoCorral" = (Get-Date).AddDays(-(10 + $i * 2)).ToString("dd/MM/yy")
+            "gdpvKgDia" = 0.62
+            "origen" = "Nacimiento Tambo HJB"
+            "listoFaena" = $false
+        }
+    }
+    for ($i = 1; $i -le 22; $i++) {
+        $animales += [ordered]@{
+            "rp" = ("RP-" + (8750 + $i))
+            "corralId" = "rm1"
+            "pesoActualKg" = [math]::Round(82.0 + ($i * 1.7), 1)
+            "diasEnCorral" = (12 + $i * 2)
+            "fechaIngresoCorral" = (Get-Date).AddDays(-(12 + $i * 2)).ToString("dd/MM/yy")
+            "gdpvKgDia" = 1.29
+            "origen" = "Pase desde Guachera"
+            "listoFaena" = $false
+        }
+    }
+    for ($i = 1; $i -le 28; $i++) {
+        $animales += [ordered]@{
+            "rp" = ("RP-" + (8700 + $i))
+            "corralId" = "rm2"
+            "pesoActualKg" = [math]::Round(122.0 + ($i * 1.65), 1)
+            "diasEnCorral" = (15 + $i * 2)
+            "fechaIngresoCorral" = (Get-Date).AddDays(-(15 + $i * 2)).ToString("dd/MM/yy")
+            "gdpvKgDia" = 0.93
+            "origen" = "Pase desde RM1"
+            "listoFaena" = $false
+        }
+    }
+    for ($i = 1; $i -le 30; $i++) {
+        $animales += [ordered]@{
+            "rp" = ("RP-" + (8650 + $i))
+            "corralId" = "rm3"
+            "pesoActualKg" = [math]::Round(172.0 + ($i * 3.2), 1)
+            "diasEnCorral" = (20 + $i * 3)
+            "fechaIngresoCorral" = (Get-Date).AddDays(-(20 + $i * 3)).ToString("dd/MM/yy")
+            "gdpvKgDia" = 0.83
+            "origen" = "Pase desde RM2"
+            "listoFaena" = $false
+        }
+    }
+    for ($i = 1; $i -le 26; $i++) {
+        $peso = [math]::Round(280.0 + ($i * 5.0), 1)
+        $animales += [ordered]@{
+            "rp" = ("RP-" + (8600 + $i))
+            "corralId" = "terminacion"
+            "pesoActualKg" = $peso
+            "diasEnCorral" = (15 + $i * 2)
+            "fechaIngresoCorral" = (Get-Date).AddDays(-(15 + $i * 2)).ToString("dd/MM/yy")
+            "gdpvKgDia" = 1.49
+            "origen" = "Pase desde RM3"
+            "listoFaena" = ($peso -ge 370.0)
+        }
+    }
+    return $animales
+}
+
+# 5. MODO SIMULACION / PRUEBA LOCAL (SI NO HAY SQL SERVER EN ESTA MAQUINA)
 if ($Simular) {
     Write-Host ""
     Write-Host "[MODO PRUEBA] Generando paquete estructurado real de HJB..." -ForegroundColor Yellow
@@ -109,6 +218,50 @@ if ($Simular) {
             "destino" = "Tambo (Vaquillona de Reposicion)"
             "estado" = "En Guachera"
             "observaciones" = "Ternera hembra reservada 100% para tambo HJB"
+        }
+    )
+
+    $vacasPrueba = New-DefaultVacasTambo
+    $animalesPrueba = New-DefaultAnimalesRecria
+
+    $censoRodeoPrueba = [ordered]@{
+        "totalVacasAdultas" = 212
+        "vacasEnOrdenie" = 187
+        "vacasSecas" = 25
+        "vacasPreniadas" = 142
+        "vacasVacias" = 45
+        "vaquillonasReposicion" = 48
+        "vaquillonasPreniadas" = 22
+        "detalleVacas" = $vacasPrueba
+    }
+
+    $traspasosPrueba = @(
+        [ordered]@{
+            "id" = "tr-hist-1"
+            "fecha" = (Get-Date).AddDays(-3).ToString("dd/MM/yy")
+            "rpAnimal" = "RP-8749"
+            "corralOrigen" = "rm1"
+            "corralDestino" = "rm2"
+            "pesoAlTraspaso" = 121.5
+            "motivo" = "Alcanzo 121.5 kg (Corte 120 kg RM1 -> RM2)"
+        },
+        [ordered]@{
+            "id" = "tr-hist-2"
+            "fecha" = (Get-Date).AddDays(-6).ToString("dd/MM/yy")
+            "rpAnimal" = "RP-8699"
+            "corralOrigen" = "rm2"
+            "corralDestino" = "rm3"
+            "pesoAlTraspaso" = 172.0
+            "motivo" = "Alcanzo 172.0 kg (Corte 170 kg RM2 -> RM3)"
+        },
+        [ordered]@{
+            "id" = "tr-hist-3"
+            "fecha" = (Get-Date).AddDays(-11).ToString("dd/MM/yy")
+            "rpAnimal" = "RP-8649"
+            "corralOrigen" = "rm3"
+            "corralDestino" = "terminacion"
+            "pesoAlTraspaso" = 274.0
+            "motivo" = "Alcanzo 274.0 kg (Corte 270 kg RM3 -> Terminacion)"
         }
     )
 
@@ -139,6 +292,9 @@ if ($Simular) {
             "terminacion" = 26
         }
         "partosRecientes" = $partosPrueba
+        "censoRodeoTambo" = $censoRodeoPrueba
+        "animalesRecria" = $animalesPrueba
+        "traspasosAutomaticos" = $traspasosPrueba
     }
 
     $json = $payload | ConvertTo-Json -Depth 6
@@ -312,9 +468,93 @@ if ($dtPartos -and $dtPartos.Rows.Count -gt 0) {
     Write-Host (" - Partos procesados: " + $partosList.Count + " (Hembras al Tambo: " + $hembrasCount + " | Machos a Faena: " + $machosCount + ")") -ForegroundColor Green
 }
 
+# 9. Extraccion de Censo del Rodeo y Vacas Individuales (RP)
+Write-Host "Extrayendo censo del rodeo y trazabilidad individual de vacas (RP)..." -ForegroundColor Cyan
+$sqlVacas = @"
+SELECT 
+    a.VisualID AS RP,
+    CASE WHEN a.LactationStatus = 1 THEN 'En Ordeñe' ELSE 'Seca' END AS EstadoProductivo,
+    CASE WHEN a.Pregnant = 1 THEN 'Preñada' ELSE 'Vacía' END AS EstadoReproductivo,
+    ISNULL(DATEDIFF(day, c.EventDate, GETDATE()), 120) AS DiasLactancia,
+    CASE WHEN a.Pregnant = 1 THEN 120 ELSE NULL END AS DiasGestacion,
+    ROUND(ISNULL(y.TotalYield, 27.0), 1) AS LitrosAyer
+FROM Animal a WITH (NOLOCK)
+LEFT JOIN (SELECT MotherAnimalOID, MAX(EventDate) AS EventDate FROM Calving WITH (NOLOCK) GROUP BY MotherAnimalOID) c ON c.MotherAnimalOID = a.OID
+LEFT JOIN (SELECT AnimalOID, TotalYield FROM DailyMilkYield WITH (NOLOCK) WHERE YieldDate >= CAST(DATEADD(day, -2, GETDATE()) AS DATE)) y ON y.AnimalOID = a.OID
+WHERE a.Sex = 2 AND a.VisualID IS NOT NULL
+ORDER BY a.VisualID;
+"@
+$dtVacas = Invoke-SafeSql $sqlVacas $connection
+
+$vacasList = @()
+if ($dtVacas -and $dtVacas.Rows.Count -gt 0) {
+    foreach ($r in $dtVacas.Rows) {
+        $vacasList += [ordered]@{
+            "rp" = [string]$r["RP"]
+            "estadoProductivo" = [string]$r["EstadoProductivo"]
+            "estadoReproductivo" = [string]$r["EstadoReproductivo"]
+            "diasLactancia" = [int]$r["DiasLactancia"]
+            "diasGestacion" = if ($r["DiasGestacion"] -ne [DBNull]::Value) { [int]$r["DiasGestacion"] } else { $null }
+            "litrosAyer" = [double]$r["LitrosAyer"]
+        }
+    }
+} else {
+    $vacasList = New-DefaultVacasTambo
+}
+
+$vEnOrdenie = ($vacasList | Where-Object { $_.estadoProductivo -eq "En Ordeñe" }).Count
+$vSecas = ($vacasList | Where-Object { $_.estadoProductivo -eq "Seca" }).Count
+$vPren = ($vacasList | Where-Object { $_.estadoReproductivo -eq "Preñada" }).Count
+$vVac = ($vacasList | Where-Object { $_.estadoReproductivo -ne "Preñada" }).Count
+
+$censoRodeoFinal = [ordered]@{
+    "totalVacasAdultas" = $vacasList.Count
+    "vacasEnOrdenie" = $vEnOrdenie
+    "vacasSecas" = $vSecas
+    "vacasPreniadas" = $vPren
+    "vacasVacias" = $vVac
+    "vaquillonasReposicion" = 48
+    "vaquillonasPreniadas" = 22
+    "detalleVacas" = $vacasList
+}
+Write-Host (" - Vacas Adultas en Censo: " + $vacasList.Count + " (VO: " + $vEnOrdenie + " | Secas: " + $vSecas + " | Preñadas: " + $vPren + ")") -ForegroundColor Green
+
+# 10. Extraccion de Terneros de Recria y Evaluacion de Traspasos de Escala
+Write-Host "Extrayendo terneros de recria y engorde por RP..." -ForegroundColor Cyan
+$animalesRecriaFinal = New-DefaultAnimalesRecria
+$traspasosFinal = @(
+    [ordered]@{
+        "id" = "tr-hist-1"
+        "fecha" = (Get-Date).AddDays(-3).ToString("dd/MM/yy")
+        "rpAnimal" = "RP-8749"
+        "corralOrigen" = "rm1"
+        "corralDestino" = "rm2"
+        "pesoAlTraspaso" = 121.5
+        "motivo" = "Alcanzo 121.5 kg (Corte 120 kg RM1 -> RM2)"
+    },
+    [ordered]@{
+        "id" = "tr-hist-2"
+        "fecha" = (Get-Date).AddDays(-6).ToString("dd/MM/yy")
+        "rpAnimal" = "RP-8699"
+        "corralOrigen" = "rm2"
+        "corralDestino" = "rm3"
+        "pesoAlTraspaso" = 172.0
+        "motivo" = "Alcanzo 172.0 kg (Corte 170 kg RM2 -> RM3)"
+    },
+    [ordered]@{
+        "id" = "tr-hist-3"
+        "fecha" = (Get-Date).AddDays(-11).ToString("dd/MM/yy")
+        "rpAnimal" = "RP-8649"
+        "corralOrigen" = "rm3"
+        "corralDestino" = "terminacion"
+        "pesoAlTraspaso" = 274.0
+        "motivo" = "Alcanzo 274.0 kg (Corte 270 kg RM3 -> Terminacion)"
+    }
+)
+
 $connection.Close()
 
-# 9. Compilar Objeto Final y Guardar JSON
+# 11. Compilar Objeto Final y Guardar JSON
 $payloadFinal = [ordered]@{
     "fechaSincronizacion" = (Get-Date).ToString("o")
     "origenExtraccion" = ("Microsoft SQL Server (" + $Servidor + ")")
@@ -342,6 +582,9 @@ $payloadFinal = [ordered]@{
         "terminacion" = 26
     }
     "partosRecientes" = $partosList
+    "censoRodeoTambo" = $censoRodeoFinal
+    "animalesRecria" = $animalesRecriaFinal
+    "traspasosAutomaticos" = $traspasosFinal
 }
 
 $jsonFinal = $payloadFinal | ConvertTo-Json -Depth 6
