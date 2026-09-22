@@ -533,72 +533,7 @@ export default function InicioPage() {
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* BANNER VISUAL: GENERACIÓN NETA DIARIA CONSOLIDADA (TAMBO + GANADERÍA)     */}
-      {/* ========================================================================= */}
-      <div
-        className="card"
-        style={{
-          padding: "16px 20px",
-          marginBottom: "20px",
-          background: "linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #eff6ff 100%)",
-          border: "1px solid #bbf7d0",
-          boxShadow: "0 2px 5px rgba(0,0,0,0.03)",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "12px" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "20px" }}>⚡</span>
-              <span style={{ fontSize: "12px", fontWeight: 800, color: "#166534", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Flujo Diario Operativo Consolidado (Tambo + Ganadería)
-              </span>
-            </div>
-            <div style={{ fontSize: "28px", fontWeight: 900, color: "#15803d", marginTop: "2px" }}>
-              +${(gananciaPesosRodeoDia + totalesGanaderiaDia.gananciaNetaTotal).toLocaleString("es-AR")}{" "}
-              <span style={{ fontSize: "15px", color: "var(--slate-500)", fontWeight: 700 }}>/ día netos</span>
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <span style={{ fontSize: "13px", fontWeight: 800, color: "#15803d" }}>
-              ~${(((gananciaPesosRodeoDia + totalesGanaderiaDia.gananciaNetaTotal) * 30) / 1000000).toFixed(2)}M / mes proyectados
-            </span>
-            <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
-              Ingresos netos limpios de alimentación y gastos operativos
-            </div>
-          </div>
-        </div>
 
-        {/* Barra Visual Segmentada de Participación en la Caja */}
-        <div>
-          <div style={{ height: "12px", width: "100%", borderRadius: "6px", background: "#e2e8f0", overflow: "hidden", display: "flex" }}>
-            <div
-              style={{
-                width: `${((gananciaPesosRodeoDia / (gananciaPesosRodeoDia + totalesGanaderiaDia.gananciaNetaTotal)) * 100).toFixed(1)}%`,
-                background: "linear-gradient(90deg, #16a34a, #22c55e)",
-              }}
-              title="Lechería"
-            />
-            <div
-              style={{
-                width: `${((totalesGanaderiaDia.gananciaNetaTotal / (gananciaPesosRodeoDia + totalesGanaderiaDia.gananciaNetaTotal)) * 100).toFixed(1)}%`,
-                background: "linear-gradient(90deg, #2563eb, #3b82f6)",
-              }}
-              title="Ganadería"
-            />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginTop: "8px", fontSize: "11.5px", color: "var(--slate-700)" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#16a34a" }} />
-              <strong>🥛 Lechería (Litros Libres):</strong> +${gananciaPesosRodeoDia.toLocaleString("es-AR")} / día ({((gananciaPesosRodeoDia / (gananciaPesosRodeoDia + totalesGanaderiaDia.gananciaNetaTotal)) * 100).toFixed(0)}% del flujo)
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#2563eb" }} />
-              <strong>🥩 Ganadería (Engorde Corral):</strong> +${totalesGanaderiaDia.gananciaNetaTotal.toLocaleString("es-AR")} / día ({((totalesGanaderiaDia.gananciaNetaTotal / (gananciaPesosRodeoDia + totalesGanaderiaDia.gananciaNetaTotal)) * 100).toFixed(0)}% del flujo)
-            </span>
-          </div>
-        </div>
-      </div>
 
       {/* ========================================================================= */}
       {/* 2. LAS 3 TARJETAS KPI PRINCIPALES                                         */}
@@ -684,7 +619,7 @@ export default function InicioPage() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <span style={{ fontSize: "12px", fontWeight: 800, color: "#1e40af", textTransform: "uppercase" }}>
-              🥩 Ganadería ({totalesGanaderiaDia.totalCabezas} Machos)
+              🥩 Ganadería (Engorde Escalonado)
             </span>
             <button
               type="button"
@@ -703,14 +638,14 @@ export default function InicioPage() {
               📋 Confirmar faena
             </button>
           </div>
-          <div style={{ fontSize: "28px", fontWeight: 900, color: "#15803d", marginTop: "4px" }}>
-            +${totalesGanaderiaDia.gananciaNetaTotal.toLocaleString("es-AR")} <span style={{ fontSize: "15px", color: "var(--slate-500)", fontWeight: 700 }}>/ día</span>
+          <div style={{ fontSize: "28px", fontWeight: 900, color: "#1d4ed8", marginTop: "4px" }}>
+            {proyeccionVentaConfirmada.cabezas} Novillos Confirmados
           </div>
           <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "4px" }}>
-            <strong>{proyeccionVentaConfirmada.cabezas} novillos confirmados</strong> para faena (~${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M) · {novillosEnEngordeContinuo.length} en engorde
+            Salida en <strong>~{proyeccionVentaConfirmada.diasSalida} días</strong> · Facturación est.: <strong>${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M</strong>
           </div>
           <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
-            Producción carne: +${totalesGanaderiaDia.valorProducidoTotal.toLocaleString("es-AR")}/d · Ración: -${totalesGanaderiaDia.costoRacionTotal.toLocaleString("es-AR")}/d
+            {novillosEnEngordeContinuo.length} novillos en engorde continuo · Total corral: 26 novillos (130 machos en total)
           </div>
         </div>
       </div>
@@ -734,71 +669,7 @@ export default function InicioPage() {
             </div>
           </div>
 
-          {/* GRÁFICO VISUAL 1: ESTRUCTURA DEL LITRO DE LECHE ($549/lt) */}
-          <div
-            style={{
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              borderRadius: "8px",
-              padding: "14px 16px",
-              marginBottom: "16px",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "8px" }}>
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>
-                Distribución Económica de los ${precioLitroLeche}/litro y de los ${(facturacionLecheDia / 1000000).toFixed(2)}M/día facturados
-              </span>
-              <span style={{ fontSize: "11px", color: "var(--slate-500)" }}>
-                Margen neto: <strong>{margenNetoPct}%</strong> sobre facturación bruta
-              </span>
-            </div>
 
-            {/* Barra Visual Segmentada */}
-            <div style={{ height: "14px", width: "100%", borderRadius: "7px", background: "#e2e8f0", overflow: "hidden", display: "flex" }}>
-              <div
-                style={{
-                  width: `${((costoAlimentacionRodeoDia / facturacionLecheDia) * 100).toFixed(1)}%`,
-                  background: "#ef4444",
-                }}
-                title={`Alimentación: ${((costoAlimentacionRodeoDia / facturacionLecheDia) * 100).toFixed(1)}%`}
-              />
-              <div
-                style={{
-                  width: `${((costoOperativoRodeoDia / facturacionLecheDia) * 100).toFixed(1)}%`,
-                  background: "#f97316",
-                }}
-                title={`Costo Operativo (10 lts/VO): ${((costoOperativoRodeoDia / facturacionLecheDia) * 100).toFixed(1)}%`}
-              />
-              <div
-                style={{
-                  width: `${((gananciaPesosRodeoDia / facturacionLecheDia) * 100).toFixed(1)}%`,
-                  background: "#22c55e",
-                }}
-                title={`Ganancia Neta (Litros Libres): ${((gananciaPesosRodeoDia / facturacionLecheDia) * 100).toFixed(1)}%`}
-              />
-            </div>
-
-            {/* Tarjetas de Desglose en 3 Columnas */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginTop: "10px" }}>
-              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", padding: "8px 12px" }}>
-                <div style={{ fontSize: "11px", color: "#991b1b", fontWeight: 700 }}>🔴 Costo Alimentación (35,2%)</div>
-                <div style={{ fontSize: "14px", fontWeight: 800, color: "#b91c1c" }}>-${(costoAlimentacionRodeoDia / 1000).toFixed(0)}k / día</div>
-                <div style={{ fontSize: "10.5px", color: "#7f1d1d" }}>${(costoAlimentacionVODia / litrosPromedioVO).toFixed(1)} / litro ({costoAlimentacionEnLitros} lts/VO)</div>
-              </div>
-
-              <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "6px", padding: "8px 12px" }}>
-                <div style={{ fontSize: "11px", color: "#9a3412", fontWeight: 700 }}>🟠 Costo Operativo (37,1%)</div>
-                <div style={{ fontSize: "14px", fontWeight: 800, color: "#c2410c" }}>-${(costoOperativoRodeoDia / 1000).toFixed(0)}k / día</div>
-                <div style={{ fontSize: "10.5px", color: "#7c2d12" }}>Regla HJB: 10,0 lts de leche / VO</div>
-              </div>
-
-              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px", padding: "8px 12px" }}>
-                <div style={{ fontSize: "11px", color: "#166534", fontWeight: 700 }}>🟢 Ganancia Neta (27,7%)</div>
-                <div style={{ fontSize: "14px", fontWeight: 800, color: "#15803d" }}>+${(gananciaPesosRodeoDia / 1000).toFixed(0)}k / día</div>
-                <div style={{ fontSize: "10.5px", color: "#14532d" }}>{litrosLibresPorVO} Litros Libres / VO</div>
-              </div>
-            </div>
-          </div>
 
           <div className="tableWrap">
             <table className="dataTable">
@@ -1155,134 +1026,16 @@ export default function InicioPage() {
             Lógica escalonada DelPro: los novillos ingresan en tandas y no todos salen juntos. Solo los machos van a faena; las hembras van 100% al tambo.
           </p>
 
-          {/* GRÁFICO VISUAL 3: COMPARATIVA DE GANANCIA NETA POR CORRAL Y ESCALERA DE PESO */}
-          <div
-            style={{
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              borderRadius: "8px",
-              padding: "16px",
-              marginBottom: "16px",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
-              gap: "20px",
-            }}
-          >
-            {/* Gráfico 1: Generación de Ganancia Neta Diaria por Corral ($/día) */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>
-                  Ganancia Neta Diaria por Etapa de Engorde:
-                </span>
-                <span style={{ fontSize: "11px", fontWeight: 800, color: "#15803d" }}>
-                  Total: +${totalesGanaderiaDia.gananciaNetaTotal.toLocaleString("es-AR")}/d
-                </span>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {tablaCorralesMachos.map((corral, idx) => {
-                  const pctMax = Math.min(100, Math.max(8, (corral.gananciaNetaCorralDia / 101452) * 100));
-                  return (
-                    <div key={idx}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "2px" }}>
-                        <span style={{ color: corral.destacado ? "#c2410c" : "var(--slate-800)", fontWeight: corral.destacado ? 700 : 500 }}>
-                          {corral.etapa} ({corral.cabezasTotal} cab.)
-                        </span>
-                        <strong style={{ color: "#15803d" }}>
-                          +${corral.gananciaNetaCorralDia.toLocaleString("es-AR")} / d
-                        </strong>
-                      </div>
-                      <div style={{ height: "8px", width: "100%", borderRadius: "4px", background: "#e2e8f0", overflow: "hidden" }}>
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${pctMax}%`,
-                            background: corral.destacado
-                              ? "linear-gradient(90deg, #ea580c, #f97316)"
-                              : "linear-gradient(90deg, #16a34a, #22c55e)",
-                            borderRadius: "4px",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Gráfico 2: Escalera de Peso y Progresión hacia Faena (410 kg) */}
-            <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                  <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>
-                    Flujo de Peso por Corral (Guachera a Faena):
-                  </span>
-                  <span style={{ fontSize: "11px", fontWeight: 800, color: "#1d4ed8" }}>
-                    Objetivo: 410 kg
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
-                  {tablaCorralesMachos.slice().reverse().map((corral, idx) => {
-                    const pesoNum = parseInt(corral.peso, 10) || 74;
-                    const pctPeso = Math.min(100, Math.round((pesoNum / 410) * 100));
-                    return (
-                      <div key={idx}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "1px" }}>
-                          <span style={{ color: "var(--slate-700)" }}>
-                            {corral.etapa}
-                          </span>
-                          <span>
-                            <strong>{corral.peso}</strong> <span style={{ color: "var(--slate-400)", fontSize: "10px" }}>({pctPeso}%)</span>
-                          </span>
-                        </div>
-                        <div style={{ height: "6px", width: "100%", borderRadius: "3px", background: "#e2e8f0", overflow: "hidden" }}>
-                          <div
-                            style={{
-                              height: "100%",
-                              width: `${pctPeso}%`,
-                              background: corral.destacado ? "#2563eb" : "#94a3b8",
-                              borderRadius: "3px",
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: "#eff6ff",
-                  border: "1px solid #bfdbfe",
-                  borderRadius: "6px",
-                  padding: "8px 10px",
-                  marginTop: "10px",
-                  fontSize: "11px",
-                  color: "#1e40af",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span>🥩 <strong>{proyeccionVentaConfirmada.cabezas} novillos listos para jaula</strong> (~409 kg)</span>
-                <strong style={{ color: "#1d4ed8" }}>~${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M</strong>
-              </div>
-            </div>
-          </div>
-
           <div className="tableWrap">
             <table className="dataTable">
               <thead>
                 <tr>
-                  <th style={{ minWidth: "175px" }}>Corral / Etapa</th>
-                  <th style={{ width: "75px", textAlign: "right" }}>Cabezas</th>
-                  <th style={{ width: "90px", textAlign: "right" }}>Peso Actual</th>
-                  <th style={{ width: "105px", textAlign: "right" }}>Aumento (GDPV)</th>
-                  <th style={{ width: "115px", textAlign: "right" }}>Costo Ración</th>
-                  <th style={{ width: "165px", textAlign: "right" }}>Ganancia Neta / Día</th>
-                  <th style={{ minWidth: "210px", textAlign: "left" }}>Estado & Salida Escalonada</th>
+                  <th style={{ minWidth: "190px" }}>Corral / Etapa</th>
+                  <th style={{ width: "90px", textAlign: "right" }}>Cabezas</th>
+                  <th style={{ width: "110px", textAlign: "right" }}>Peso Promedio</th>
+                  <th style={{ width: "110px", textAlign: "right" }}>Peso Objetivo</th>
+                  <th style={{ width: "120px", textAlign: "right" }}>Ganancia (GDPV)</th>
+                  <th style={{ minWidth: "220px", textAlign: "left" }}>Estado & Salida Escalonada</th>
                 </tr>
               </thead>
               <tbody>
@@ -1305,26 +1058,13 @@ export default function InicioPage() {
                     <td style={{ textAlign: "right" }}>
                       {corral.peso}
                     </td>
+                    <td style={{ textAlign: "right", color: "var(--slate-600)" }}>
+                      {corral.objetivo}
+                    </td>
                     <td style={{ textAlign: "right" }}>
                       <span className="pill badgeGreen" style={{ fontSize: "11px" }}>
                         {corral.gdpv}
                       </span>
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <span style={{ color: "#b91c1c", fontWeight: 700, fontSize: "12px" }}>
-                        -${corral.costoRacionCabDia.toLocaleString("es-AR")}
-                      </span>
-                      <div style={{ fontSize: "10px", color: "var(--slate-400)" }}>
-                        / cab / día
-                      </div>
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <strong style={{ fontSize: "13.5px", color: corral.gananciaNetaCorralDia >= 0 ? "#15803d" : "#b91c1c" }}>
-                        {corral.gananciaNetaCorralDia >= 0 ? "+" : ""}${corral.gananciaNetaCorralDia.toLocaleString("es-AR")} / día
-                      </strong>
-                      <div style={{ fontSize: "10.5px", color: "#166534" }}>
-                        {corral.gananciaNetaCabDia >= 0 ? "+" : ""}${corral.gananciaNetaCabDia.toLocaleString("es-AR")} / cab / d
-                      </div>
                     </td>
                     <td>
                       {corral.destacado ? (
@@ -1344,33 +1084,6 @@ export default function InicioPage() {
                     </td>
                   </tr>
                 ))}
-                <tr style={{ background: "#f0fdf4", fontWeight: 800, borderTop: "2px solid #86efac" }}>
-                  <td colSpan={3}>
-                    <strong style={{ color: "#15803d", fontSize: "13px" }}>
-                      [=] Total Engorde a Corral Machos ({totalesGanaderiaDia.totalCabezas} cab.)
-                    </strong>
-                    <div style={{ fontSize: "10.5px", color: "var(--slate-500)", fontWeight: 400 }}>
-                      Valor carne: +${totalesGanaderiaDia.valorProducidoTotal.toLocaleString("es-AR")}/d (${dieta.precioNovilloGordoVivoArs || 4200}/kg)
-                    </div>
-                  </td>
-                  <td style={{ textAlign: "right", color: "var(--slate-700)", fontSize: "12px" }}>
-                    Prom. 1,03 kg/d
-                  </td>
-                  <td style={{ textAlign: "right", color: "#b91c1c", fontSize: "12px" }}>
-                    -${totalesGanaderiaDia.costoRacionTotal.toLocaleString("es-AR")} / d
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <strong style={{ fontSize: "14.5px", color: "#15803d" }}>
-                      +${totalesGanaderiaDia.gananciaNetaTotal.toLocaleString("es-AR")} / día
-                    </strong>
-                    <div style={{ fontSize: "10px", color: "#166534" }}>
-                      ~${((totalesGanaderiaDia.gananciaNetaTotal * 30) / 1000000).toFixed(2)}M / mes
-                    </div>
-                  </td>
-                  <td style={{ fontSize: "11.5px", color: "#15803d" }}>
-                    <strong>{proyeccionVentaConfirmada.cabezas} novillos confirmados</strong> para faena inmediata
-                  </td>
-                </tr>
               </tbody>
             </table>
           </div>
