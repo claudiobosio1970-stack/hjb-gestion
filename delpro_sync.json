@@ -1,5 +1,5 @@
 {
-    "fechaSincronizacion":  "2026-09-22T00:00:44.9061378-03:00",
+    "fechaSincronizacion":  "2026-09-22T00:08:16.4148618-03:00",
     "origenExtraccion":  "Modo Prueba HJB (SQL Server DelPro)",
     "servidorHost":  "localhost\\DELPRO",
     "baseDatosSql":  "DelProFarmManager",
@@ -3277,7 +3277,8 @@
                                      "corralOrigen":  "rm1",
                                      "corralDestino":  "rm2",
                                      "pesoAlTraspaso":  121.5,
-                                     "motivo":  "Alcanzo 121.5 kg (Corte 120 kg RM1 -\u003e RM2)"
+                                     "motivo":  "Alcanzo 121.5 kg (Corte 120 kg RM1 -\u003e RM2)",
+                                     "origenMovimiento":  "escala_automatica_hjb"
                                  },
                                  {
                                      "id":  "tr-hist-2",
@@ -3286,7 +3287,8 @@
                                      "corralOrigen":  "rm2",
                                      "corralDestino":  "rm3",
                                      "pesoAlTraspaso":  172,
-                                     "motivo":  "Alcanzo 172.0 kg (Corte 170 kg RM2 -\u003e RM3)"
+                                     "motivo":  "Alcanzo 172.0 kg (Corte 170 kg RM2 -\u003e RM3)",
+                                     "origenMovimiento":  "escala_automatica_hjb"
                                  },
                                  {
                                      "id":  "tr-hist-3",
@@ -3295,7 +3297,32 @@
                                      "corralOrigen":  "rm3",
                                      "corralDestino":  "terminacion",
                                      "pesoAlTraspaso":  274,
-                                     "motivo":  "Alcanzo 274.0 kg (Corte 270 kg RM3 -\u003e Terminacion)"
+                                     "motivo":  "Alcanzo 274.0 kg (Corte 270 kg RM3 -\u003e Terminacion)",
+                                     "origenMovimiento":  "escala_automatica_hjb"
                                  }
-                             ]
+                             ],
+    "movimientosCorralDelPro":  [
+                                    {
+                                        "id":  "mov-delpro-1",
+                                        "fecha":  "21/09/26",
+                                        "rpAnimal":  "RP-8750",
+                                        "grupoOrigen":  "Guachera (Lacteo)",
+                                        "grupoDestino":  "Recria 1 (RM1)",
+                                        "corralOrigenId":  "guachera",
+                                        "corralDestinoId":  "rm1",
+                                        "pesoAlMovimiento":  81.2,
+                                        "motivo":  "Cambio de grupo anotado en DeLaval DelPro (Desleche a RM1)"
+                                    },
+                                    {
+                                        "id":  "mov-delpro-2",
+                                        "fecha":  "20/09/26",
+                                        "rpAnimal":  "RP-8705",
+                                        "grupoOrigen":  "Recria 1 (RM1)",
+                                        "grupoDestino":  "Recria 2 (RM2)",
+                                        "corralOrigenId":  "rm1",
+                                        "corralDestinoId":  "rm2",
+                                        "pesoAlMovimiento":  122,
+                                        "motivo":  "Cambio de grupo anotado en DeLaval DelPro (Pase a RM2)"
+                                    }
+                                ]
 }

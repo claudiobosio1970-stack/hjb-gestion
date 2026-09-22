@@ -36,6 +36,7 @@ export interface VacaTamboIndividual {
   diasGestacion?: number;
   fechaProbableParto?: string;
   litrosAyer: number;
+  grupoDelPro?: string; // ej: "Lote 1 (Alta Producción)", "Lote 2", "Preparto", "Secas"
 }
 
 export interface CensoRodeoTambo {
@@ -58,6 +59,19 @@ export interface AnimalRecriaIndividual {
   gdpvKgDia: number;
   origen: string;
   listoFaena?: boolean;
+  grupoDelPro?: string; // Grupo anotado en DeLaval DelPro
+}
+
+export interface MovimientoCorralDelPro {
+  id: string;
+  fecha: string;
+  rpAnimal: string;
+  grupoOrigen: string;
+  grupoDestino: string;
+  corralOrigenId?: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
+  corralDestinoId?: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
+  pesoAlMovimiento?: number;
+  motivo?: string;
 }
 
 export interface TraspasoCorralRegistro {
@@ -68,6 +82,31 @@ export interface TraspasoCorralRegistro {
   corralDestino: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
   pesoAlTraspaso: number;
   motivo: string;
+  origenMovimiento?: "delpro_farm_manager" | "escala_automatica_hjb" | "manual_operador";
+}
+
+/**
+ * Normaliza y mapea el nombre del grupo anotado en DeLaval DelPro al ID de corral oficial de HJB
+ */
+export function parseDelProGrupoToCorralId(grupoNombre: string): "guachera" | "rm1" | "rm2" | "rm3" | "terminacion" | null {
+  if (!grupoNombre) return null;
+  const s = grupoNombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  if (s.includes("guachera") || s.includes("terner") || s.includes("maternid") || s.includes("lacteo") || s.includes("estarter")) {
+    return "guachera";
+  }
+  if (s.includes("rm1") || s.includes("recria 1") || s.includes("recria1") || s.includes("etapa 1") || s.includes("etapa1")) {
+    return "rm1";
+  }
+  if (s.includes("rm2") || s.includes("recria 2") || s.includes("recria2") || s.includes("etapa 2") || s.includes("etapa2")) {
+    return "rm2";
+  }
+  if (s.includes("rm3") || s.includes("recria 3") || s.includes("recria3") || s.includes("etapa 3") || s.includes("etapa3")) {
+    return "rm3";
+  }
+  if (s.includes("terminaci") || s.includes("terminador") || s.includes("gordo") || s.includes("feedlot") || s.includes("faena") || s.includes("engorde")) {
+    return "terminacion";
+  }
+  return null;
 }
 
 export interface DelProSyncPayload {
@@ -96,6 +135,7 @@ export interface DelProSyncPayload {
   censoRodeoTambo?: CensoRodeoTambo;
   animalesRecria?: AnimalRecriaIndividual[];
   traspasosAutomaticos?: TraspasoCorralRegistro[];
+  movimientosCorralDelPro?: MovimientoCorralDelPro[];
 }
 
 export interface DelProConfig {
@@ -135,6 +175,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       diasGestacion: diasGest,
       fechaProbableParto: fechaPartoProb,
       litrosAyer: lts,
+      grupoDelPro: i % 3 === 0 ? "Lote 2 (Media Producción)" : "Lote 1 (Alta Producción)",
     });
   }
   // 25 vacas secas preparto
@@ -151,6 +192,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       diasGestacion: diasGest,
       fechaProbableParto: fechaPartoProb,
       litrosAyer: 0,
+      grupoDelPro: i <= 10 ? "Preparto (Rodeo 21d)" : "Secas (Lote Descanso)",
     });
   }
   return vacas;
@@ -169,6 +211,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       fechaIngresoCorral: new Date(Date.now() - (10 + i * 2) * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: 0.62,
       origen: "Nacimiento Tambo HJB",
+      grupoDelPro: "Guachera (Lácteo)",
     });
   }
   // RM1: 22 animales (80 a 119 kg)
@@ -182,6 +225,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       fechaIngresoCorral: new Date(Date.now() - (12 + i * 2) * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: 1.29,
       origen: "Pase desde Guachera",
+      grupoDelPro: "Recría 1 (RM1)",
     });
   }
   // RM2: 28 animales (120 a 169 kg)
@@ -195,6 +239,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       fechaIngresoCorral: new Date(Date.now() - (15 + i * 2) * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: 0.93,
       origen: "Pase desde RM1",
+      grupoDelPro: "Recría 2 (RM2)",
     });
   }
   // RM3: 30 animales (170 a 269 kg)
@@ -208,6 +253,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       fechaIngresoCorral: new Date(Date.now() - (20 + i * 3) * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: 0.83,
       origen: "Pase desde RM2",
+      grupoDelPro: "Recría 3 (RM3)",
     });
   }
   // Terminación: 26 animales (270 a 415 kg)
@@ -222,6 +268,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       gdpvKgDia: 1.49,
       origen: "Pase desde RM3",
       listoFaena: peso >= 370,
+      grupoDelPro: "Terminación / Engorde",
     });
   }
   return animales;
@@ -280,7 +327,8 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
         corralOrigen: "rm1",
         corralDestino: "rm2",
         pesoAlTraspaso: 121.5,
-        motivo: "Alcanzó 121.5 kg (Corte 120 kg RM1 -> RM2)",
+        motivo: "Anotado en DeLaval DelPro (Pase de grupo RM1 a RM2)",
+        origenMovimiento: "delpro_farm_manager",
       },
       {
         id: "tr-hist-2",
@@ -290,6 +338,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
         corralDestino: "rm3",
         pesoAlTraspaso: 172.0,
         motivo: "Alcanzó 172.0 kg (Corte 170 kg RM2 -> RM3)",
+        origenMovimiento: "escala_automatica_hjb",
       },
       {
         id: "tr-hist-3",
@@ -299,6 +348,20 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
         corralDestino: "terminacion",
         pesoAlTraspaso: 274.0,
         motivo: "Alcanzó 274.0 kg (Corte 270 kg RM3 -> Terminación)",
+        origenMovimiento: "escala_automatica_hjb",
+      },
+    ],
+    movimientosCorralDelPro: [
+      {
+        id: "mov-delpro-init-1",
+        fecha: "18/09/26",
+        rpAnimal: "RP-8749",
+        grupoOrigen: "Recría 1 (RM1)",
+        grupoDestino: "Recría 2 (RM2)",
+        corralOrigenId: "rm1",
+        corralDestinoId: "rm2",
+        pesoAlMovimiento: 121.5,
+        motivo: "Cambio de grupo registrado en DeLaval DelPro FarmManager",
       },
     ],
     partosRecientes: [
@@ -460,6 +523,7 @@ export function evaluarYEjecutarTraspasosAutomaticos(
         corralDestino: nuevoCorral,
         pesoAlTraspaso: a.pesoActualKg,
         motivo,
+        origenMovimiento: "escala_automatica_hjb",
       });
 
       actualizados.push({
@@ -523,6 +587,7 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
           censoRodeoTambo: payload?.censoRodeoTambo || current.datosSincronizados.censoRodeoTambo,
           animalesRecria: payload?.animalesRecria || current.datosSincronizados.animalesRecria,
           traspasosAutomaticos: payload?.traspasosAutomaticos || current.datosSincronizados.traspasosAutomaticos,
+          movimientosCorralDelPro: payload?.movimientosCorralDelPro || current.datosSincronizados.movimientosCorralDelPro,
         };
 
         const updatedConfig = propagarDatosDelProATodoElSistema(payloadData, {
@@ -632,21 +697,107 @@ export function propagarDatosDelProATodoElSistema(
     actualizadoPor: "DeLaval DelPro (Sincronización Automática)",
   });
 
-  // 2. Procesar animales de recría y ejecutar traspasos automáticos si corresponde
-  let animalesActuales = mergedDatos.animalesRecria || getAnimalesRecria();
-  const resultadoTraspasos = evaluarYEjecutarTraspasosAutomaticos(animalesActuales);
-  saveAnimalesRecria(resultadoTraspasos.animalesActualizados);
+  // 2. Procesar animales de recría y aplicar cambios de corral anotados en DelPro
+  let animalesActuales = [...getAnimalesRecria()];
+  const traspasosDelProNuevos: TraspasoCorralRegistro[] = [];
+  const hoy = new Date().toLocaleDateString("es-AR");
 
-  if (resultadoTraspasos.traspasosRealizados.length > 0) {
+  // A. Movimientos explícitos de grupo/corral registrados en DelPro FarmManager
+  if (mergedDatos.movimientosCorralDelPro && mergedDatos.movimientosCorralDelPro.length > 0) {
+    for (const mov of mergedDatos.movimientosCorralDelPro) {
+      const corralDest = mov.corralDestinoId || parseDelProGrupoToCorralId(mov.grupoDestino);
+      if (corralDest) {
+        const animalIndex = animalesActuales.findIndex((a) => a.rp === mov.rpAnimal);
+        if (animalIndex >= 0) {
+          const actual = animalesActuales[animalIndex];
+          if (actual.corralId !== corralDest) {
+            traspasosDelProNuevos.push({
+              id: `tr-delpro-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              fecha: mov.fecha || hoy,
+              rpAnimal: actual.rp,
+              corralOrigen: actual.corralId,
+              corralDestino: corralDest,
+              pesoAlTraspaso: mov.pesoAlMovimiento || actual.pesoActualKg,
+              motivo: mov.motivo || `Anotado en DeLaval DelPro (Pase de ${actual.corralId.toUpperCase()} a ${corralDest.toUpperCase()})`,
+              origenMovimiento: "delpro_farm_manager",
+            });
+            animalesActuales[animalIndex] = {
+              ...actual,
+              corralId: corralDest,
+              diasEnCorral: 0,
+              fechaIngresoCorral: mov.fecha || hoy,
+              grupoDelPro: mov.grupoDestino,
+              listoFaena: corralDest === "terminacion" && actual.pesoActualKg >= 370,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // B. Si la sincronización incluye animalesRecria con grupos/corrales actualizados desde DelPro
+  if (mergedDatos.animalesRecria && mergedDatos.animalesRecria.length > 0) {
+    for (const incoming of mergedDatos.animalesRecria) {
+      const destCorral = incoming.corralId || parseDelProGrupoToCorralId(incoming.grupoDelPro || "");
+      const idx = animalesActuales.findIndex((a) => a.rp === incoming.rp);
+      if (idx >= 0) {
+        const prev = animalesActuales[idx];
+        if (destCorral && prev.corralId !== destCorral) {
+          traspasosDelProNuevos.push({
+            id: `tr-delpro-sync-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            fecha: hoy,
+            rpAnimal: incoming.rp,
+            corralOrigen: prev.corralId,
+            corralDestino: destCorral,
+            pesoAlTraspaso: incoming.pesoActualKg || prev.pesoActualKg,
+            motivo: `Anotado en DeLaval DelPro (Movimiento a ${incoming.grupoDelPro || destCorral.toUpperCase()})`,
+            origenMovimiento: "delpro_farm_manager",
+          });
+          animalesActuales[idx] = {
+            ...prev,
+            ...incoming,
+            corralId: destCorral,
+            diasEnCorral: 0,
+            fechaIngresoCorral: hoy,
+            listoFaena: destCorral === "terminacion" && (incoming.pesoActualKg || prev.pesoActualKg) >= 370,
+          };
+        } else {
+          animalesActuales[idx] = {
+            ...prev,
+            ...incoming,
+            corralId: destCorral || prev.corralId,
+          };
+        }
+      } else {
+        animalesActuales.push(incoming);
+      }
+    }
+  }
+
+  // C. Evaluar traspasos automáticos de escala HJB para terneros que hayan alcanzado el corte
+  const resultadoTraspasos = evaluarYEjecutarTraspasosAutomaticos(animalesActuales);
+  animalesActuales = resultadoTraspasos.animalesActualizados;
+  saveAnimalesRecria(animalesActuales);
+
+  // D. Consolidar historial completo de traspasos (DelPro + Escala HJB)
+  const todosLosTraspasosNuevos = [...traspasosDelProNuevos, ...resultadoTraspasos.traspasosRealizados];
+  if (todosLosTraspasosNuevos.length > 0) {
     const historialActual = getTraspasosCorrales();
-    const nuevoHistorial = [...resultadoTraspasos.traspasosRealizados, ...historialActual].slice(0, 50);
+    const nuevoHistorial = [...todosLosTraspasosNuevos, ...historialActual].slice(0, 50);
     saveTraspasosCorrales(nuevoHistorial);
     mergedDatos.traspasosAutomaticos = nuevoHistorial;
   } else if (!mergedDatos.traspasosAutomaticos) {
     mergedDatos.traspasosAutomaticos = getTraspasosCorrales();
   }
-  mergedDatos.animalesRecria = resultadoTraspasos.animalesActualizados;
-  mergedDatos.machosEnRecriaEngorde = resultadoTraspasos.resumenPorCorral;
+
+  mergedDatos.animalesRecria = animalesActuales;
+  mergedDatos.machosEnRecriaEngorde = {
+    guachera: animalesActuales.filter((a) => a.corralId === "guachera").length,
+    rm1: animalesActuales.filter((a) => a.corralId === "rm1").length,
+    rm2: animalesActuales.filter((a) => a.corralId === "rm2").length,
+    rm3: animalesActuales.filter((a) => a.corralId === "rm3").length,
+    terminacion: animalesActuales.filter((a) => a.corralId === "terminacion").length,
+  };
 
   // 3. Sincronizar Módulo Ganadería (Machos a recría, hembras a reposición tambo)
   sincronizarGanaderiaDesdeDelPro(
@@ -697,6 +848,7 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
       censoRodeoTambo: parsed.censoRodeoTambo,
       animalesRecria: parsed.animalesRecria,
       traspasosAutomaticos: parsed.traspasosAutomaticos,
+      movimientosCorralDelPro: parsed.movimientosCorralDelPro,
     };
 
     const host = parsed.servidorHost || parsed.origenExtraccion || "SQL Server Local";

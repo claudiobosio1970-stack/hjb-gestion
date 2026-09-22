@@ -837,8 +837,9 @@ export default function GanaderiaPage() {
                         <tr>
                           <th>Fecha</th>
                           <th>Animal (Caravana / RP)</th>
-                          <th>Traspaso</th>
+                          <th>Traspaso de Corral</th>
                           <th style={{ textAlign: "right" }}>Peso al Traspaso</th>
+                          <th>Origen del Cambio</th>
                           <th>Motivo / Regla</th>
                         </tr>
                       </thead>
@@ -847,15 +848,30 @@ export default function GanaderiaPage() {
                           <tr key={tr.id}>
                             <td>{tr.fecha}</td>
                             <td>
-                              <strong style={{ fontFamily: "monospace" }}>{tr.rpAnimal}</strong>
+                              <strong style={{ fontFamily: "monospace", fontSize: "13px" }}>{tr.rpAnimal}</strong>
                             </td>
                             <td>
-                              <span className="pill badgeSlate" style={{ textTransform: "uppercase", fontSize: "11px" }}>
+                              <span className="pill badgeSlate" style={{ textTransform: "uppercase", fontSize: "11px", fontWeight: 700 }}>
                                 {tr.corralOrigen} ➔ {tr.corralDestino}
                               </span>
                             </td>
                             <td style={{ textAlign: "right" }}>
                               <strong>{tr.pesoAlTraspaso} kg</strong>
+                            </td>
+                            <td>
+                              {tr.origenMovimiento === "delpro_farm_manager" || tr.motivo.toLowerCase().includes("delpro") ? (
+                                <span className="pill badgeBlue" style={{ fontSize: "11px", fontWeight: 700 }}>
+                                  🚜 DeLaval DelPro (PC Tambo)
+                                </span>
+                              ) : tr.origenMovimiento === "manual_operador" ? (
+                                <span className="pill badgeSlate" style={{ fontSize: "11px", fontWeight: 700 }}>
+                                  👤 Manual Operario
+                                </span>
+                              ) : (
+                                <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+                                  ⚡ Escala Automática HJB
+                                </span>
+                              )}
                             </td>
                             <td style={{ fontSize: "12px", color: "var(--slate-600)" }}>{tr.motivo}</td>
                           </tr>
@@ -1103,6 +1119,11 @@ export default function GanaderiaPage() {
                             <td>
                               <strong style={{ fontFamily: "monospace", fontSize: "13.5px" }}>{a.rp}</strong>
                               <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{a.origen}</div>
+                              {a.grupoDelPro && (
+                                <div style={{ fontSize: "10.5px", color: "#2563eb", fontWeight: 600 }}>
+                                  🚜 DelPro: {a.grupoDelPro}
+                                </div>
+                              )}
                             </td>
                             <td>
                               <span
@@ -2213,6 +2234,11 @@ export default function GanaderiaPage() {
                                   <td>
                                     <strong style={{ fontFamily: "monospace", fontSize: "13px" }}>{a.rp}</strong>
                                     <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{a.origen}</div>
+                                    {a.grupoDelPro && (
+                                      <div style={{ fontSize: "10px", color: "#2563eb", fontWeight: 600 }}>
+                                        🚜 DelPro: {a.grupoDelPro}
+                                      </div>
+                                    )}
                                   </td>
                                   <td style={{ textAlign: "right" }}>
                                     <strong style={{ fontSize: "13px", color: "#0f172a" }}>{a.pesoActualKg} kg</strong>

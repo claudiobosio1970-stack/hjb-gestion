@@ -616,6 +616,11 @@ export default function TamboPage() {
                         <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>
                           🏷️ {v.rp}
                         </strong>
+                        {v.grupoDelPro && (
+                          <div style={{ fontSize: "10.5px", color: "#2563eb", fontWeight: 600 }}>
+                            📍 {v.grupoDelPro}
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span

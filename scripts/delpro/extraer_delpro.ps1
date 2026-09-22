@@ -191,6 +191,17 @@ function New-DefaultAnimalesRecria() {
     return $animales
 }
 
+function Convert-DelProGrupoToCorralId([string]$nombre) {
+    if ([string]::IsNullOrWhiteSpace($nombre)) { return $null }
+    $s = $nombre.ToLower().Trim()
+    if ($s -match "guachera|terner|maternid|estarter|leche") { return "guachera" }
+    if ($s -match "rm1|recria 1|recria1|etapa 1") { return "rm1" }
+    if ($s -match "rm2|recria 2|recria2|etapa 2") { return "rm2" }
+    if ($s -match "rm3|recria 3|recria3|etapa 3") { return "rm3" }
+    if ($s -match "terminaci|gordo|feedlot|faena|engorde") { return "terminacion" }
+    return $null
+}
+
 # 5. MODO SIMULACION / PRUEBA LOCAL (SI NO HAY SQL SERVER EN ESTA MAQUINA)
 if ($Simular) {
     Write-Host ""
@@ -244,6 +255,7 @@ if ($Simular) {
             "corralDestino" = "rm2"
             "pesoAlTraspaso" = 121.5
             "motivo" = "Alcanzo 121.5 kg (Corte 120 kg RM1 -> RM2)"
+            "origenMovimiento" = "escala_automatica_hjb"
         },
         [ordered]@{
             "id" = "tr-hist-2"
@@ -253,6 +265,7 @@ if ($Simular) {
             "corralDestino" = "rm3"
             "pesoAlTraspaso" = 172.0
             "motivo" = "Alcanzo 172.0 kg (Corte 170 kg RM2 -> RM3)"
+            "origenMovimiento" = "escala_automatica_hjb"
         },
         [ordered]@{
             "id" = "tr-hist-3"
@@ -262,6 +275,32 @@ if ($Simular) {
             "corralDestino" = "terminacion"
             "pesoAlTraspaso" = 274.0
             "motivo" = "Alcanzo 274.0 kg (Corte 270 kg RM3 -> Terminacion)"
+            "origenMovimiento" = "escala_automatica_hjb"
+        }
+    )
+
+    $movimientosDelProPrueba = @(
+        [ordered]@{
+            "id" = "mov-delpro-1"
+            "fecha" = (Get-Date).AddDays(-1).ToString("dd/MM/yy")
+            "rpAnimal" = "RP-8750"
+            "grupoOrigen" = "Guachera (Lacteo)"
+            "grupoDestino" = "Recria 1 (RM1)"
+            "corralOrigenId" = "guachera"
+            "corralDestinoId" = "rm1"
+            "pesoAlMovimiento" = 81.2
+            "motivo" = "Cambio de grupo anotado en DeLaval DelPro (Desleche a RM1)"
+        },
+        [ordered]@{
+            "id" = "mov-delpro-2"
+            "fecha" = (Get-Date).AddDays(-2).ToString("dd/MM/yy")
+            "rpAnimal" = "RP-8705"
+            "grupoOrigen" = "Recria 1 (RM1)"
+            "grupoDestino" = "Recria 2 (RM2)"
+            "corralOrigenId" = "rm1"
+            "corralDestinoId" = "rm2"
+            "pesoAlMovimiento" = 122.0
+            "motivo" = "Cambio de grupo anotado en DeLaval DelPro (Pase a RM2)"
         }
     )
 
@@ -295,6 +334,7 @@ if ($Simular) {
         "censoRodeoTambo" = $censoRodeoPrueba
         "animalesRecria" = $animalesPrueba
         "traspasosAutomaticos" = $traspasosPrueba
+        "movimientosCorralDelPro" = $movimientosDelProPrueba
     }
 
     $json = $payload | ConvertTo-Json -Depth 6
@@ -531,6 +571,7 @@ $traspasosFinal = @(
         "corralDestino" = "rm2"
         "pesoAlTraspaso" = 121.5
         "motivo" = "Alcanzo 121.5 kg (Corte 120 kg RM1 -> RM2)"
+        "origenMovimiento" = "escala_automatica_hjb"
     },
     [ordered]@{
         "id" = "tr-hist-2"
@@ -540,6 +581,7 @@ $traspasosFinal = @(
         "corralDestino" = "rm3"
         "pesoAlTraspaso" = 172.0
         "motivo" = "Alcanzo 172.0 kg (Corte 170 kg RM2 -> RM3)"
+        "origenMovimiento" = "escala_automatica_hjb"
     },
     [ordered]@{
         "id" = "tr-hist-3"
@@ -549,12 +591,53 @@ $traspasosFinal = @(
         "corralDestino" = "terminacion"
         "pesoAlTraspaso" = 274.0
         "motivo" = "Alcanzo 274.0 kg (Corte 270 kg RM3 -> Terminacion)"
+        "origenMovimiento" = "escala_automatica_hjb"
     }
 )
 
+# 11. Extraccion de Movimientos de Corral / Grupo anotados en DelPro
+Write-Host "Extrayendo cambios de corral/grupo registrados en DelPro..." -ForegroundColor Cyan
+$sqlCambios = @"
+SELECT TOP 30
+    gc.OID AS MovimientoId,
+    CONVERT(VARCHAR(10), gc.EventDate, 103) AS FechaMovimiento,
+    a.VisualID AS RP,
+    ISNULL(gFrom.Name, 'Sin Grupo') AS GrupoOrigen,
+    ISNULL(gTo.Name, 'Sin Grupo') AS GrupoDestino
+FROM GroupChange gc WITH (NOLOCK)
+JOIN Animal a WITH (NOLOCK) ON gc.AnimalOID = a.OID
+LEFT JOIN [Group] gFrom WITH (NOLOCK) ON gc.FromGroupOID = gFrom.OID
+LEFT JOIN [Group] gTo WITH (NOLOCK) ON gc.ToGroupOID = gTo.OID
+ORDER BY gc.EventDate DESC;
+"@
+$dtCambios = Invoke-SafeSql $sqlCambios $connection
+$movimientosDelProFinal = @()
+
+if ($dtCambios -and $dtCambios.Rows.Count -gt 0) {
+    foreach ($r in $dtCambios.Rows) {
+        $gOrig = [string]$r["GrupoOrigen"]
+        $gDest = [string]$r["GrupoDestino"]
+        $cOrig = Convert-DelProGrupoToCorralId $gOrig
+        $cDest = Convert-DelProGrupoToCorralId $gDest
+        $movimientosDelProFinal += [ordered]@{
+            "id" = ("mov-delpro-" + $r["MovimientoId"])
+            "fecha" = $r["FechaMovimiento"]
+            "rpAnimal" = [string]$r["RP"]
+            "grupoOrigen" = $gOrig
+            "grupoDestino" = $gDest
+            "corralOrigenId" = $cOrig
+            "corralDestinoId" = $cDest
+            "motivo" = ("Anotado en DelPro: " + $gOrig + " -> " + $gDest)
+        }
+    }
+    Write-Host (" - Cambios de grupo registrados en DelPro: " + $movimientosDelProFinal.Count) -ForegroundColor Green
+} else {
+    Write-Host " - (Sin movimientos de grupo recientes en DelPro)" -ForegroundColor Gray
+}
+
 $connection.Close()
 
-# 11. Compilar Objeto Final y Guardar JSON
+# 12. Compilar Objeto Final y Guardar JSON
 $payloadFinal = [ordered]@{
     "fechaSincronizacion" = (Get-Date).ToString("o")
     "origenExtraccion" = ("Microsoft SQL Server (" + $Servidor + ")")
@@ -585,6 +668,7 @@ $payloadFinal = [ordered]@{
     "censoRodeoTambo" = $censoRodeoFinal
     "animalesRecria" = $animalesRecriaFinal
     "traspasosAutomaticos" = $traspasosFinal
+    "movimientosCorralDelPro" = $movimientosDelProFinal
 }
 
 $jsonFinal = $payloadFinal | ConvertTo-Json -Depth 6
