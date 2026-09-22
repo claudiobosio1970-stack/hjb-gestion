@@ -26,6 +26,7 @@ import {
   toggleConfirmacionNovillo,
   confirmarListaNovillos,
   HJB_NOVILLOS_CONFIRMADOS_EVENT,
+  getCostoDiarioPorAnimal,
 } from "@/lib/ganaderiaData";
 import { getPrecioReferencia } from "@/lib/valoresMovilesData";
 import {
@@ -353,63 +354,113 @@ export default function InicioPage() {
     };
   }, [novillosConfirmados, dieta.precioNovilloGordoVivoArs]);
 
-  const tablaCorralesMachos = [
-    {
-      etapa: "5. Terminación (Gordos)",
-      cabezasTotal: 26,
-      cabezasConfirmadas: proyeccionVentaConfirmada.cabezas,
-      cabezasContinuo: novillosEnEngordeContinuo.length,
-      peso: `${proyeccionVentaConfirmada.pesoPromedioActual} kg`,
-      objetivo: "410 kg",
-      gdpv: "+1.49 kg/d",
-      estado: `🥩 ${proyeccionVentaConfirmada.cabezas} novillos confirmados para faena (~$${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M) · ${novillosEnEngordeContinuo.length} novillos en engorde continuo`,
-      destacado: true,
-    },
-    {
-      etapa: "4. Recría Mixta 3 (RM3)",
-      cabezasTotal: 30,
-      cabezasConfirmadas: 0,
-      cabezasContinuo: 30,
-      peso: "262 kg",
-      objetivo: "270 kg",
-      gdpv: "+0.83 kg/d",
-      estado: "Pase próximo a Terminación (preparación engorde)",
-      destacado: false,
-    },
-    {
-      etapa: "3. Recría Mixta 2 (RM2)",
-      cabezasTotal: 28,
-      cabezasConfirmadas: 0,
-      cabezasContinuo: 28,
-      peso: "165 kg",
-      objetivo: "170 kg",
-      gdpv: "+0.93 kg/d",
-      estado: "En desarrollo a corral (crecimiento estructural)",
-      destacado: false,
-    },
-    {
-      etapa: "2. Recría Mixta 1 (RM1)",
-      cabezasTotal: 22,
-      cabezasConfirmadas: 0,
-      cabezasContinuo: 22,
-      peso: "106 kg",
-      objetivo: "115 kg",
-      gdpv: "+1.29 kg/d",
-      estado: "Transición post-guachera (rumen temprano)",
-      destacado: false,
-    },
-    {
-      etapa: "1. Guachera / Estaca",
-      cabezasTotal: 24,
-      cabezasConfirmadas: 0,
-      cabezasContinuo: 24,
-      peso: "74 kg",
-      objetivo: "80 kg",
-      gdpv: "+0.62 kg/d",
-      estado: "Crianza individual de machos (Hembras van 100% al Tambo)",
-      destacado: false,
-    },
-  ];
+  const precioNovilloKg = dieta.precioNovilloGordoVivoArs ?? 4200;
+
+  const tablaCorralesMachos = useMemo(() => {
+    const etapas = [
+      {
+        id: "terminacion" as const,
+        etapa: "5. Terminación (Gordos)",
+        cabezasTotal: 26,
+        cabezasConfirmadas: proyeccionVentaConfirmada.cabezas,
+        cabezasContinuo: novillosEnEngordeContinuo.length,
+        peso: `${proyeccionVentaConfirmada.pesoPromedioActual} kg`,
+        objetivo: "410 kg",
+        gdpvNum: 1.49,
+        estado: `🥩 ${proyeccionVentaConfirmada.cabezas} novillos confirmados para faena (~$${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M)`,
+        destacado: true,
+      },
+      {
+        id: "rm3" as const,
+        etapa: "4. Recría Mixta 3 (RM3)",
+        cabezasTotal: 30,
+        cabezasConfirmadas: 0,
+        cabezasContinuo: 30,
+        peso: "262 kg",
+        objetivo: "270 kg",
+        gdpvNum: 0.83,
+        estado: "Pase próximo a Terminación (preparación engorde)",
+        destacado: false,
+      },
+      {
+        id: "rm2" as const,
+        etapa: "3. Recría Mixta 2 (RM2)",
+        cabezasTotal: 28,
+        cabezasConfirmadas: 0,
+        cabezasContinuo: 28,
+        peso: "165 kg",
+        objetivo: "170 kg",
+        gdpvNum: 0.93,
+        estado: "En desarrollo a corral (crecimiento estructural)",
+        destacado: false,
+      },
+      {
+        id: "rm1" as const,
+        etapa: "2. Recría Mixta 1 (RM1)",
+        cabezasTotal: 22,
+        cabezasConfirmadas: 0,
+        cabezasContinuo: 22,
+        peso: "106 kg",
+        objetivo: "115 kg",
+        gdpvNum: 1.29,
+        estado: "Transición post-guachera (rumen temprano)",
+        destacado: false,
+      },
+      {
+        id: "guachera" as const,
+        etapa: "1. Guachera / Estaca",
+        cabezasTotal: 24,
+        cabezasConfirmadas: 0,
+        cabezasContinuo: 24,
+        peso: "74 kg",
+        objetivo: "80 kg",
+        gdpvNum: 0.62,
+        estado: "Crianza individual de machos (Hembras van 100% al Tambo)",
+        destacado: false,
+      },
+    ];
+
+    return etapas.map((e) => {
+      const costoRacionCabDia = getCostoDiarioPorAnimal(e.id, corrales);
+      const valorProducidoCabDia = Math.round(e.gdpvNum * precioNovilloKg);
+      const gananciaNetaCabDia = valorProducidoCabDia - costoRacionCabDia;
+      const gananciaNetaCorralDia = Math.round(gananciaNetaCabDia * e.cabezasTotal);
+      const costoRacionCorralDia = Math.round(costoRacionCabDia * e.cabezasTotal);
+      const valorProducidoCorralDia = Math.round(valorProducidoCabDia * e.cabezasTotal);
+
+      return {
+        ...e,
+        gdpv: `+${e.gdpvNum.toFixed(2)} kg/d`,
+        costoRacionCabDia,
+        valorProducidoCabDia,
+        gananciaNetaCabDia,
+        gananciaNetaCorralDia,
+        costoRacionCorralDia,
+        valorProducidoCorralDia,
+      };
+    });
+  }, [corrales, precioNovilloKg, proyeccionVentaConfirmada, novillosEnEngordeContinuo]);
+
+  const totalesGanaderiaDia = useMemo(() => {
+    let valorProducidoTotal = 0;
+    let costoRacionTotal = 0;
+    let gananciaNetaTotal = 0;
+    let totalCabezas = 0;
+
+    for (const c of tablaCorralesMachos) {
+      valorProducidoTotal += c.valorProducidoCorralDia;
+      costoRacionTotal += c.costoRacionCorralDia;
+      gananciaNetaTotal += c.gananciaNetaCorralDia;
+      totalCabezas += c.cabezasTotal;
+    }
+
+    return {
+      valorProducidoTotal,
+      costoRacionTotal,
+      gananciaNetaTotal,
+      totalCabezas,
+    };
+  }, [tablaCorralesMachos]);
 
   return (
     <AppShell active="Inicio">
@@ -566,7 +617,7 @@ export default function InicioPage() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <span style={{ fontSize: "12px", fontWeight: 800, color: "#1e40af", textTransform: "uppercase" }}>
-              🥩 Ganadería (Engorde Escalonado)
+              🥩 Ganadería ({totalesGanaderiaDia.totalCabezas} Machos)
             </span>
             <button
               type="button"
@@ -585,14 +636,14 @@ export default function InicioPage() {
               📋 Confirmar faena
             </button>
           </div>
-          <div style={{ fontSize: "28px", fontWeight: 900, color: "#1d4ed8", marginTop: "4px" }}>
-            {proyeccionVentaConfirmada.cabezas} Novillos Confirmados
+          <div style={{ fontSize: "28px", fontWeight: 900, color: "#15803d", marginTop: "4px" }}>
+            +${totalesGanaderiaDia.gananciaNetaTotal.toLocaleString("es-AR")} <span style={{ fontSize: "15px", color: "var(--slate-500)", fontWeight: 700 }}>/ día</span>
           </div>
           <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "4px" }}>
-            Salida en <strong>~{proyeccionVentaConfirmada.diasSalida} días</strong> · Facturación est.: <strong>${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M</strong>
+            <strong>{proyeccionVentaConfirmada.cabezas} novillos confirmados</strong> para faena (~${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M) · {novillosEnEngordeContinuo.length} en engorde
           </div>
           <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
-            {novillosEnEngordeContinuo.length} novillos en engorde continuo · Total corral: 26 novillos
+            Producción carne: +${totalesGanaderiaDia.valorProducidoTotal.toLocaleString("es-AR")}/d · Ración: -${totalesGanaderiaDia.costoRacionTotal.toLocaleString("es-AR")}/d
           </div>
         </div>
       </div>
@@ -804,12 +855,13 @@ export default function InicioPage() {
             <table className="dataTable">
               <thead>
                 <tr>
-                  <th style={{ minWidth: "190px" }}>Corral / Etapa</th>
-                  <th style={{ width: "90px", textAlign: "right" }}>Cabezas</th>
-                  <th style={{ width: "110px", textAlign: "right" }}>Peso Promedio</th>
-                  <th style={{ width: "110px", textAlign: "right" }}>Peso Objetivo</th>
-                  <th style={{ width: "120px", textAlign: "right" }}>Ganancia (GDPV)</th>
-                  <th style={{ minWidth: "220px", textAlign: "left" }}>Estado & Salida Escalonada</th>
+                  <th style={{ minWidth: "175px" }}>Corral / Etapa</th>
+                  <th style={{ width: "75px", textAlign: "right" }}>Cabezas</th>
+                  <th style={{ width: "90px", textAlign: "right" }}>Peso Actual</th>
+                  <th style={{ width: "105px", textAlign: "right" }}>Aumento (GDPV)</th>
+                  <th style={{ width: "115px", textAlign: "right" }}>Costo Ración</th>
+                  <th style={{ width: "165px", textAlign: "right" }}>Ganancia Neta / Día</th>
+                  <th style={{ minWidth: "210px", textAlign: "left" }}>Estado & Salida Escalonada</th>
                 </tr>
               </thead>
               <tbody>
@@ -832,22 +884,35 @@ export default function InicioPage() {
                     <td style={{ textAlign: "right" }}>
                       {corral.peso}
                     </td>
-                    <td style={{ textAlign: "right", color: "var(--slate-600)" }}>
-                      {corral.objetivo}
-                    </td>
                     <td style={{ textAlign: "right" }}>
                       <span className="pill badgeGreen" style={{ fontSize: "11px" }}>
                         {corral.gdpv}
                       </span>
                     </td>
+                    <td style={{ textAlign: "right" }}>
+                      <span style={{ color: "#b91c1c", fontWeight: 700, fontSize: "12px" }}>
+                        -${corral.costoRacionCabDia.toLocaleString("es-AR")}
+                      </span>
+                      <div style={{ fontSize: "10px", color: "var(--slate-400)" }}>
+                        / cab / día
+                      </div>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <strong style={{ fontSize: "13.5px", color: corral.gananciaNetaCorralDia >= 0 ? "#15803d" : "#b91c1c" }}>
+                        {corral.gananciaNetaCorralDia >= 0 ? "+" : ""}${corral.gananciaNetaCorralDia.toLocaleString("es-AR")} / día
+                      </strong>
+                      <div style={{ fontSize: "10.5px", color: "#166534" }}>
+                        {corral.gananciaNetaCabDia >= 0 ? "+" : ""}${corral.gananciaNetaCabDia.toLocaleString("es-AR")} / cab / d
+                      </div>
+                    </td>
                     <td>
                       {corral.destacado ? (
                         <div>
-                          <div style={{ color: "#c2410c", fontWeight: 800, fontSize: "12.5px" }}>
-                            🥩 {corral.cabezasConfirmadas} novillos confirmados para venta inmediata (~${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M)
+                          <div style={{ color: "#c2410c", fontWeight: 800, fontSize: "12px" }}>
+                            🥩 {corral.cabezasConfirmadas} novillos confirmados para faena (~${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M)
                           </div>
                           <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
-                            ⏳ {corral.cabezasContinuo} novillos continúan en engorde (salida escalonada a 35d y 70d)
+                            ⏳ {corral.cabezasContinuo} novillos continúan en engorde (salida a 35d y 70d)
                           </div>
                         </div>
                       ) : (
@@ -858,6 +923,33 @@ export default function InicioPage() {
                     </td>
                   </tr>
                 ))}
+                <tr style={{ background: "#f0fdf4", fontWeight: 800, borderTop: "2px solid #86efac" }}>
+                  <td colSpan={3}>
+                    <strong style={{ color: "#15803d", fontSize: "13px" }}>
+                      [=] Total Engorde a Corral Machos ({totalesGanaderiaDia.totalCabezas} cab.)
+                    </strong>
+                    <div style={{ fontSize: "10.5px", color: "var(--slate-500)", fontWeight: 400 }}>
+                      Valor carne: +${totalesGanaderiaDia.valorProducidoTotal.toLocaleString("es-AR")}/d (${dieta.precioNovilloGordoVivoArs || 4200}/kg)
+                    </div>
+                  </td>
+                  <td style={{ textAlign: "right", color: "var(--slate-700)", fontSize: "12px" }}>
+                    Prom. 1,03 kg/d
+                  </td>
+                  <td style={{ textAlign: "right", color: "#b91c1c", fontSize: "12px" }}>
+                    -${totalesGanaderiaDia.costoRacionTotal.toLocaleString("es-AR")} / d
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <strong style={{ fontSize: "14.5px", color: "#15803d" }}>
+                      +${totalesGanaderiaDia.gananciaNetaTotal.toLocaleString("es-AR")} / día
+                    </strong>
+                    <div style={{ fontSize: "10px", color: "#166534" }}>
+                      ~${((totalesGanaderiaDia.gananciaNetaTotal * 30) / 1000000).toFixed(2)}M / mes
+                    </div>
+                  </td>
+                  <td style={{ fontSize: "11.5px", color: "#15803d" }}>
+                    <strong>{proyeccionVentaConfirmada.cabezas} novillos confirmados</strong> para faena inmediata
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
