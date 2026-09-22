@@ -1474,6 +1474,50 @@ export default function InicioPage() {
             {/* CONTENIDO SOLAPA 1: EXTRACTOR SQL SERVER */}
             {tabDelProModal === "sql_extractor" && (
               <div>
+                {/* Botón de Descarga Directa del Paquete */}
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)",
+                    border: "1px solid #86efac",
+                    borderRadius: "10px",
+                    padding: "16px 18px",
+                    marginBottom: "16px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: "#166534" }}>
+                      📦 Descargar Sincronizador para la PC del Tambo
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "2px" }}>
+                      Descarga el archivo ZIP listo para usar en la computadora de la sala de ordeñe (6 KB).
+                    </div>
+                  </div>
+                  <a
+                    href="/Sincronizador_DelPro_HJB.zip"
+                    download="Sincronizador_DelPro_HJB.zip"
+                    className="primaryBtn"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      textDecoration: "none",
+                      padding: "9px 18px",
+                      fontSize: "13px",
+                      fontWeight: 800,
+                      background: "#16a34a",
+                      color: "#ffffff",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    <span>⬇️</span> Descargar ZIP Directo
+                  </a>
+                </div>
+
                 <div style={{ background: "#f8fafc", border: "2px dashed #cbd5e1", borderRadius: "10px", padding: "18px", textAlign: "center", marginBottom: "16px" }}>
                   <div style={{ fontSize: "28px", marginBottom: "4px" }}>💾</div>
                   <strong style={{ fontSize: "14px", color: "var(--slate-800)" }}>Cargar Archivo Extraído de SQL Server</strong>
