@@ -36,6 +36,10 @@ export interface VacaTamboIndividual {
   diasGestacion?: number;
   fechaProbableParto?: string;
   litrosAyer: number;
+  pesoKg?: number; // Peso corporal actual en kg
+  pesoOficialDelPro?: number; // Peso real extraído desde DeLaval DelPro (balanza / pesaje oficial)
+  fechaPesajeDelPro?: string; // Fecha en que se pesó en DelPro
+  origenPeso?: "delpro_oficial" | "estimado_curva";
   grupoDelPro?: string; // ej: "Lote 1 (Alta Producción)", "Lote 2", "Preparto", "Secas"
 }
 
@@ -54,6 +58,9 @@ export interface AnimalRecriaIndividual {
   rp: string;
   corralId: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
   pesoActualKg: number;
+  pesoOficialDelPro?: number; // Peso real extraído desde DeLaval DelPro (balanza / pesaje oficial)
+  fechaPesajeDelPro?: string; // Fecha en que se pesó en DelPro
+  origenPeso?: "delpro_oficial" | "estimado_curva";
   diasEnCorral: number;
   diasVida?: number; // Días totales de vida estimados desde nacimiento
   fechaIngresoCorral: string;
@@ -168,6 +175,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       ? new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR")
       : undefined;
 
+    const esPesadoDelPro = (i % 6 === 0);
+    const pesoOficial = esPesadoDelPro ? Number((565 + ((i * 7) % 120)).toFixed(1)) : undefined;
+    const pesoEst = Number((580 + ((i * 5) % 80)).toFixed(1));
+
     vacas.push({
       rp: `RP-${rpNum}`,
       estadoProductivo: "En Ordeñe",
@@ -176,6 +187,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       diasGestacion: diasGest,
       fechaProbableParto: fechaPartoProb,
       litrosAyer: lts,
+      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "20/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       grupoDelPro: i % 3 === 0 ? "Lote 2 (Media Producción)" : "Lote 1 (Alta Producción)",
     });
   }
@@ -185,6 +200,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const diasGest = 220 + (i * 2);
     const fechaPartoProb = new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR");
 
+    const esPesadoDelPro = (i % 4 === 0);
+    const pesoOficial = esPesadoDelPro ? Number((610 + ((i * 6) % 80)).toFixed(1)) : undefined;
+    const pesoEst = Number((625 + ((i * 4) % 70)).toFixed(1));
+
     vacas.push({
       rp: `RP-${rpNum}`,
       estadoProductivo: "Seca",
@@ -193,6 +212,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       diasGestacion: diasGest,
       fechaProbableParto: fechaPartoProb,
       litrosAyer: 0,
+      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "19/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       grupoDelPro: i <= 10 ? "Preparto (Rodeo 21d)" : "Secas (Lote Descanso)",
     });
   }
@@ -305,6 +328,90 @@ export function calcularPesoEstimativoVida(animal: {
   };
 }
 
+/**
+ * Determina el peso oficial y origen de un animal de recría/engorde o tambo.
+ * Si el animal cuenta con un pesaje extraído desde DeLaval DelPro (balanza oficial),
+ * se toma dicho peso extraído de DelPro como oficial y prioritario por sobre el estimativo.
+ * Si aún no se registró un pesaje en DelPro, se calcula el peso estimativo
+ * según la curva de crecimiento biológico de vida.
+ */
+export function resolverPesoAnimal(animal: {
+  corralId?: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
+  diasEnCorral?: number;
+  pesoActualKg?: number;
+  pesoKg?: number;
+  pesoOficialDelPro?: number;
+  fechaPesajeDelPro?: string;
+  origenPeso?: "delpro_oficial" | "estimado_curva";
+  pesoNacimientoKg?: number;
+  diasVida?: number;
+}): {
+  pesoKg: number;
+  esOficialDelPro: boolean;
+  origenEtiqueta: string;
+  badgeClase: string;
+  icono: string;
+  diasVida: number;
+  gdpvKgDia: number;
+  detalleCalculo: string;
+} {
+  const corralId = animal.corralId || "guachera";
+  const diasCorral = animal.diasEnCorral || 15;
+  const calc = calcularPesoEstimativoVida({
+    corralId,
+    diasEnCorral: diasCorral,
+    pesoNacimientoKg: animal.pesoNacimientoKg,
+    diasVida: animal.diasVida,
+  });
+
+  // REGLA OFICIAL DELPRO: Si existe un peso extraído de DelPro, se toma como OFICIAL y prioritario.
+  const tieneDelPro =
+    (animal.pesoOficialDelPro && animal.pesoOficialDelPro > 0) ||
+    (animal.origenPeso === "delpro_oficial" && ((animal.pesoActualKg && animal.pesoActualKg > 0) || (animal.pesoKg && animal.pesoKg > 0)));
+  const pesoDelProVal = animal.pesoOficialDelPro || (animal.origenPeso === "delpro_oficial" ? (animal.pesoActualKg || animal.pesoKg || 0) : 0) || 0;
+
+  if (tieneDelPro && pesoDelProVal > 0) {
+    return {
+      pesoKg: Number(pesoDelProVal.toFixed(1)),
+      esOficialDelPro: true,
+      origenEtiqueta: "Oficial DelPro",
+      badgeClase: "badgeGreen",
+      icono: "⚖️",
+      diasVida: animal.diasVida || calc.diasVida,
+      gdpvKgDia: calc.gdpvEtapaKgDia,
+      detalleCalculo: `Balanza oficial DelPro${animal.fechaPesajeDelPro ? ` (${animal.fechaPesajeDelPro})` : ""}`,
+    };
+  }
+
+  // Si no hay pesaje de DelPro:
+  // Si no tiene corral (vaca adulta de tambo), se toma su peso estándar o estimado
+  if (!animal.corralId) {
+    const pesoEst = animal.pesoKg || animal.pesoActualKg || 580;
+    return {
+      pesoKg: Number(pesoEst.toFixed(1)),
+      esOficialDelPro: false,
+      origenEtiqueta: "Estimado",
+      badgeClase: "badgeBlue",
+      icono: "📈",
+      diasVida: 0,
+      gdpvKgDia: 0,
+      detalleCalculo: "Estimación estándar por estado y lote",
+    };
+  }
+
+  // Animal de recría/engorde: se calcula el peso estimativo por curva biológica de vida
+  return {
+    pesoKg: calc.pesoEstimadoKg,
+    esOficialDelPro: false,
+    origenEtiqueta: "Estimado (Curva Vida)",
+    badgeClase: "badgeBlue",
+    icono: "📈",
+    diasVida: animal.diasVida || calc.diasVida,
+    gdpvKgDia: calc.gdpvEtapaKgDia,
+    detalleCalculo: calc.explicacionCurva,
+  };
+}
+
 export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   const animales: AnimalRecriaIndividual[] = [];
 
@@ -316,6 +423,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       rp: `RP-${8800 + i}`,
       corralId: "guachera",
       pesoActualKg: calc.pesoEstimadoKg,
+      origenPeso: "estimado_curva",
       diasVida: calc.diasVida,
       diasEnCorral: dias,
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
@@ -328,16 +436,26 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   // RM1: 22 animales (edad 68 a 108 días de vida)
   for (let i = 1; i <= 22; i++) {
     const dias = 8 + Math.round(i * 1.8);
+    const rp = `RP-${8750 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "rm1", diasEnCorral: dias });
+
+    // Ejemplo: animales pesados oficialmente en DelPro
+    const esPesadoDelPro = i === 5 || i === 10;
+    const pesoOficial = esPesadoDelPro ? (i === 5 ? 114.5 : 118.0) : undefined;
+    const pesoFinal = pesoOficial || calc.pesoEstimadoKg;
+
     animales.push({
-      rp: `RP-${8750 + i}`,
+      rp,
       corralId: "rm1",
-      pesoActualKg: calc.pesoEstimadoKg,
+      pesoActualKg: pesoFinal,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "19/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       diasVida: calc.diasVida,
       diasEnCorral: dias,
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
-      origen: "Pase desde Guachera",
+      origen: esPesadoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "Pase desde Guachera",
       grupoDelPro: "Recría 1 (RM1)",
     });
   }
@@ -345,16 +463,25 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   // RM2: 28 animales (edad 115 a 159 días de vida)
   for (let i = 1; i <= 28; i++) {
     const dias = 8 + Math.round(i * 1.6);
+    const rp = `RP-${8700 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "rm2", diasEnCorral: dias });
+
+    const esPesadoDelPro = i === 5;
+    const pesoOficial = esPesadoDelPro ? 142.0 : undefined;
+    const pesoFinal = pesoOficial || calc.pesoEstimadoKg;
+
     animales.push({
-      rp: `RP-${8700 + i}`,
+      rp,
       corralId: "rm2",
-      pesoActualKg: calc.pesoEstimadoKg,
+      pesoActualKg: pesoFinal,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "18/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       diasVida: calc.diasVida,
       diasEnCorral: dias,
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
-      origen: "Pase desde RM1",
+      origen: esPesadoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "Pase desde RM1",
       grupoDelPro: "Recría 2 (RM2)",
     });
   }
@@ -362,16 +489,25 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   // RM3: 30 animales (edad 170 a 248 días de vida)
   for (let i = 1; i <= 30; i++) {
     const dias = 10 + Math.round(i * 2.6);
+    const rp = `RP-${8650 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "rm3", diasEnCorral: dias });
+
+    const esPesadoDelPro = i === 5;
+    const pesoOficial = esPesadoDelPro ? 235.0 : undefined;
+    const pesoFinal = pesoOficial || calc.pesoEstimadoKg;
+
     animales.push({
-      rp: `RP-${8650 + i}`,
+      rp,
       corralId: "rm3",
-      pesoActualKg: calc.pesoEstimadoKg,
+      pesoActualKg: pesoFinal,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "20/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       diasVida: calc.diasVida,
       diasEnCorral: dias,
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
-      origen: "Pase desde RM2",
+      origen: esPesadoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "Pase desde RM2",
       grupoDelPro: "Recría 3 (RM3)",
     });
   }
@@ -379,17 +515,26 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   // Terminación: 26 animales (edad 261 a 346 días de vida, peso 280 a 405 kg)
   for (let i = 1; i <= 26; i++) {
     const dias = 10 + Math.round(i * 3.3);
+    const rp = `RP-${8600 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "terminacion", diasEnCorral: dias });
+
+    const esPesadoDelPro = i === 5 || i === 10;
+    const pesoOficial = esPesadoDelPro ? (i === 5 ? 395.0 : 402.0) : undefined;
+    const pesoFinal = pesoOficial || calc.pesoEstimadoKg;
+
     animales.push({
-      rp: `RP-${8600 + i}`,
+      rp,
       corralId: "terminacion",
-      pesoActualKg: calc.pesoEstimadoKg,
+      pesoActualKg: pesoFinal,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? (i === 5 ? "20/09/26" : "21/09/26") : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       diasVida: calc.diasVida,
       diasEnCorral: dias,
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
-      origen: "Pase desde RM3",
-      listoFaena: calc.pesoEstimadoKg >= 370,
+      origen: esPesadoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "Pase desde RM3",
+      listoFaena: pesoFinal >= 370,
       grupoDelPro: "Terminación / Engorde",
     });
   }
@@ -864,32 +1009,47 @@ export function propagarDatosDelProATodoElSistema(
       const idx = animalesActuales.findIndex((a) => a.rp === incoming.rp);
       if (idx >= 0) {
         const prev = animalesActuales[idx];
-        if (destCorral && prev.corralId !== destCorral) {
-          traspasosDelProNuevos.push({
-            id: `tr-delpro-sync-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-            fecha: hoy,
-            rpAnimal: incoming.rp,
-            corralOrigen: prev.corralId,
-            corralDestino: destCorral,
-            pesoAlTraspaso: incoming.pesoActualKg || prev.pesoActualKg,
-            motivo: `Anotado en DeLaval DelPro (Movimiento a ${incoming.grupoDelPro || destCorral.toUpperCase()})`,
-            origenMovimiento: "delpro_farm_manager",
-          });
-          animalesActuales[idx] = {
-            ...prev,
-            ...incoming,
-            corralId: destCorral,
-            diasEnCorral: 0,
-            fechaIngresoCorral: hoy,
-            listoFaena: destCorral === "terminacion" && (incoming.pesoActualKg || prev.pesoActualKg) >= 370,
-          };
-        } else {
-          animalesActuales[idx] = {
-            ...prev,
-            ...incoming,
-            corralId: destCorral || prev.corralId,
-          };
-        }
+          const tieneDelProIncoming = incoming.pesoOficialDelPro || (incoming.origenPeso === "delpro_oficial" ? incoming.pesoActualKg : undefined);
+          const pesoOficialResuelto = tieneDelProIncoming || prev.pesoOficialDelPro;
+          const fechaPesajeResuelta = incoming.fechaPesajeDelPro || prev.fechaPesajeDelPro;
+          const origenPesoResuelto = pesoOficialResuelto ? "delpro_oficial" : (incoming.origenPeso || prev.origenPeso || "estimado_curva");
+          const pesoActualResuelto = pesoOficialResuelto || incoming.pesoActualKg || prev.pesoActualKg;
+
+          if (destCorral && prev.corralId !== destCorral) {
+            traspasosDelProNuevos.push({
+              id: `tr-delpro-sync-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              fecha: hoy,
+              rpAnimal: incoming.rp,
+              corralOrigen: prev.corralId,
+              corralDestino: destCorral,
+              pesoAlTraspaso: pesoActualResuelto,
+              motivo: `Anotado en DeLaval DelPro (Movimiento a ${incoming.grupoDelPro || destCorral.toUpperCase()})`,
+              origenMovimiento: "delpro_farm_manager",
+            });
+            animalesActuales[idx] = {
+              ...prev,
+              ...incoming,
+              corralId: destCorral,
+              pesoActualKg: pesoActualResuelto,
+              pesoOficialDelPro: pesoOficialResuelto,
+              fechaPesajeDelPro: fechaPesajeResuelta,
+              origenPeso: origenPesoResuelto,
+              diasEnCorral: 0,
+              fechaIngresoCorral: hoy,
+              listoFaena: destCorral === "terminacion" && pesoActualResuelto >= 370,
+            };
+          } else {
+            animalesActuales[idx] = {
+              ...prev,
+              ...incoming,
+              corralId: destCorral || prev.corralId,
+              pesoActualKg: pesoActualResuelto,
+              pesoOficialDelPro: pesoOficialResuelto,
+              fechaPesajeDelPro: fechaPesajeResuelta,
+              origenPeso: origenPesoResuelto,
+              listoFaena: (destCorral || prev.corralId) === "terminacion" && pesoActualResuelto >= 370,
+            };
+          }
       } else {
         animalesActuales.push(incoming);
       }
@@ -979,26 +1139,46 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
 
         if (corralId) {
           // Animales de Ganadería y Recría / Engorde (Crianza, Recría Machos, Engorde Macho)
+          const pesoDelPro = Number(item.PesoBalanza || item.Peso || item.PesoKg || item.pesoActualKg || item.pesoDelPro) || 0;
+          const fechaPesaje = item.FechaPesaje || item.Fecha || hoyStr;
+          const tienePesoDelPro = pesoDelPro > 0;
+
+          const diasEnCorral = Number(item.diasEnCorral) || 15;
+          const calcEstimado = calcularPesoEstimativoVida({ corralId, diasEnCorral });
+          const pesoFinal = tienePesoDelPro ? pesoDelPro : calcEstimado.pesoEstimadoKg;
+
           recriaList.push({
             rp,
             corralId,
-            pesoActualKg: corralId === "guachera" ? 48.0 : (corralId === "rm1" ? 105.0 : (corralId === "rm2" ? 145.0 : (corralId === "rm3" ? 225.0 : 385.0))),
-            diasEnCorral: 15,
-            fechaIngresoCorral: hoyStr,
-            gdpvKgDia: corralId === "terminacion" ? 1.45 : 0.95,
-            origen: "DeLaval DelPro (PC Tambo)",
+            pesoActualKg: pesoFinal,
+            pesoOficialDelPro: tienePesoDelPro ? pesoDelPro : undefined,
+            fechaPesajeDelPro: tienePesoDelPro ? fechaPesaje : undefined,
+            origenPeso: tienePesoDelPro ? "delpro_oficial" : "estimado_curva",
+            diasEnCorral,
+            diasVida: calcEstimado.diasVida,
+            fechaIngresoCorral: item.FechaIngreso || hoyStr,
+            gdpvKgDia: calcEstimado.gdpvEtapaKgDia,
+            origen: tienePesoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "DeLaval DelPro (PC Tambo)",
             grupoDelPro: grNombre,
-            listoFaena: corralId === "terminacion",
+            listoFaena: pesoFinal >= 370,
           });
         } else if (grNombre.includes("ordeño") || grNombre.includes("punta") || grNombre.includes("Secas") || grNombre.includes("Preparto")) {
           // Vacas de Tambo (Ordeñe y Secas)
           const isOrdenie = grNombre.includes("ordeño") || grNombre.includes("punta");
+          const pesoDelPro = Number(item.PesoBalanza || item.Peso || item.PesoKg || item.pesoActualKg || item.pesoDelPro) || 0;
+          const fechaPesaje = item.FechaPesaje || item.Fecha;
+          const tienePesoDelPro = pesoDelPro > 0;
+
           vacasTamboList.push({
             rp,
             estadoProductivo: isOrdenie ? "En Ordeñe" : "Seca",
             estadoReproductivo: "Preñada",
             diasLactancia: isOrdenie ? 120 : 0,
-            litrosAyer: isOrdenie ? 26.2 : 0,
+            litrosAyer: isOrdenie ? (Number(item.Ayer) || 26.2) : 0,
+            pesoKg: tienePesoDelPro ? pesoDelPro : (isOrdenie ? 580 : 610),
+            pesoOficialDelPro: tienePesoDelPro ? pesoDelPro : undefined,
+            fechaPesajeDelPro: tienePesoDelPro ? fechaPesaje : undefined,
+            origenPeso: tienePesoDelPro ? "delpro_oficial" : "estimado_curva",
             grupoDelPro: grNombre,
           });
         }

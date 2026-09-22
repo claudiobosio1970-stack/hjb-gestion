@@ -23,6 +23,7 @@ import {
   CensoRodeoTambo,
   VacaTamboIndividual,
   importarPayloadDesdeJson,
+  resolverPesoAnimal,
 } from "@/lib/delproData";
 
 export default function TamboPage() {
@@ -36,7 +37,7 @@ export default function TamboPage() {
   // Filtros individuales de vacas por RP
   const [busquedaVacaRP, setBusquedaVacaRP] = useState("");
   const [filtroEstadoVaca, setFiltroEstadoVaca] = useState<"todas" | "en_ordenie" | "secas" | "preniadas" | "inseminadas" | "vacias">("todas");
-  const [ordenCenso, setOrdenCenso] = useState<"rp_asc" | "del_desc" | "del_asc" | "litros_desc" | "litros_asc" | "parto_proximo">("rp_asc");
+  const [ordenCenso, setOrdenCenso] = useState<"rp_asc" | "del_desc" | "del_asc" | "litros_desc" | "litros_asc" | "parto_proximo" | "peso_desc" | "peso_asc">("rp_asc");
   const [elementosPorPagina, setElementosPorPagina] = useState(50);
   const [paginaVacas, setPaginaVacas] = useState(1);
 
@@ -184,6 +185,16 @@ export default function TamboPage() {
       }
       if (ordenCenso === "litros_asc") {
         return (a.litrosAyer || 0) - (b.litrosAyer || 0);
+      }
+      if (ordenCenso === "peso_desc") {
+        const pA = a.pesoOficialDelPro || a.pesoKg || 0;
+        const pB = b.pesoOficialDelPro || b.pesoKg || 0;
+        return pB - pA;
+      }
+      if (ordenCenso === "peso_asc") {
+        const pA = a.pesoOficialDelPro || a.pesoKg || 0;
+        const pB = b.pesoOficialDelPro || b.pesoKg || 0;
+        return pA - pB;
       }
       if (ordenCenso === "parto_proximo") {
         const diasFaltanA = a.diasGestacion ? Math.max(0, 282 - a.diasGestacion) : 99999;
@@ -686,6 +697,8 @@ export default function TamboPage() {
                   <option value="del_asc">⏱️ Días Lactancia: Menor a Mayor (DEL ↑)</option>
                   <option value="litros_desc">🥛 Producción Ayer: Mayor a Menor (Litros ↓)</option>
                   <option value="litros_asc">🥛 Producción Ayer: Menor a Mayor (Litros ↑)</option>
+                  <option value="peso_desc">⚖️ Peso Corporal: Mayor a Menor (Oficial DelPro)</option>
+                  <option value="peso_asc">⚖️ Peso Corporal: Menor a Mayor (Oficial DelPro)</option>
                   <option value="parto_proximo">🤰 Fecha más próxima a parir</option>
                 </select>
               </div>
@@ -734,12 +747,22 @@ export default function TamboPage() {
                   >
                     Producción Ayer {ordenCenso === "litros_desc" ? "▼" : ordenCenso === "litros_asc" ? "▲" : ""}
                   </th>
+                  <th
+                    style={{ textAlign: "right", cursor: "pointer", userSelect: "none" }}
+                    onClick={() => {
+                      setOrdenCenso(ordenCenso === "peso_desc" ? "peso_asc" : "peso_desc");
+                      setPaginaVacas(1);
+                    }}
+                    title="Click para ordenar por Peso Corporal (DelPro / Estimado)"
+                  >
+                    Peso Corporal {ordenCenso === "peso_desc" ? "▼" : ordenCenso === "peso_asc" ? "▲" : ""}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {vacasPaginadas.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: "20px", color: "var(--slate-500)" }}>
+                    <td colSpan={8} style={{ textAlign: "center", padding: "20px", color: "var(--slate-500)" }}>
                       No se encontraron vacas con el filtro especificado.
                     </td>
                   </tr>
@@ -813,6 +836,39 @@ export default function TamboPage() {
                         ) : (
                           <span style={{ color: "var(--slate-400)" }}>0.0 lts</span>
                         )}
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        {(() => {
+                          const infoPeso = resolverPesoAnimal(v);
+                          return (
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "5px" }}>
+                                <strong style={{ fontSize: "13px", color: infoPeso.esOficialDelPro ? "#166534" : "#0f172a" }}>
+                                  {infoPeso.pesoKg} kg
+                                </strong>
+                                <span
+                                  className={`pill ${infoPeso.badgeClase}`}
+                                  style={{
+                                    fontSize: "9.5px",
+                                    fontWeight: 700,
+                                    padding: "1px 5px",
+                                    border: infoPeso.esOficialDelPro ? "1px solid #86efac" : "1px solid #bae6fd",
+                                    background: infoPeso.esOficialDelPro ? "#dcfce7" : "#e0f2fe",
+                                    color: infoPeso.esOficialDelPro ? "#166534" : "#0369a1",
+                                  }}
+                                  title={infoPeso.detalleCalculo}
+                                >
+                                  {infoPeso.icono} {infoPeso.origenEtiqueta}
+                                </span>
+                              </div>
+                              {infoPeso.esOficialDelPro && (
+                                <div style={{ fontSize: "10px", color: "#166534", fontWeight: 600, marginTop: "1px" }}>
+                                  {infoPeso.detalleCalculo}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))

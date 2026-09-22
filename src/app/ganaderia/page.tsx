@@ -36,6 +36,7 @@ import {
   saveTraspasosCorrales,
   evaluarYEjecutarTraspasosAutomaticos,
   calcularPesoEstimativoVida,
+  resolverPesoAnimal,
 } from "@/lib/delproData";
 
 export default function GanaderiaPage() {
@@ -937,7 +938,7 @@ export default function GanaderiaPage() {
                       <tr>
                         <th>Caravana / RP</th>
                         <th>Corral Actual</th>
-                        <th style={{ textAlign: "right" }}>Peso Estimado (Vida)</th>
+                        <th style={{ textAlign: "right" }}>Peso Animal (Balanza / Estimado)</th>
                         <th style={{ textAlign: "right" }}>Ganancia (GDPV)</th>
                         <th style={{ textAlign: "right" }}>Edad / Días Corral</th>
                         <th>Fecha Ingreso</th>
@@ -947,10 +948,10 @@ export default function GanaderiaPage() {
                     </thead>
                     <tbody>
                       {animalesPaginados.map((a) => {
-                        const calc = calcularPesoEstimativoVida(a);
+                        const infoPeso = resolverPesoAnimal(a);
                         const corralObj = corrales.find((c) => c.id === a.corralId);
-                        const pesoMostrar = a.pesoActualKg || calc.pesoEstimadoKg;
-                        const diasVidaMostrar = a.diasVida || calc.diasVida;
+                        const pesoMostrar = infoPeso.pesoKg;
+                        const diasVidaMostrar = infoPeso.diasVida;
                         const superaCorte =
                           (a.corralId === "guachera" && (pesoMostrar >= 80 || a.diasEnCorral >= 60)) ||
                           (a.corralId === "rm1" && pesoMostrar >= 120) ||
@@ -983,13 +984,39 @@ export default function GanaderiaPage() {
                               </span>
                             </td>
                             <td style={{ textAlign: "right" }}>
-                              <strong style={{ fontSize: "14px", color: "#0f172a" }}>{pesoMostrar} kg</strong>
-                              <div style={{ fontSize: "10.5px", color: "#0284c7", fontWeight: 600 }} title={calc.explicacionCurva}>
-                                📈 {calc.explicacionCurva}
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
+                                <strong style={{ fontSize: "14px", color: infoPeso.esOficialDelPro ? "#166534" : "#0f172a" }}>
+                                  {infoPeso.pesoKg} kg
+                                </strong>
+                                <span
+                                  className={`pill ${infoPeso.badgeClase}`}
+                                  style={{
+                                    fontSize: "10px",
+                                    fontWeight: 700,
+                                    padding: "2px 6px",
+                                    border: infoPeso.esOficialDelPro ? "1px solid #86efac" : "1px solid #bae6fd",
+                                    background: infoPeso.esOficialDelPro ? "#dcfce7" : "#e0f2fe",
+                                    color: infoPeso.esOficialDelPro ? "#166534" : "#0369a1",
+                                  }}
+                                  title={infoPeso.detalleCalculo}
+                                >
+                                  {infoPeso.icono} {infoPeso.origenEtiqueta}
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "10.5px",
+                                  color: infoPeso.esOficialDelPro ? "#15803d" : "#0284c7",
+                                  fontWeight: 600,
+                                  marginTop: "2px",
+                                }}
+                                title={infoPeso.detalleCalculo}
+                              >
+                                {infoPeso.detalleCalculo}
                               </div>
                             </td>
                             <td style={{ textAlign: "right" }}>
-                              <span className="pill badgeGreen">+{calc.gdpvEtapaKgDia} kg/d</span>
+                              <span className="pill badgeGreen">+{infoPeso.gdpvKgDia} kg/d</span>
                             </td>
                             <td style={{ textAlign: "right" }}>
                               <strong style={{ fontSize: "13px", color: "#0f172a" }}>{diasVidaMostrar} d vida</strong>
@@ -2072,12 +2099,14 @@ export default function GanaderiaPage() {
                           </thead>
                           <tbody>
                             {animalesFiltrados.map((a) => {
+                              const infoPeso = resolverPesoAnimal(a);
+                              const pesoMostrar = infoPeso.pesoKg;
                               const superaCorte =
-                                (a.corralId === "guachera" && (a.pesoActualKg >= 80 || a.diasEnCorral >= 60)) ||
-                                (a.corralId === "rm1" && a.pesoActualKg >= 120) ||
-                                (a.corralId === "rm2" && a.pesoActualKg >= 170) ||
-                                (a.corralId === "rm3" && a.pesoActualKg >= 270) ||
-                                (a.corralId === "terminacion" && a.pesoActualKg >= 370);
+                                (a.corralId === "guachera" && (pesoMostrar >= 80 || a.diasEnCorral >= 60)) ||
+                                (a.corralId === "rm1" && pesoMostrar >= 120) ||
+                                (a.corralId === "rm2" && pesoMostrar >= 170) ||
+                                (a.corralId === "rm3" && pesoMostrar >= 270) ||
+                                (a.corralId === "terminacion" && pesoMostrar >= 370);
 
                               return (
                                 <tr key={a.rp}>
@@ -2091,23 +2120,41 @@ export default function GanaderiaPage() {
                                     )}
                                   </td>
                                   <td style={{ textAlign: "right" }}>
-                                    <strong style={{ fontSize: "13px", color: "#0f172a" }}>{a.pesoActualKg} kg</strong>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "5px" }}>
+                                      <strong style={{ fontSize: "13px", color: infoPeso.esOficialDelPro ? "#166534" : "#0f172a" }}>
+                                        {pesoMostrar} kg
+                                      </strong>
+                                      <span
+                                        className={`pill ${infoPeso.badgeClase}`}
+                                        style={{
+                                          fontSize: "9.5px",
+                                          fontWeight: 700,
+                                          padding: "1px 5px",
+                                          border: infoPeso.esOficialDelPro ? "1px solid #86efac" : "1px solid #bae6fd",
+                                          background: infoPeso.esOficialDelPro ? "#dcfce7" : "#e0f2fe",
+                                          color: infoPeso.esOficialDelPro ? "#166534" : "#0369a1",
+                                        }}
+                                        title={infoPeso.detalleCalculo}
+                                      >
+                                        {infoPeso.icono} {infoPeso.origenEtiqueta}
+                                      </span>
+                                    </div>
                                   </td>
                                   <td style={{ textAlign: "right" }}>
-                                    <span className="pill badgeGreen">+{a.gdpvKgDia} kg/d</span>
+                                    <span className="pill badgeGreen">+{infoPeso.gdpvKgDia} kg/d</span>
                                   </td>
                                   <td style={{ textAlign: "right" }}>
                                     <strong>{a.diasEnCorral} d</strong>
                                   </td>
                                   <td style={{ fontSize: "12px" }}>{a.fechaIngresoCorral}</td>
                                   <td>
-                                    {a.listoFaena ? (
+                                    {pesoMostrar >= 370 ? (
                                       <span className="pill badgeGreen" style={{ fontWeight: 800 }}>🥩 Listo Faena (≥370 kg)</span>
                                     ) : superaCorte ? (
                                       <span className="pill badgeAmber" style={{ fontWeight: 700 }}>⚡ Cumple corte de traspaso</span>
                                     ) : (
                                       <span className="pill badgeSlate" style={{ fontSize: "11.5px" }}>
-                                        Faltan {Math.max(0, Math.round(corralModalSeleccionado.pesoObjetivoKg - a.pesoActualKg))} kg
+                                        Faltan {Math.max(0, Math.round(corralModalSeleccionado.pesoObjetivoKg - pesoMostrar))} kg
                                       </span>
                                     )}
                                   </td>
