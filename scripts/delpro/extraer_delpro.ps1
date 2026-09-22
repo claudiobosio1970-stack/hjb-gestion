@@ -150,44 +150,85 @@ if ($Simular) {
     return
 }
 
-# 5. Conexion Real a SQL Server con Autodeteccion de Instancia DeLaval
+# 5. Conexion Real a SQL Server con Autodeteccion Inteligente
 Write-Host ""
-Write-Host "Buscando instancia de DeLaval DelPro en esta computadora..." -ForegroundColor Cyan
+Write-Host "Buscando instalacion de DeLaval DelPro y SQL Server..." -ForegroundColor Cyan
 
-$instanciasCandidatas = @($Servidor, ".\DELPRO", "(local)\DELPRO", "localhost\DELPRO", ".\SQLEXPRESS", "localhost\SQLEXPRESS", "(local)\SQLEXPRESS", ".") | Select-Object -Unique
+# A. Detectar servicios SQL Server instalados en Windows
+$serviciosSql = Get-Service -Name "*sql*" -ErrorAction SilentlyContinue
+$instanciasDetectadas = @()
+
+if ($serviciosSql) {
+    foreach ($s in $serviciosSql) {
+        if ($s.Name -match "MSSQL\$(.+)") {
+            $instanciasDetectadas += (".\" + $matches[1])
+            $instanciasDetectadas += ("localhost\" + $matches[1])
+        } elseif ($s.Name -eq "MSSQLSERVER") {
+            $instanciasDetectadas += "."
+            $instanciasDetectadas += "localhost"
+        }
+    }
+}
+
+# B. Lista completa de candidatas
+$instanciasCandidatas = @($instanciasDetectadas + @($Servidor, ".\DELPRO", "(local)\DELPRO", "localhost\DELPRO", ".\ALPRO", "localhost\ALPRO", ".\DELAVAL", ".\SQLEXPRESS", "localhost\SQLEXPRESS", ".")) | Select-Object -Unique
+
+# C. Bases de datos candidatas
+$basesCandidatas = @($BaseDatos, "DelProFarmManager", "DelPro", "FarmManager", "ALPRO") | Select-Object -Unique
 
 $connection = $null
 $servidorConectado = ""
+$baseConectada = ""
 
 foreach ($inst in $instanciasCandidatas) {
-    Write-Host (" Probando: " + $inst + " [" + $BaseDatos + "]... ") -NoNewline
-    if ([string]::IsNullOrWhiteSpace($Usuario)) {
-        $cStr = "Server=$inst;Database=$BaseDatos;Integrated Security=True;Connect Timeout=3;TrustServerCertificate=True;"
-    } else {
-        $cStr = "Server=$inst;Database=$BaseDatos;User Id=$Usuario;Password=$Clave;Connect Timeout=3;TrustServerCertificate=True;"
+    foreach ($dbName in $basesCandidatas) {
+        Write-Host (" Probando: " + $inst + " [" + $dbName + "]... ") -NoNewline
+        if ([string]::IsNullOrWhiteSpace($Usuario)) {
+            $cStr = "Server=$inst;Database=$dbName;Integrated Security=True;Connect Timeout=2;TrustServerCertificate=True;"
+        } else {
+            $cStr = "Server=$inst;Database=$dbName;User Id=$Usuario;Password=$Clave;Connect Timeout=2;TrustServerCertificate=True;"
+        }
+        try {
+            $testConn = New-Object System.Data.SqlClient.SqlConnection($cStr)
+            $testConn.Open()
+            $connection = $testConn
+            $servidorConectado = $inst
+            $baseConectada = $dbName
+            $Servidor = $inst
+            $BaseDatos = $dbName
+            Write-Host "[CONECTADO CON EXITO]" -ForegroundColor Green
+            break
+        } catch {
+            Write-Host "No disponible" -ForegroundColor Gray
+        }
     }
-    try {
-        $testConn = New-Object System.Data.SqlClient.SqlConnection($cStr)
-        $testConn.Open()
-        $connection = $testConn
-        $servidorConectado = $inst
-        $Servidor = $inst
-        Write-Host "[ENCONTRADO Y CONECTADO]" -ForegroundColor Green
-        break
-    } catch {
-        Write-Host "No disponible" -ForegroundColor Gray
-    }
+    if ($connection) { break }
 }
 
 if (-not $connection -or $connection.State -ne [System.Data.ConnectionState]::Open) {
     Write-Host ""
     Write-Host " [NO SE PUDO CONECTAR A DELPRO]" -ForegroundColor Red
     Write-Host ""
-    Write-Host "GUIA RAPIDA DE RESOLUCION:" -ForegroundColor Yellow
-    Write-Host " 1. Asegurate de ejecutar este archivo EN LA COMPUTADORA DEL TAMBO donde esta instalado DelPro."
-    Write-Host " 2. Comprueba que el programa DeLaval DelPro este abierto o su servicio SQL activo."
-    Write-Host " 3. Para generar una prueba inmediata en esta maquina sin SQL Server, ejecuta:"
-    Write-Host "    powershell -ExecutionPolicy Bypass -File .\extraer_delpro.ps1 -Simular" -ForegroundColor Cyan
+    if (-not $serviciosSql -or $serviciosSql.Count -eq 0) {
+        Write-Host "DIAGNOSTICO: En esta computadora NO hay ningun servicio de SQL Server instalado." -ForegroundColor Yellow
+        Write-Host "-> Esto ocurre si ejecutas el archivo en tu NOTEBOOK en lugar de la COMPUTADORA DEL TAMBO." -ForegroundColor Yellow
+        Write-Host "-> Debes copiar esta carpeta a la computadora donde esta abierto DeLaval DelPro (sala de ordenie)." -ForegroundColor Yellow
+    } else {
+        Write-Host "Se encontraron los siguientes servicios SQL en esta maquina:" -ForegroundColor Yellow
+        foreach ($s in $serviciosSql) {
+            Write-Host (" - " + $s.Name + " (" + $s.Status + ")") -ForegroundColor Gray
+        }
+        Write-Host "Comprueba que DeLaval DelPro este abierto y que el usuario de Windows tenga permisos de lectura." -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Host "OPCIONES PARA CONTINUAR:" -ForegroundColor Cyan
+    Write-Host " 1. Llevar esta carpeta a la PC DEL TAMBO y ejecutar 'Sincronizar_DelPro.bat' alli." -ForegroundColor White
+    Write-Host " 2. Enviar una prueba ahora mismo para verificar que la plataforma web lo recibe en vivo." -ForegroundColor White
+    Write-Host ""
+    $resp = Read-Host "Quieres enviar una prueba ahora a la plataforma HJB Gestion? (S/N)"
+    if ($resp -match "^[sSyY]") {
+        & $MyInvocation.MyCommand.Path -Simular
+    }
     return
 }
 
