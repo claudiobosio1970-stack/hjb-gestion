@@ -1,7 +1,14 @@
 "use client";
 
 import { saveDietaTambo, getDietaTambo } from "./stockInsumosData";
-import { getCorrales, getTropas, saveTropas, TropaGanadera } from "./ganaderiaData";
+import {
+  getCorrales,
+  getTropas,
+  saveTropas,
+  TropaGanadera,
+  sincronizarGanaderiaDesdeDelPro,
+  HJB_GANADERIA_SYNC_EVENT,
+} from "./ganaderiaData";
 import { db } from "./firebase";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { sanitizeForFirestore } from "./agricultureData";
@@ -170,24 +177,21 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
         }
         
         const current = getDelProConfig();
-        const updatedConfig: DelProConfig = {
-          ...current,
-          estadoConexion: (data.estadoConexion as EstadoConexionDelPro) || "conectado",
-          mensajeEstado: data.mensajeEstado || `Sincronizado con DelPro (${new Date().toLocaleTimeString("es-AR")})`,
-          servidorHost: data.servidorHost || current.servidorHost,
-          baseDatosSql: data.baseDatosSql || current.baseDatosSql,
-          ultimaSincronizacion: data.fechaSincronizacion || current.ultimaSincronizacion || new Date().toISOString(),
-          datosSincronizados: {
-            ...current.datosSincronizados,
-            ...(payload || {}),
-            litrosTotalesDia: Number(data.litrosTotalesDia ?? payload?.litrosTotalesDia ?? current.datosSincronizados.litrosTotalesDia),
-            vacasEnOrdeñe: Number(data.vacasEnOrdeñe ?? payload?.vacasEnOrdeñe ?? current.datosSincronizados.vacasEnOrdeñe),
-            litrosPromedioVO: Number(data.litrosPromedioVO ?? payload?.litrosPromedioVO ?? current.datosSincronizados.litrosPromedioVO),
-          },
+        const payloadData: Partial<DelProSyncPayload> = {
+          ...(payload || {}),
+          litrosTotalesDia: Number(data.litrosTotalesDia ?? payload?.litrosTotalesDia ?? current.datosSincronizados.litrosTotalesDia),
+          vacasEnOrdeñe: Number(data.vacasEnOrdeñe ?? payload?.vacasEnOrdeñe ?? current.datosSincronizados.vacasEnOrdeñe),
+          litrosPromedioVO: Number(data.litrosPromedioVO ?? payload?.litrosPromedioVO ?? current.datosSincronizados.litrosPromedioVO),
+          fechaSincronizacion: data.fechaSincronizacion || current.ultimaSincronizacion || new Date().toISOString(),
         };
 
-        localStorage.setItem(STORAGE_DELPRO_CONFIG, JSON.stringify(updatedConfig));
-        window.dispatchEvent(new CustomEvent(HJB_DELPRO_SYNC_EVENT, { detail: updatedConfig }));
+        const updatedConfig = propagarDatosDelProATodoElSistema(payloadData, {
+          estadoConexion: (data.estadoConexion as EstadoConexionDelPro) || "conectado",
+          servidorHost: data.servidorHost || current.servidorHost,
+          baseDatosSql: data.baseDatosSql || current.baseDatosSql,
+          mensajeEstado: data.mensajeEstado || `Sincronizado con DelPro (${new Date().toLocaleTimeString("es-AR")})`,
+        });
+
         if (onUpdate) onUpdate(updatedConfig);
       }
     }, (error) => {
@@ -240,18 +244,21 @@ export function saveDelProConfig(config: Partial<DelProConfig>): DelProConfig {
 }
 
 /**
- * Ingesta de paquete de datos desde DeLaval DelPro.
- * Actualiza automáticamente:
- * 1. Litros totales y Vacas en Ordeñe en el módulo Tambo
- * 2. Dieta activa
- * 3. Segregación de partos: Hembras al Tambo, Machos al engorde
+ * Propaga los datos extraídos de DeLaval DelPro a TODO el sistema HJB:
+ * 1. Tambo (Litros del día, vacas en ordeñe, vacas secas, promedio lts/VO, raciones)
+ * 2. Insumos (Recalcula consumo diario por cabeza de pellets, silos y granos, y días de autonomía)
+ * 3. Ganadería (Actualiza cabezas de machos en recría/terminación y registra nacimientos segregados)
+ * 4. Dashboard e Inicio (Refleja facturación y costos operativos del tambo en tiempo real)
  */
-export function aplicarSincronizacionDelPro(payload: Partial<DelProSyncPayload>): DelProConfig {
+export function propagarDatosDelProATodoElSistema(
+  payload: Partial<DelProSyncPayload>,
+  metadatos?: { servidorHost?: string; baseDatosSql?: string; mensajeEstado?: string; estadoConexion?: EstadoConexionDelPro }
+): DelProConfig {
   const current = getDelProConfig();
   const mergedDatos: DelProSyncPayload = {
     ...current.datosSincronizados,
     ...payload,
-    fechaSincronizacion: new Date().toISOString(),
+    fechaSincronizacion: payload.fechaSincronizacion || new Date().toISOString(),
   };
 
   // Calcular litros promedio si vienen litros y vacas
@@ -259,22 +266,56 @@ export function aplicarSincronizacionDelPro(payload: Partial<DelProSyncPayload>)
     mergedDatos.litrosPromedioVO = Number((mergedDatos.litrosTotalesDia / mergedDatos.vacasEnOrdeñe).toFixed(2));
   }
 
-  // 1. Sincronizar Tambo (Dieta y Rodeo)
+  // 1. Sincronizar Módulo Tambo & Dieta / Stock
+  const currentDieta = getDietaTambo();
+  const racionesActualizadas = { ...currentDieta.racionesKgDia };
+  if (mergedDatos.dietaAsignada) {
+    if (mergedDatos.dietaAsignada.pelletSojaKg !== undefined && mergedDatos.dietaAsignada.pelletSojaKg > 0) {
+      racionesActualizadas["pellet-soja"] = mergedDatos.dietaAsignada.pelletSojaKg;
+    }
+    if (mergedDatos.dietaAsignada.pelletTrigoKg !== undefined && mergedDatos.dietaAsignada.pelletTrigoKg > 0) {
+      racionesActualizadas["pellet-trigo"] = mergedDatos.dietaAsignada.pelletTrigoKg;
+    }
+    if (mergedDatos.dietaAsignada.siloMaizKg !== undefined && mergedDatos.dietaAsignada.siloMaizKg > 0) {
+      racionesActualizadas["silo-maiz"] = mergedDatos.dietaAsignada.siloMaizKg;
+    }
+    if (mergedDatos.dietaAsignada.maizKg !== undefined && mergedDatos.dietaAsignada.maizKg > 0) {
+      racionesActualizadas["maiz"] = mergedDatos.dietaAsignada.maizKg;
+    }
+  }
+
   saveDietaTambo({
     vacasEnOrdeñe: mergedDatos.vacasEnOrdeñe,
     vacasPreparto: mergedDatos.vacasSecasPreparto,
     litrosPromedioVO: mergedDatos.litrosPromedioVO,
+    racionesKgDia: racionesActualizadas,
     actualizadoPor: "DeLaval DelPro (Sincronización Automática)",
   });
 
-  // 2. Guardar estado DelPro
+  // 2. Sincronizar Módulo Ganadería (Machos a recría, hembras a reposición tambo)
+  sincronizarGanaderiaDesdeDelPro(
+    mergedDatos.machosEnRecriaEngorde,
+    mergedDatos.partosRecientes
+  );
+
+  // 3. Guardar estado y configuración DelPro
   const updatedConfig = saveDelProConfig({
-    estadoConexion: "conectado",
-    mensajeEstado: `Sincronizado con DelPro exitosamente (${new Date().toLocaleTimeString("es-AR")})`,
+    estadoConexion: metadatos?.estadoConexion || "conectado",
+    tipoConexion: "sql_server",
+    servidorHost: metadatos?.servidorHost || current.servidorHost,
+    baseDatosSql: metadatos?.baseDatosSql || current.baseDatosSql,
+    mensajeEstado: metadatos?.mensajeEstado || `Sincronizado con DelPro exitosamente (${new Date().toLocaleTimeString("es-AR")})`,
     datosSincronizados: mergedDatos,
   });
 
   return updatedConfig;
+}
+
+/**
+ * Ingesta de paquete de datos desde DeLaval DelPro.
+ */
+export function aplicarSincronizacionDelPro(payload: Partial<DelProSyncPayload>): DelProConfig {
+  return propagarDatosDelProATodoElSistema(payload);
 }
 
 /**
@@ -302,29 +343,15 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
     const host = parsed.servidorHost || parsed.origenExtraccion || "SQL Server Local";
     const base = parsed.baseDatosSql || "DelProFarmManager";
 
-    const config = saveDelProConfig({
-      estadoConexion: "conectado",
-      tipoConexion: "sql_server",
+    const config = propagarDatosDelProATodoElSistema(payload, {
       servidorHost: host,
       baseDatosSql: base,
       mensajeEstado: `Datos extraídos de SQL Server (${new Date().toLocaleTimeString("es-AR")})`,
-      datosSincronizados: {
-        ...getDelProConfig().datosSincronizados,
-        ...payload,
-      },
-    });
-
-    // Sincronizar también con la dieta del tambo
-    saveDietaTambo({
-      vacasEnOrdeñe: payload.vacasEnOrdeñe || 187,
-      vacasPreparto: payload.vacasSecasPreparto || 25,
-      litrosPromedioVO: payload.litrosPromedioVO || 27.0,
-      actualizadoPor: `Extracción SQL Server (${host})`,
     });
 
     return {
       success: true,
-      mensaje: `✓ Sincronización exitosa: ${payload.vacasEnOrdeñe} VO, ${payload.litrosTotalesDia?.toLocaleString("es-AR")} lts/día, ${payload.partosRecientes?.length || 0} partos procesados.`,
+      mensaje: `✓ Sincronización exitosa: ${payload.vacasEnOrdeñe} VO, ${payload.litrosTotalesDia?.toLocaleString("es-AR")} lts/día, ${payload.partosRecientes?.length || 0} partos procesados. Todo el sistema actualizado.`,
       config,
     };
   } catch (err: any) {

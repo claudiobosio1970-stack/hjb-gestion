@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { initDelProFirestoreSync } from "@/lib/delproData";
 import Sidebar from "./Sidebar";
 
 export default function AppShell({
@@ -26,6 +27,8 @@ export default function AppShell({
       }
       setEmail(user.email ?? "");
       setReady(true);
+      // Inicializar enlace en vivo con DeLaval DelPro en segundo plano
+      initDelProFirestoreSync();
     });
     return unsubscribe;
   }, [router]);

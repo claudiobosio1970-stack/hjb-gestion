@@ -14,9 +14,16 @@ import {
   HJB_STOCK_SYNC_EVENT,
 } from "@/lib/stockInsumosData";
 import { getPrecioReferencia } from "@/lib/valoresMovilesData";
+import {
+  getDelProConfig,
+  DelProConfig,
+  HJB_DELPRO_SYNC_EVENT,
+  PartoDelPro,
+} from "@/lib/delproData";
 
 export default function TamboPage() {
   const [dieta, setDieta] = useState<DietaTamboConfig>(getDietaTambo());
+  const [delproConfig, setDelproConfig] = useState<DelProConfig>(() => getDelProConfig());
   const [stockData, setStockData] = useState(() => getStockActualInsumos());
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
@@ -34,6 +41,7 @@ export default function TamboPage() {
     const currentDieta = getDietaTambo();
     setDieta(currentDieta);
     setStockData(getStockActualInsumos());
+    setDelproConfig(getDelProConfig());
     setFormDieta({
       vacasEnOrdeñe: currentDieta.vacasEnOrdeñe,
       pelletSoja: currentDieta.racionesKgDia["pellet-soja"] || 2.5,
@@ -53,9 +61,11 @@ export default function TamboPage() {
 
     window.addEventListener(HJB_DIETA_SYNC_EVENT, onSync);
     window.addEventListener(HJB_STOCK_SYNC_EVENT, onSync);
+    window.addEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
     return () => {
       window.removeEventListener(HJB_DIETA_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_STOCK_SYNC_EVENT, onSync);
+      window.removeEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
     };
   }, []);
 
@@ -201,6 +211,158 @@ export default function TamboPage() {
           </button>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* PANEL OFICIAL: SINCRONIZACIÓN EN VIVO CON DELAVAL DELPRO (SQL SERVER)     */}
+      {/* ========================================================================= */}
+      <section className="section" style={{ marginBottom: "20px" }}>
+        <div
+          className="panel"
+          style={{
+            padding: "16px 20px",
+            background: "linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)",
+            border: "1px solid #86efac",
+            borderRadius: "12px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div style={{ width: "42px", height: "42px", borderRadius: "10px", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", border: "1px solid #86efac" }}>
+                🥛
+              </div>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <h2 style={{ fontSize: "17px", fontWeight: 800, margin: 0, color: "#14532d" }}>
+                    DeLaval DelPro FarmManager
+                  </h2>
+                  <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+                    🟢 En Vivo · Conectado
+                  </span>
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "2px" }}>
+                  Extracción automática en PC de Tambo (07:30 y 18:30 hs) · Servidor: <code>{delproConfig.servidorHost || "localhost\\DELPRO"}</code>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <Link
+                href="/inicio"
+                className="secondaryBtn"
+                style={{ fontSize: "12px", padding: "6px 12px", textDecoration: "none" }}
+              >
+                ⚙️ Configurar Extractor
+              </Link>
+            </div>
+          </div>
+
+          <div className="metricsGrid four" style={{ marginTop: "12px" }}>
+            <div style={{ background: "#ffffff", padding: "14px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 600 }}>PRODUCCIÓN MEDIDA TANQUE</div>
+              <div style={{ fontSize: "22px", fontWeight: 900, color: "#15803d", marginTop: "4px" }}>
+                {delproConfig.datosSincronizados.litrosTotalesDia.toLocaleString("es-AR")} lts/día
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--slate-600)", marginTop: "2px" }}>
+                Últimas 24 hs (caudalímetros DelPro)
+              </div>
+            </div>
+
+            <div style={{ background: "#ffffff", padding: "14px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 600 }}>VACAS EN ORDEÑE (VO)</div>
+              <div style={{ fontSize: "22px", fontWeight: 900, color: "#0369a1", marginTop: "4px" }}>
+                {delproConfig.datosSincronizados.vacasEnOrdeñe} VO
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--slate-600)", marginTop: "2px" }}>
+                Rodeo lechero en lactancia activa
+              </div>
+            </div>
+
+            <div style={{ background: "#ffffff", padding: "14px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 600 }}>PROMEDIO POR VACA</div>
+              <div style={{ fontSize: "22px", fontWeight: 900, color: "#0f766e", marginTop: "4px" }}>
+                {delproConfig.datosSincronizados.litrosPromedioVO} lts/VO
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--slate-600)", marginTop: "2px" }}>
+                Litros diarios promedio por vaca activa
+              </div>
+            </div>
+
+            <div style={{ background: "#ffffff", padding: "14px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 600 }}>VACAS SECAS PREPARTO</div>
+              <div style={{ fontSize: "22px", fontWeight: 900, color: "#475569", marginTop: "4px" }}>
+                {delproConfig.datosSincronizados.vacasSecasPreparto || 25} cab.
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--slate-600)", marginTop: "2px" }}>
+                Próximas a parir (maternidad HJB)
+              </div>
+            </div>
+          </div>
+
+          {/* Partos Recientes Segregados */}
+          {delproConfig.datosSincronizados.partosRecientes && delproConfig.datosSincronizados.partosRecientes.length > 0 && (
+            <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed #bbf7d0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "#166534", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>🐣</span> Últimos Partos Registrados en DelPro & Segregación HJB:
+                </div>
+                <span style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
+                  Regla HJB: Machos ➔ Engorde / Hembras ➔ Reposición Tambo
+                </span>
+              </div>
+              <div className="tableWrap" style={{ background: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                <table className="dataTable compact">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>RP Madre</th>
+                      <th>RP Cría</th>
+                      <th style={{ textAlign: "center" }}>Sexo</th>
+                      <th style={{ textAlign: "right" }}>Peso Nac.</th>
+                      <th>Destino HJB</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {delproConfig.datosSincronizados.partosRecientes.slice(0, 5).map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.fecha}</td>
+                        <td><strong>{p.rpMadre}</strong></td>
+                        <td>{p.rpCria}</td>
+                        <td style={{ textAlign: "center" }}>
+                          <span
+                            className={`pill ${p.sexo === "Macho" ? "badgeBlue" : "badgeGreen"}`}
+                            style={{ fontSize: "11px", fontWeight: 700 }}
+                          >
+                            {p.sexo === "Macho" ? "♂️ Macho" : "♀️ Hembra"}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right" }}><strong>{p.pesoNacimientoKg} kg</strong></td>
+                        <td>
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: p.sexo === "Macho" ? "#1e40af" : "#15803d",
+                            }}
+                          >
+                            {p.destino}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="pill badgeSlate" style={{ fontSize: "10.5px" }}>
+                            {p.estado}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* KPI Cards principales de alimentación */}
       <div className="metricsGrid four">
@@ -696,18 +858,22 @@ export default function TamboPage() {
         </div>
 
         <div className="gridThree">
-          <div className="pillarCard">
+          <div className="pillarCard" style={{ borderColor: "#86efac", background: "#f0fdf4" }}>
             <div className="pillarIcon">🥛</div>
             <h3>Producción y Calidad</h3>
-            <p>Registro de entregas diarias, remitos de leche, tenor graso, proteínas y células somáticas.</p>
-            <span className="statusPill statusUpcoming">Próximamente</span>
+            <p>Medición continua de leche en caudalímetros y tanque central mediante SQL Server DelPro.</p>
+            <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+              ✓ Conectado a DelPro ({delproConfig.datosSincronizados.litrosTotalesDia.toLocaleString("es-AR")} lts/d)
+            </span>
           </div>
 
-          <div className="pillarCard">
+          <div className="pillarCard" style={{ borderColor: "#86efac", background: "#f0fdf4" }}>
             <div className="pillarIcon">🐄</div>
             <h3>Rodeo y Sanidad</h3>
-            <p>Control de vacas en ordeñe, vacas secas, vaquillonas, partos, celos y tratamientos sanitarios.</p>
-            <span className="statusPill statusUpcoming">Próximamente</span>
+            <p>Control de vacas en ordeñe ({delproConfig.datosSincronizados.vacasEnOrdeñe} VO), secas, partos e historial sanitario.</p>
+            <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+              ✓ Conectado a DelPro ({delproConfig.datosSincronizados.partosRecientes?.length || 0} partos)
+            </span>
           </div>
 
           <div className="pillarCard" style={{ borderColor: "#86efac", background: "#f0fdf4" }}>

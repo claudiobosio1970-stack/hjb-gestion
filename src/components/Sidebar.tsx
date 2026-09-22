@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getDelProConfig, HJB_DELPRO_SYNC_EVENT } from "@/lib/delproData";
 
 type Props = {
   active?: string;
@@ -130,6 +132,18 @@ const secondaryNav = [
 ];
 
 export default function Sidebar({ active, email, onLogout, mobileOpen, onCloseMobile }: Props) {
+  const [delproConectado, setDelproConectado] = useState(false);
+
+  useEffect(() => {
+    function checkDelPro() {
+      const cfg = getDelProConfig();
+      setDelproConectado(cfg.estadoConexion === "conectado");
+    }
+    checkDelPro();
+    window.addEventListener(HJB_DELPRO_SYNC_EVENT, checkDelPro);
+    return () => window.removeEventListener(HJB_DELPRO_SYNC_EVENT, checkDelPro);
+  }, []);
+
   return (
     <aside className={`sidebar ${mobileOpen ? "sidebarMobileOpen" : ""}`}>
       <div className="sideTop">
@@ -159,6 +173,10 @@ export default function Sidebar({ active, email, onLogout, mobileOpen, onCloseMo
           <nav className="sideNav">
             {navigation.map((item) => {
               const isActive = active === item.name;
+              let itemBadge = item.badge;
+              if (item.name === "Tambo" && delproConectado) {
+                itemBadge = "🟢 DelPro";
+              }
               return (
                 <Link
                   key={item.name}
@@ -168,7 +186,18 @@ export default function Sidebar({ active, email, onLogout, mobileOpen, onCloseMo
                 >
                   <span className="navIcon">{item.icon}</span>
                   <span className="navLabel">{item.name}</span>
-                  {item.badge && <span className="navBadge">{item.badge}</span>}
+                  {itemBadge && (
+                    <span
+                      className="navBadge"
+                      style={
+                        itemBadge === "🟢 DelPro"
+                          ? { background: "#dcfce7", color: "#166534", fontWeight: 700 }
+                          : undefined
+                      }
+                    >
+                      {itemBadge}
+                    </span>
+                  )}
                 </Link>
               );
             })}

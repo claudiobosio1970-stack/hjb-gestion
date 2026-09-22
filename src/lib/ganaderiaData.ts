@@ -404,10 +404,98 @@ export function getTropas(): TropaGanadera[] {
   }
 }
 
+export const HJB_GANADERIA_SYNC_EVENT = "hjb_ganaderia_sync_event";
+
 export function saveTropas(tropas: TropaGanadera[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_TROPAS, JSON.stringify(tropas));
+  window.dispatchEvent(new CustomEvent(HJB_GANADERIA_SYNC_EVENT, { detail: { tropas } }));
 }
+
+/**
+ * Sincroniza automáticamente las cabezas de machos en recría y terminación
+ * a partir de las extracciones de DeLaval DelPro.
+ */
+export function sincronizarGanaderiaDesdeDelPro(
+  machosPorCorral?: {
+    guachera?: number;
+    rm1?: number;
+    rm2?: number;
+    rm3?: number;
+    terminacion?: number;
+  },
+  partosRecientes?: Array<{
+    id: string;
+    fecha: string;
+    rpMadre: string;
+    rpCria: string;
+    sexo: "Macho" | "Hembra";
+    pesoNacimientoKg: number;
+    destino: string;
+    estado: string;
+    observaciones?: string;
+  }>
+): TropaGanadera[] {
+  if (typeof window === "undefined") return TROPAS_DEFAULT;
+
+  const currentTropas = getTropas();
+  let updatedTropas = [...currentTropas];
+
+  if (machosPorCorral) {
+    updatedTropas = updatedTropas.map((tropa) => {
+      if (tropa.corralId === "guachera" && machosPorCorral.guachera !== undefined) {
+        return { ...tropa, cabezas: Math.max(0, machosPorCorral.guachera) };
+      }
+      if (tropa.corralId === "rm1" && machosPorCorral.rm1 !== undefined) {
+        return { ...tropa, cabezas: Math.max(0, machosPorCorral.rm1) };
+      }
+      if (tropa.corralId === "rm2" && machosPorCorral.rm2 !== undefined) {
+        return { ...tropa, cabezas: Math.max(0, machosPorCorral.rm2) };
+      }
+      if (tropa.corralId === "rm3" && machosPorCorral.rm3 !== undefined) {
+        return { ...tropa, cabezas: Math.max(0, machosPorCorral.rm3) };
+      }
+      if (tropa.corralId === "terminacion" && machosPorCorral.terminacion !== undefined) {
+        return { ...tropa, cabezas: Math.max(0, machosPorCorral.terminacion) };
+      }
+      return tropa;
+    });
+  }
+
+  saveTropas(updatedTropas);
+
+  if (partosRecientes && partosRecientes.length > 0) {
+    try {
+      localStorage.setItem("hjb_delpro_partos_recientes", JSON.stringify(partosRecientes));
+    } catch {
+      // ignore
+    }
+  }
+
+  window.dispatchEvent(new CustomEvent(HJB_GANADERIA_SYNC_EVENT, { detail: { tropas: updatedTropas, machosPorCorral } }));
+  return updatedTropas;
+}
+
+export function getPartosRecientesDelPro(): Array<{
+  id: string;
+  fecha: string;
+  rpMadre: string;
+  rpCria: string;
+  sexo: "Macho" | "Hembra";
+  pesoNacimientoKg: number;
+  destino: string;
+  estado: string;
+  observaciones?: string;
+}> {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("hjb_delpro_partos_recientes");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
 
 export function getPesajes(): PesajeRegistro[] {
   if (typeof window === "undefined") return PESAJES_DEFAULT;

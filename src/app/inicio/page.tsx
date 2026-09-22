@@ -26,6 +26,7 @@ import {
   toggleConfirmacionNovillo,
   confirmarListaNovillos,
   HJB_NOVILLOS_CONFIRMADOS_EVENT,
+  HJB_GANADERIA_SYNC_EVENT,
   getCostoDiarioPorAnimal,
 } from "@/lib/ganaderiaData";
 import { getPrecioReferencia } from "@/lib/valoresMovilesData";
@@ -182,6 +183,7 @@ export default function InicioPage() {
     window.addEventListener(HJB_STOCK_SYNC_EVENT, onSync);
     window.addEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
     window.addEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
+    window.addEventListener(HJB_GANADERIA_SYNC_EVENT, onSync);
     window.addEventListener(HJB_NOVILLOS_CONFIRMADOS_EVENT, onNovillosSync);
 
     return () => {
@@ -189,6 +191,7 @@ export default function InicioPage() {
       window.removeEventListener(HJB_STOCK_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
+      window.removeEventListener(HJB_GANADERIA_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_NOVILLOS_CONFIRMADOS_EVENT, onNovillosSync);
     };
   }, []);

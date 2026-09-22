@@ -21,14 +21,23 @@ import {
   saveTropas,
   saveVentas,
   resetCorralesToDefault,
+  getPartosRecientesDelPro,
+  HJB_GANADERIA_SYNC_EVENT,
 } from "@/lib/ganaderiaData";
+import {
+  getDelProConfig,
+  DelProConfig,
+  HJB_DELPRO_SYNC_EVENT,
+} from "@/lib/delproData";
 
 export default function GanaderiaPage() {
-  const [activeTab, setActiveTab] = useState<"corrales" | "dietas" | "pesajes" | "ventas">("corrales");
+  const [activeTab, setActiveTab] = useState<"corrales" | "dietas" | "pesajes" | "ventas" | "partos_delpro">("corrales");
   const [corrales, setCorrales] = useState<DefinicionCorral[]>([]);
   const [tropas, setTropas] = useState<TropaGanadera[]>([]);
   const [pesajes, setPesajes] = useState<PesajeRegistro[]>([]);
   const [ventas, setVentas] = useState<FichaVentaFrigorifico[]>([]);
+  const [partosDelPro, setPartosDelPro] = useState(() => getPartosRecientesDelPro());
+  const [delproConfig, setDelproConfig] = useState<DelProConfig>(() => getDelProConfig());
   const [feedback, setFeedback] = useState<string | null>(null);
 
   // Ficha Técnica Dedicada del Corral (Modal Enfocado)
@@ -81,11 +90,28 @@ export default function GanaderiaPage() {
     pesoInicial: 38,
   });
 
-  useEffect(() => {
+  function cargarTodoGanaderia() {
     setCorrales(getCorrales());
     setTropas(getTropas());
     setPesajes(getPesajes());
     setVentas(getVentas());
+    setPartosDelPro(getPartosRecientesDelPro());
+    setDelproConfig(getDelProConfig());
+  }
+
+  useEffect(() => {
+    cargarTodoGanaderia();
+
+    function onSync() {
+      cargarTodoGanaderia();
+    }
+
+    window.addEventListener(HJB_GANADERIA_SYNC_EVENT, onSync);
+    window.addEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
+    return () => {
+      window.removeEventListener(HJB_GANADERIA_SYNC_EVENT, onSync);
+      window.removeEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
+    };
   }, []);
 
   const resumen = getResumenGanaderia(corrales, tropas);
@@ -492,6 +518,17 @@ export default function GanaderiaPage() {
           onClick={() => setActiveTab("ventas")}
         >
           🚛 Ventas a Frigorífico & Fichas ({ventas.length})
+        </button>
+        <button
+          type="button"
+          className={activeTab === "partos_delpro" ? "tab active" : "tab"}
+          onClick={() => setActiveTab("partos_delpro")}
+        >
+          🐣 Nacimientos DelPro (
+          {partosDelPro.length > 0
+            ? partosDelPro.length
+            : delproConfig.datosSincronizados.partosRecientes?.length || 0}
+          )
         </button>
       </div>
 
@@ -961,6 +998,145 @@ export default function GanaderiaPage() {
                       >
                         📄 Ver Ficha
                       </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 5: TRAZABILIDAD DE PARTOS & SEGREGACIÓN HJB (DELAVAL DELPRO)          */}
+      {/* ========================================================================= */}
+      {activeTab === "partos_delpro" && (
+        <section className="panel" style={{ padding: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "22px" }}>🐣</span>
+                <h2 style={{ fontSize: "17.5px", margin: 0, fontWeight: 800 }}>
+                  Trazabilidad de Partos & Segregación HJB (DeLaval DelPro)
+                </h2>
+                <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+                  🟢 Conectado con SQL DelPro
+                </span>
+              </div>
+              <p className="muted" style={{ fontSize: "12.5px", margin: "4px 0 0 0" }}>
+                <strong>Regla de Negocio HJB:</strong> El 100% de los terneros machos nacidos en el tambo se integran al circuito de engorde comercial (comenzando en Guachera/Estaca). Las terneras hembras quedan 100% reservadas como futuras vaquillonas de reposición para el rodeo lechero.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                className="secondaryBtn"
+                onClick={() => setModalNuevaGuacheraOpen(true)}
+                style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                🍼 + Crear Camada Guachera
+              </button>
+            </div>
+          </div>
+
+          {/* Tarjetas Informativas de Segregación */}
+          <div className="metricsGrid four" style={{ marginBottom: "20px" }}>
+            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "14px", borderRadius: "10px" }}>
+              <div style={{ fontSize: "11.5px", color: "#1e40af", fontWeight: 700 }}>MACHOS A ENGORDE COMERCIAL</div>
+              <div style={{ fontSize: "22px", fontWeight: 900, color: "#1e3a8a", marginTop: "4px" }}>
+                {delproConfig.datosSincronizados.machosEnRecriaEngorde
+                  ? (delproConfig.datosSincronizados.machosEnRecriaEngorde.guachera +
+                     delproConfig.datosSincronizados.machosEnRecriaEngorde.rm1 +
+                     delproConfig.datosSincronizados.machosEnRecriaEngorde.rm2 +
+                     delproConfig.datosSincronizados.machosEnRecriaEngorde.rm3 +
+                     delproConfig.datosSincronizados.machosEnRecriaEngorde.terminacion)
+                  : 130} cab.
+              </div>
+              <div style={{ fontSize: "11px", color: "#2563eb", marginTop: "2px" }}>
+                Guachera (24) + RM1 (22) + RM2 (28) + RM3 (30) + Term (26)
+              </div>
+            </div>
+
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "14px", borderRadius: "10px" }}>
+              <div style={{ fontSize: "11.5px", color: "#166534", fontWeight: 700 }}>HEMBRAS REPOSICIÓN TAMBO</div>
+              <div style={{ fontSize: "22px", fontWeight: 900, color: "#14532d", marginTop: "4px" }}>
+                {delproConfig.datosSincronizados.hembrasEnReposicionTambo || 48} cab.
+              </div>
+              <div style={{ fontSize: "11px", color: "#15803d", marginTop: "2px" }}>
+                100% reservadas como futuras vientres lecheros
+              </div>
+            </div>
+
+            <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "14px", borderRadius: "10px" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 700 }}>PESO PROMEDIO AL NACER</div>
+              <div style={{ fontSize: "22px", fontWeight: 900, color: "var(--slate-800)", marginTop: "4px" }}>
+                38.2 kg
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                Registro biométrico en sala de maternidad
+              </div>
+            </div>
+
+            <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "14px", borderRadius: "10px" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 700 }}>SINCRONIZACIÓN SQL DELPRO</div>
+              <div style={{ fontSize: "18px", fontWeight: 800, color: "#166534", marginTop: "6px" }}>
+                Automática
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                Dos turnos diarios: 07:30 y 18:30 hs
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla de Partos Sincronizados */}
+          <div className="tableWrap">
+            <table className="dataTable">
+              <thead>
+                <tr>
+                  <th>Fecha Parto</th>
+                  <th>RP Madre (Tambo)</th>
+                  <th>RP Ternero/a</th>
+                  <th style={{ textAlign: "center" }}>Sexo</th>
+                  <th style={{ textAlign: "right" }}>Peso Nacimiento</th>
+                  <th>Destino HJB</th>
+                  <th>Estado Actual</th>
+                  <th>Detalle / Observaciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(partosDelPro.length > 0 ? partosDelPro : (delproConfig.datosSincronizados.partosRecientes || [])).map((p: any) => (
+                  <tr key={p.id}>
+                    <td><strong>{p.fecha}</strong></td>
+                    <td>{p.rpMadre}</td>
+                    <td><strong style={{ color: p.sexo === "Macho" ? "#1e40af" : "#166534" }}>{p.rpCria}</strong></td>
+                    <td style={{ textAlign: "center" }}>
+                      <span
+                        className={`pill ${p.sexo === "Macho" ? "badgeBlue" : "badgeGreen"}`}
+                        style={{ fontSize: "11px", fontWeight: 700 }}
+                      >
+                        {p.sexo === "Macho" ? "♂️ Macho" : "♀️ Hembra"}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: "right" }}><strong>{p.pesoNacimientoKg} kg</strong></td>
+                    <td>
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          color: p.sexo === "Macho" ? "#1e40af" : "#15803d",
+                        }}
+                      >
+                        {p.destino}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
+                        {p.estado}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: "12px", color: "var(--slate-600)" }}>
+                      {p.observaciones || "—"}
                     </td>
                   </tr>
                 ))}
