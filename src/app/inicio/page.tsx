@@ -21,6 +21,11 @@ import {
   getTropas,
   DefinicionCorral,
   TropaGanadera,
+  NovilloTerminacion,
+  getNovillosTerminacion,
+  toggleConfirmacionNovillo,
+  confirmarListaNovillos,
+  HJB_NOVILLOS_CONFIRMADOS_EVENT,
 } from "@/lib/ganaderiaData";
 import { getPrecioReferencia } from "@/lib/valoresMovilesData";
 import {
@@ -41,10 +46,12 @@ export default function InicioPage() {
   const [corrales, setCorrales] = useState<DefinicionCorral[]>([]);
   const [tropas, setTropas] = useState<TropaGanadera[]>([]);
   const [delproConfig, setDelproConfig] = useState<DelProConfig>(() => getDelProConfig());
+  const [novillosTerminacion, setNovillosTerminacion] = useState<NovilloTerminacion[]>(() => getNovillosTerminacion());
 
   // Modales
   const [modalParametrosOpen, setModalParametrosOpen] = useState(false);
   const [modalDelProOpen, setModalDelProOpen] = useState(false);
+  const [modalConfirmarFaenaOpen, setModalConfirmarFaenaOpen] = useState(false);
   const [tabDelProModal, setTabDelProModal] = useState<TabDelProModal>("sql_extractor");
   const [feedbackDelPro, setFeedbackDelPro] = useState<string | null>(null);
   const [copiadoSql, setCopiadoSql] = useState(false);
@@ -88,6 +95,7 @@ export default function InicioPage() {
     setCorrales(getCorrales());
     setTropas(getTropas());
     setDelproConfig(getDelProConfig());
+    setNovillosTerminacion(getNovillosTerminacion());
     setFormParametros({
       litrosPromedioVO: d.litrosPromedioVO ?? 27.0,
       precioLitroLecheArs: d.precioLitroLecheArs ?? 549.0,
@@ -103,16 +111,22 @@ export default function InicioPage() {
       cargarTodo();
     }
 
+    function onNovillosSync() {
+      setNovillosTerminacion(getNovillosTerminacion());
+    }
+
     window.addEventListener(HJB_DIETA_SYNC_EVENT, onSync);
     window.addEventListener(HJB_STOCK_SYNC_EVENT, onSync);
     window.addEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
     window.addEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
+    window.addEventListener(HJB_NOVILLOS_CONFIRMADOS_EVENT, onNovillosSync);
 
     return () => {
       window.removeEventListener(HJB_DIETA_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_STOCK_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_AGRICULTURE_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
+      window.removeEventListener(HJB_NOVILLOS_CONFIRMADOS_EVENT, onNovillosSync);
     };
   }, []);
 
@@ -186,7 +200,6 @@ export default function InicioPage() {
   // Costo Total
   const costoTotalVODia = Number((costoAlimentacionVODia + costoOperativoVODia).toFixed(2));
   const costoTotalRodeoDia = Math.round(costoTotalVODia * vacasVO);
-  const costoTotalEnLitros = Number((costoAlimentacionEnLitros + costoOperativoLitrosVO).toFixed(2));
 
   // Litros Libres y Ganancia Neta
   const gananciaPesosPorVODia = Number((facturacionPorVODia - costoTotalVODia).toFixed(2));
@@ -195,102 +208,141 @@ export default function InicioPage() {
   const margenNetoPct = facturacionLecheDia > 0 ? Number(((gananciaPesosRodeoDia / facturacionLecheDia) * 100).toFixed(1)) : 30.5;
 
   // =========================================================================
-  // 2. CÁLCULOS AGRICULTURA & USO DEL SUELO (279 ha)
+  // 2. CÁLCULOS AGRICULTURA — MATRIZ REAL AUDITADA (279 ha · 142 ha de MAÍZ)
   // =========================================================================
   const superficieTotalHa = 279;
   const matrizAgricola = [
-    { cultivo: "Soja 1ra", destino: "Comercial (Granos AFA Los Cardos)", ha: 85, pct: 30.5, estado: "En desarrollo vegetativo", tipo: "granos" },
-    { cultivo: "Alfalfa Henificada", destino: "Forraje Tambo HJB (Rollos)", ha: 65, pct: 23.3, estado: "En producción / cortes", tipo: "forraje" },
-    { cultivo: "Maíz Grano Seco", destino: "Comercial (Granos AFA Los Cardos)", ha: 45, pct: 16.1, estado: "Campaña gruesa", tipo: "granos" },
-    { cultivo: "Maíz Silo Planta Entera", destino: "Forraje Tambo HJB (Picado fino)", ha: 44, pct: 15.8, estado: "Embolsado / Silobolsa", tipo: "forraje" },
-    { cultivo: "Avena / Verdeos", destino: "Pastoreo directo Tambo HJB", ha: 40, pct: 14.3, estado: "Pastoreo activo", tipo: "forraje" },
+    {
+      cultivo: "Maíz Grano Comercial (AFA)",
+      lotes: "Racca L2 (50 ha), Kitty (29 ha), Aguilera (20 ha)",
+      destino: "Comercial (Granos AFA Los Cardos)",
+      ha: 99,
+      pct: 35.5,
+      estado: "Campaña gruesa comercial",
+      tipo: "granos",
+      esMaiz: true,
+    },
+    {
+      cultivo: "Soja 1ra / 2da (AFA)",
+      lotes: "Racca L1 (50 ha), Keuneke L1 (48 ha Avena/Soja)",
+      destino: "Comercial (Granos AFA Los Cardos)",
+      ha: 98,
+      pct: 35.1,
+      estado: "En desarrollo vegetativo",
+      tipo: "granos",
+      esMaiz: false,
+    },
+    {
+      cultivo: "Maíz Silo / Doble Propósito (Tambo)",
+      lotes: "Tambo L1 (7 ha), L2 (10 ha), L3 (11 ha), L4 (5 ha), L7 (10 ha)",
+      destino: "Forraje Tambo HJB (Picado fino & Silo)",
+      ha: 43,
+      pct: 15.4,
+      estado: "Embolsado / Silobolsa",
+      tipo: "forraje",
+      esMaiz: true,
+    },
+    {
+      cultivo: "Alfalfa Henificada (Rollos Tambo)",
+      lotes: "Keuneke L2 (9 ha), Tambo L5 (3 ha), L6 (10 ha), L8 (10 ha), L9 (7 ha)",
+      destino: "Forraje Tambo HJB (Rollos)",
+      ha: 39,
+      pct: 14.0,
+      estado: "En producción / cortes",
+      tipo: "forraje",
+      esMaiz: false,
+    },
   ];
-  const haGranosAFA = 130 + 20; // 150 ha comerciales
-  const haForrajeTambo = 129; // 129 ha forraje tambo
+
+  const totalMaizHa = 99 + 43; // 142 ha de maíz en total
+  const haGranosComerciales = 99 + 98; // 197 ha para granos AFA
+  const haForrajesTambo = 43 + 39; // 82 ha para tambo
 
   // =========================================================================
-  // 3. CÁLCULOS GANADERÍA & SALIDA DE GORDOS (SOLO MACHOS)
+  // 3. CÁLCULOS GANADERÍA — NOVILLOS ESCALONADOS Y CONFIRMACIÓN DE FAENA
   // =========================================================================
   const totalMachosEngorde = 130;
-  const tropaTerminacion = useMemo(() => {
-    return tropas.find((t) => t.corralId === "terminacion") || {
-      id: "tropa-cg-1",
-      codigo: "TR-26-GORDOS",
-      nombre: "Lote Terminación Frigorífico (Solo Machos)",
-      corralId: "terminacion" as const,
-      cabezas: 26,
-      fechaIngreso: "20/06/26",
-      diasEnCorral: 87,
-      pesoInicialKg: 274,
-      pesoActualKg: 404.0,
-      gdpvKgDia: 1.49,
-      origen: "Solo Machos Tambo HJB (DelPro)",
-    };
-  }, [tropas]);
+  const novillosConfirmados = useMemo(() => {
+    return novillosTerminacion.filter((n) => n.confirmadoVenta);
+  }, [novillosTerminacion]);
 
-  const proximaVentaGordos = useMemo(() => {
-    const cabezas = tropaTerminacion.cabezas || 26;
-    const pesoActual = tropaTerminacion.pesoActualKg || 404;
-    const pesoObj = 410;
-    const gdpv = tropaTerminacion.gdpvKgDia || 1.49;
-    const dias = gdpv > 0 ? Math.ceil((pesoObj - pesoActual) / gdpv) : 4;
+  const novillosEnEngordeContinuo = useMemo(() => {
+    return novillosTerminacion.filter((n) => !n.confirmadoVenta);
+  }, [novillosTerminacion]);
+
+  const proyeccionVentaConfirmada = useMemo(() => {
+    const cabezas = novillosConfirmados.length;
     const precioKg = dieta.precioNovilloGordoVivoArs ?? 4200;
-    const pesoNeto = Math.round(cabezas * pesoObj * 0.93); // 7% desbaste
+    const pesoBrutoTotal = novillosConfirmados.reduce((sum, n) => sum + n.pesoActualEstimadoKg, 0);
+    const pesoPromedioActual = cabezas > 0 ? Math.round(pesoBrutoTotal / cabezas) : 410;
+    const pesoNeto = Math.round(pesoBrutoTotal * 0.93); // 7% desbaste
     const facturacion = Math.round(pesoNeto * precioKg);
+    const diasSalida = 4; // Salida próxima de la tanda confirmada
+
     return {
       cabezas,
-      pesoActual,
-      pesoObj,
-      dias,
-      facturacion,
+      pesoBrutoTotal,
+      pesoPromedioActual,
       pesoNeto,
+      facturacion,
+      diasSalida,
     };
-  }, [tropaTerminacion, dieta.precioNovilloGordoVivoArs]);
+  }, [novillosConfirmados, dieta.precioNovilloGordoVivoArs]);
 
   const tablaCorralesMachos = [
     {
       etapa: "5. Terminación (Gordos)",
-      cabezas: proximaVentaGordos.cabezas,
-      peso: `${proximaVentaGordos.pesoActual} kg`,
-      objetivo: `${proximaVentaGordos.pesoObj} kg`,
+      cabezasTotal: 26,
+      cabezasConfirmadas: proyeccionVentaConfirmada.cabezas,
+      cabezasContinuo: novillosEnEngordeContinuo.length,
+      peso: `${proyeccionVentaConfirmada.pesoPromedioActual} kg`,
+      objetivo: "410 kg",
       gdpv: "+1.49 kg/d",
-      estado: `🥩 Salida en ~${proximaVentaGordos.dias} días ($${(proximaVentaGordos.facturacion / 1000000).toFixed(2)}M)`,
+      estado: `🥩 ${proyeccionVentaConfirmada.cabezas} novillos confirmados para faena (~$${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M) · ${novillosEnEngordeContinuo.length} novillos en engorde continuo`,
       destacado: true,
     },
     {
       etapa: "4. Recría Mixta 3 (RM3)",
-      cabezas: 30,
+      cabezasTotal: 30,
+      cabezasConfirmadas: 0,
+      cabezasContinuo: 30,
       peso: "262 kg",
       objetivo: "270 kg",
       gdpv: "+0.83 kg/d",
-      estado: "Pase próximo a Terminación",
+      estado: "Pase próximo a Terminación (preparación engorde)",
       destacado: false,
     },
     {
       etapa: "3. Recría Mixta 2 (RM2)",
-      cabezas: 28,
+      cabezasTotal: 28,
+      cabezasConfirmadas: 0,
+      cabezasContinuo: 28,
       peso: "165 kg",
       objetivo: "170 kg",
       gdpv: "+0.93 kg/d",
-      estado: "En desarrollo a corral",
+      estado: "En desarrollo a corral (crecimiento estructural)",
       destacado: false,
     },
     {
       etapa: "2. Recría Mixta 1 (RM1)",
-      cabezas: 22,
+      cabezasTotal: 22,
+      cabezasConfirmadas: 0,
+      cabezasContinuo: 22,
       peso: "106 kg",
       objetivo: "115 kg",
       gdpv: "+1.29 kg/d",
-      estado: "Transición post-guachera",
+      estado: "Transición post-guachera (rumen temprano)",
       destacado: false,
     },
     {
       etapa: "1. Guachera / Estaca",
-      cabezas: 24,
+      cabezasTotal: 24,
+      cabezasConfirmadas: 0,
+      cabezasContinuo: 24,
       peso: "74 kg",
       objetivo: "80 kg",
       gdpv: "+0.62 kg/d",
-      estado: "Crianza inicial (Hembras van al Tambo)",
+      estado: "Crianza individual de machos (Hembras van 100% al Tambo)",
       destacado: false,
     },
   ];
@@ -298,7 +350,7 @@ export default function InicioPage() {
   return (
     <AppShell active="Inicio">
       {/* ========================================================================= */}
-      {/* 1. ENCABEZADO LIMPIO & EJECUTIVO                                          */}
+      {/* 1. ENCABEZADO LIMPIO & ACCESOS RÁPIDOS                                    */}
       {/* ========================================================================= */}
       <div
         style={{
@@ -367,7 +419,7 @@ export default function InicioPage() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. LAS 3 TARJETAS KPI PRINCIPALES (PANTALLAZO RÁPIDO)                     */}
+      {/* 2. LAS 3 TARJETAS KPI PRINCIPALES                                         */}
       {/* ========================================================================= */}
       <div
         style={{
@@ -427,13 +479,13 @@ export default function InicioPage() {
             </Link>
           </div>
           <div style={{ fontSize: "28px", fontWeight: 900, color: "#c2410c", marginTop: "4px" }}>
-            {superficieTotalHa} Hectáreas
+            {totalMaizHa} ha Maíz <span style={{ fontSize: "16px", color: "var(--slate-500)", fontWeight: 700 }}>(51%)</span>
           </div>
           <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "4px" }}>
-            <strong>{haGranosAFA} ha</strong> Granos Comerciales (AFA) · <strong>{haForrajeTambo} ha</strong> Forraje Tambo
+            <strong>99 ha</strong> Maíz Grano AFA · <strong>43 ha</strong> Maíz Silo Tambo · 98 ha Soja · 39 ha Alfalfa
           </div>
           <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
-            5 campos agrícolas integrados a la producción
+            279 ha totales trabajadas en los 5 campos
           </div>
         </div>
 
@@ -450,26 +502,39 @@ export default function InicioPage() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <span style={{ fontSize: "12px", fontWeight: 800, color: "#1e40af", textTransform: "uppercase" }}>
-              🥩 Ganadería (Solo Machos)
+              🥩 Ganadería (Engorde Escalonado)
             </span>
-            <Link href="/ganaderia" style={{ fontSize: "11.5px", color: "#2563eb", fontWeight: 700, textDecoration: "none" }}>
-              Ver corrales →
-            </Link>
+            <button
+              type="button"
+              onClick={() => setModalConfirmarFaenaOpen(true)}
+              style={{
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                color: "#1d4ed8",
+                fontSize: "11px",
+                fontWeight: 700,
+                borderRadius: "4px",
+                padding: "2px 7px",
+                cursor: "pointer",
+              }}
+            >
+              📋 Confirmar faena
+            </button>
           </div>
           <div style={{ fontSize: "28px", fontWeight: 900, color: "#1d4ed8", marginTop: "4px" }}>
-            {proximaVentaGordos.cabezas} Novillos Faena
+            {proyeccionVentaConfirmada.cabezas} Novillos Confirmados
           </div>
           <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "4px" }}>
-            Salida en <strong>~{proximaVentaGordos.dias} días</strong> ({proximaVentaGordos.pesoActual} kg → {proximaVentaGordos.pesoObj} kg)
+            Salida en <strong>~{proyeccionVentaConfirmada.diasSalida} días</strong> · Facturación est.: <strong>${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M</strong>
           </div>
           <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
-            Facturación proyectada: ~${(proximaVentaGordos.facturacion / 1000000).toFixed(2)}M · {totalMachosEngorde} machos en recría
+            {novillosEnEngordeContinuo.length} novillos en engorde continuo · Total corral: 26 novillos
           </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. LAS 3 TABLAS PRINCIPALES (DATOS CLAVE POR UNIDAD DE NEGOCIO)           */}
+      {/* 3. LAS 3 TABLAS PRINCIPALES DEL DASHBOARD                                 */}
       {/* ========================================================================= */}
       <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
         
@@ -575,7 +640,7 @@ export default function InicioPage() {
           </div>
         </div>
 
-        {/* TABLA 2: AGRICULTURA & USO DEL SUELO */}
+        {/* TABLA 2: AGRICULTURA — MATRIZ REAL AUDITADA CON 142 ha DE MAÍZ */}
         <div className="card" style={{ padding: "18px 20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -584,8 +649,8 @@ export default function InicioPage() {
                 2. Agricultura — Matriz de Cultivos y Destinos (279 ha)
               </h2>
             </div>
-            <div style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
-              5 campos: Aguilera, Tambo, Racca, Don Pedro, La Unión
+            <div style={{ fontSize: "12px", color: "#c2410c", fontWeight: 800 }}>
+              🌽 Total Maíz: {totalMaizHa} ha (50,9% de la superficie)
             </div>
           </div>
 
@@ -593,50 +658,55 @@ export default function InicioPage() {
             <table className="dataTable">
               <thead>
                 <tr>
-                  <th style={{ minWidth: "200px" }}>Cultivo / Especie</th>
-                  <th style={{ minWidth: "220px" }}>Destino Principal</th>
+                  <th style={{ minWidth: "220px" }}>Cultivo & Destino</th>
+                  <th style={{ minWidth: "240px" }}>Lotes y Campos Asignados</th>
                   <th style={{ width: "120px", textAlign: "right" }}>Superficie</th>
-                  <th style={{ width: "120px", textAlign: "right" }}>% Ocupación</th>
-                  <th style={{ width: "180px", textAlign: "center" }}>Estado / Campaña</th>
+                  <th style={{ width: "110px", textAlign: "right" }}>% Campo</th>
+                  <th style={{ width: "180px", textAlign: "center" }}>Destino Principal</th>
                 </tr>
               </thead>
               <tbody>
                 {matrizAgricola.map((item, idx) => (
-                  <tr key={idx}>
+                  <tr
+                    key={idx}
+                    style={{
+                      background: item.esMaiz ? "#fffbeb" : "transparent",
+                    }}
+                  >
                     <td>
-                      <strong>{item.cultivo}</strong>
+                      <strong style={{ color: item.esMaiz ? "#92400e" : "var(--slate-800)" }}>
+                        {item.cultivo}
+                      </strong>
                     </td>
-                    <td>
-                      <span
-                        style={{
-                          display: "inline-block",
-                          padding: "2px 8px",
-                          borderRadius: "4px",
-                          fontSize: "11.5px",
-                          fontWeight: 700,
-                          background: item.tipo === "granos" ? "#fef3c7" : "#dbeafe",
-                          color: item.tipo === "granos" ? "#92400e" : "#1e40af",
-                        }}
-                      >
-                        {item.destino}
-                      </span>
+                    <td style={{ fontSize: "12px", color: "var(--slate-600)" }}>
+                      {item.lotes}
                     </td>
-                    <td style={{ textAlign: "right", fontWeight: 800 }}>
+                    <td style={{ textAlign: "right", fontWeight: 800, color: item.esMaiz ? "#b45309" : "var(--slate-900)" }}>
                       {item.ha} ha
                     </td>
                     <td style={{ textAlign: "right", color: "var(--slate-600)" }}>
                       {item.pct}%
                     </td>
                     <td style={{ textAlign: "center" }}>
-                      <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
-                        {item.estado}
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          background: item.tipo === "granos" ? "#fef3c7" : "#dbeafe",
+                          color: item.tipo === "granos" ? "#92400e" : "#1e40af",
+                        }}
+                      >
+                        {item.tipo === "granos" ? "Comercial AFA" : "Forraje Tambo HJB"}
                       </span>
                     </td>
                   </tr>
                 ))}
                 <tr style={{ background: "#f8fafc", fontWeight: 800, borderTop: "2px solid var(--line)" }}>
                   <td colSpan={2}>
-                    Total Superficie Agrícola HJB
+                    Total Superficie Agrícola HJB (5 campos)
                   </td>
                   <td style={{ textAlign: "right", color: "var(--slate-900)" }}>
                     {superficieTotalHa} ha
@@ -645,7 +715,7 @@ export default function InicioPage() {
                     100.0%
                   </td>
                   <td style={{ textAlign: "center", fontSize: "11.5px", color: "var(--slate-600)" }}>
-                    150 ha Granos · 129 ha Forrajes
+                    197 ha Granos AFA · 82 ha Forrajes Tambo
                   </td>
                 </tr>
               </tbody>
@@ -653,7 +723,7 @@ export default function InicioPage() {
           </div>
         </div>
 
-        {/* TABLA 3: GANADERÍA & CORRALES DE MACHOS */}
+        {/* TABLA 3: GANADERÍA — ENGORDE ESCALONADO Y CONFIRMACIÓN DE FAENA */}
         <div className="card" style={{ padding: "18px 20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -662,13 +732,27 @@ export default function InicioPage() {
                 3. Ganadería — Engorde a Corral de Machos ({totalMachosEngorde} cab.)
               </h2>
             </div>
-            <div style={{ fontSize: "11.5px", color: "#166534", fontWeight: 700 }}>
-              ✓ Regla HJB: Hembras van 100% al Tambo (Reposición)
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={() => setModalConfirmarFaenaOpen(true)}
+                className="secondaryBtn"
+                style={{
+                  fontSize: "12px",
+                  padding: "5px 12px",
+                  fontWeight: 800,
+                  background: "#eff6ff",
+                  border: "1px solid #93c5fd",
+                  color: "#1d4ed8",
+                }}
+              >
+                📋 Confirmar Novillos para Frigorífico ({proyeccionVentaConfirmada.cabezas})
+              </button>
             </div>
           </div>
 
           <p style={{ fontSize: "12px", color: "var(--slate-500)", margin: "0 0 12px 0" }}>
-            Solo los terneros machos nacidos ingresan al circuito de engorde comercial con destino a frigorífico.
+            Lógica escalonada DelPro: los novillos ingresan en tandas y no todos salen juntos. Solo los machos van a faena; las hembras van 100% al tambo.
           </p>
 
           <div className="tableWrap">
@@ -680,7 +764,7 @@ export default function InicioPage() {
                   <th style={{ width: "110px", textAlign: "right" }}>Peso Promedio</th>
                   <th style={{ width: "110px", textAlign: "right" }}>Peso Objetivo</th>
                   <th style={{ width: "120px", textAlign: "right" }}>Ganancia (GDPV)</th>
-                  <th style={{ minWidth: "200px", textAlign: "left" }}>Estado & Destino</th>
+                  <th style={{ minWidth: "220px", textAlign: "left" }}>Estado & Salida Escalonada</th>
                 </tr>
               </thead>
               <tbody>
@@ -698,7 +782,7 @@ export default function InicioPage() {
                       </strong>
                     </td>
                     <td style={{ textAlign: "right", fontWeight: 800 }}>
-                      {corral.cabezas} cab.
+                      {corral.cabezasTotal} cab.
                     </td>
                     <td style={{ textAlign: "right" }}>
                       {corral.peso}
@@ -713,9 +797,14 @@ export default function InicioPage() {
                     </td>
                     <td>
                       {corral.destacado ? (
-                        <span style={{ color: "#c2410c", fontWeight: 800, fontSize: "12.5px" }}>
-                          {corral.estado}
-                        </span>
+                        <div>
+                          <div style={{ color: "#c2410c", fontWeight: 800, fontSize: "12.5px" }}>
+                            🥩 {corral.cabezasConfirmadas} novillos confirmados para venta inmediata (~${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M)
+                          </div>
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                            ⏳ {corral.cabezasContinuo} novillos continúan en engorde (salida escalonada a 35d y 70d)
+                          </div>
+                        </div>
                       ) : (
                         <span style={{ color: "var(--slate-600)", fontSize: "12px" }}>
                           {corral.estado}
@@ -732,7 +821,205 @@ export default function InicioPage() {
       </div>
 
       {/* ========================================================================= */}
-      {/* MODAL 1: PARÁMETROS REALES HJB                                            */}
+      {/* MODAL: CONFIRMAR NOVILLOS PARA SALIDA A FRIGORÍFICO (DELPRO ESCALONADO)   */}
+      {/* ========================================================================= */}
+      {modalConfirmarFaenaOpen && (
+        <div className="modalOverlay" onClick={() => setModalConfirmarFaenaOpen(false)}>
+          <div
+            className="modalContent"
+            style={{ maxWidth: "780px", padding: "24px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "22px" }}>📋</span>
+                <div>
+                  <h2 style={{ fontSize: "18px", margin: 0 }}>Confirmación de Novillos para Frigorífico</h2>
+                  <div style={{ fontSize: "12px", color: "var(--slate-500)" }}>
+                    Cálculo predictivo DelPro según días acumulados en el corral de terminación.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalConfirmarFaenaOpen(false)}
+                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--slate-400)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Barra de resumen de selección */}
+            <div
+              style={{
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                borderRadius: "8px",
+                padding: "12px 16px",
+                marginBottom: "16px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "10px",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "12px", color: "#166534", fontWeight: 700, textTransform: "uppercase" }}>
+                  Tropa Seleccionada para el Camión:
+                </span>
+                <div style={{ fontSize: "18px", fontWeight: 900, color: "#15803d" }}>
+                  {proyeccionVentaConfirmada.cabezas} Novillos Confirmados
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "13px", color: "var(--slate-700)" }}>
+                  Peso neto est. (7% desbaste): <strong>{proyeccionVentaConfirmada.pesoNeto.toLocaleString("es-AR")} kg</strong>
+                </div>
+                <div style={{ fontSize: "15px", fontWeight: 900, color: "#15803d" }}>
+                  Facturación est.: ~${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M (${dieta.precioNovilloGordoVivoArs || 4200}/kg)
+                </div>
+              </div>
+            </div>
+
+            {/* Acciones rápidas de selección */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+              <div style={{ fontSize: "12.5px", color: "var(--slate-600)" }}>
+                Marca con el tilde los novillos que se cargarán al camión:
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const listosIds = novillosTerminacion
+                      .filter((n) => n.categoriaFaena === "listo_para_venta")
+                      .map((n) => n.id);
+                    setNovillosTerminacion(confirmarListaNovillos(listosIds));
+                  }}
+                  className="secondaryBtn"
+                  style={{ fontSize: "11.5px", padding: "4px 8px" }}
+                >
+                  Tildar solo Punta de Tropa (10)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const todosIds = novillosTerminacion.map((n) => n.id);
+                    setNovillosTerminacion(confirmarListaNovillos(todosIds));
+                  }}
+                  className="secondaryBtn"
+                  style={{ fontSize: "11.5px", padding: "4px 8px" }}
+                >
+                  Tildar todos (26)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNovillosTerminacion(confirmarListaNovillos([]))}
+                  className="secondaryBtn"
+                  style={{ fontSize: "11.5px", padding: "4px 8px" }}
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+
+            {/* Tabla de novillos individuales */}
+            <div className="tableWrap" style={{ maxHeight: "320px", overflowY: "auto", marginBottom: "16px" }}>
+              <table className="dataTable" style={{ fontSize: "12px" }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: "40px", textAlign: "center" }}>Cargar</th>
+                    <th style={{ minWidth: "100px" }}>Caravana RP</th>
+                    <th style={{ minWidth: "90px" }}>RP Madre</th>
+                    <th style={{ minWidth: "90px" }}>Ingreso</th>
+                    <th style={{ width: "100px", textAlign: "right" }}>Días Corral</th>
+                    <th style={{ width: "90px", textAlign: "right" }}>Peso Ingreso</th>
+                    <th style={{ width: "110px", textAlign: "right" }}>Peso DelPro</th>
+                    <th style={{ minWidth: "150px" }}>Estado Faena</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {novillosTerminacion.map((novillo) => (
+                    <tr
+                      key={novillo.id}
+                      style={{
+                        background: novillo.confirmadoVenta ? "#f0fdf4" : "transparent",
+                      }}
+                    >
+                      <td style={{ textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={novillo.confirmadoVenta}
+                          onChange={() => setNovillosTerminacion(toggleConfirmacionNovillo(novillo.id))}
+                          style={{ cursor: "pointer", width: "16px", height: "16px" }}
+                        />
+                      </td>
+                      <td>
+                        <strong>{novillo.caravana}</strong>
+                      </td>
+                      <td style={{ color: "var(--slate-500)" }}>
+                        {novillo.rpMadre || "-"}
+                      </td>
+                      <td style={{ color: "var(--slate-600)" }}>
+                        {novillo.fechaIngreso}
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: 700 }}>
+                        {novillo.diasEnCorral} d
+                      </td>
+                      <td style={{ textAlign: "right", color: "var(--slate-600)" }}>
+                        {novillo.pesoIngresoKg} kg
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <strong
+                          style={{
+                            color: novillo.pesoActualEstimadoKg >= 400 ? "#15803d" : "var(--slate-900)",
+                          }}
+                        >
+                          {novillo.pesoActualEstimadoKg} kg
+                        </strong>
+                      </td>
+                      <td>
+                        {novillo.categoriaFaena === "listo_para_venta" && (
+                          <span className="pill badgeGreen" style={{ fontSize: "10.5px", fontWeight: 700 }}>
+                            🥩 Listo para Faena (Punta)
+                          </span>
+                        )}
+                        {novillo.categoriaFaena === "engorde_medio" && (
+                          <span className="pill badgeSlate" style={{ fontSize: "10.5px" }}>
+                            🌾 Engorde medio (~35d)
+                          </span>
+                        )}
+                        {novillo.categoriaFaena === "recien_ingresado" && (
+                          <span className="pill badgeSlate" style={{ fontSize: "10.5px", color: "#64748b" }}>
+                            ⏳ Recién ingresado (~70d)
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
+                * Los cambios se guardan y recalculan el tablero en tiempo real.
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalConfirmarFaenaOpen(false)}
+                className="primaryBtn"
+                style={{ padding: "8px 20px" }}
+              >
+                Guardar y Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: PARÁMETROS REALES HJB                                              */}
       {/* ========================================================================= */}
       {modalParametrosOpen && (
         <div className="modalOverlay" onClick={() => setModalParametrosOpen(false)}>
@@ -819,7 +1106,7 @@ export default function InicioPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 2: INTEGRACIÓN DELAVAL DELPRO (SQL SERVER)                          */}
+      {/* MODAL: INTEGRACIÓN DELAVAL DELPRO (SQL SERVER)                            */}
       {/* ========================================================================= */}
       {modalDelProOpen && (
         <div className="modalOverlay" onClick={() => setModalDelProOpen(false)}>
