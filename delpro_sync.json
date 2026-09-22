@@ -1,9 +1,10 @@
 {
-    "fechaSincronizacion":  "2026-09-21T20:35:31.3713427-03:00",
+    "fechaSincronizacion":  "2026-09-21T22:23:46.8898771-03:00",
     "origenExtraccion":  "Modo Prueba HJB (SQL Server DelPro)",
     "servidorHost":  "localhost\\DELPRO",
     "baseDatosSql":  "DelProFarmManager",
     "litrosTotalesDia":  5049,
+    "vacasEnOrdenie":  187,
     "vacasEnOrdeÃ±e":  187,
     "vacasSecasPreparto":  25,
     "litrosPromedioVO":  27,

@@ -2,6 +2,9 @@
 
 import { saveDietaTambo, getDietaTambo } from "./stockInsumosData";
 import { getCorrales, getTropas, saveTropas, TropaGanadera } from "./ganaderiaData";
+import { db } from "./firebase";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { sanitizeForFirestore } from "./agricultureData";
 
 export type EstadoConexionDelPro = "vinculando" | "conectado" | "error" | "desconectado";
 export type TipoConexionDelPro = "sql_server" | "delpro_sync_agent" | "archivo_exportacion" | "manual";
@@ -145,6 +148,56 @@ export function getDelProConfig(): DelProConfig {
   }
 }
 
+let isDelProFirestoreSyncInitialized = false;
+
+export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => void) {
+  if (typeof window === "undefined" || !db) return;
+  if (isDelProFirestoreSyncInitialized) return;
+  isDelProFirestoreSyncInitialized = true;
+
+  try {
+    const docRef = doc(db, "delpro", "sincronizacion_actual");
+    onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        let payload: DelProSyncPayload | null = null;
+        if (data.payloadJson) {
+          try {
+            payload = JSON.parse(data.payloadJson);
+          } catch {
+            // fallback si no es json valido
+          }
+        }
+        
+        const current = getDelProConfig();
+        const updatedConfig: DelProConfig = {
+          ...current,
+          estadoConexion: (data.estadoConexion as EstadoConexionDelPro) || "conectado",
+          mensajeEstado: data.mensajeEstado || `Sincronizado con DelPro (${new Date().toLocaleTimeString("es-AR")})`,
+          servidorHost: data.servidorHost || current.servidorHost,
+          baseDatosSql: data.baseDatosSql || current.baseDatosSql,
+          ultimaSincronizacion: data.fechaSincronizacion || current.ultimaSincronizacion || new Date().toISOString(),
+          datosSincronizados: {
+            ...current.datosSincronizados,
+            ...(payload || {}),
+            litrosTotalesDia: Number(data.litrosTotalesDia ?? payload?.litrosTotalesDia ?? current.datosSincronizados.litrosTotalesDia),
+            vacasEnOrdeñe: Number(data.vacasEnOrdeñe ?? payload?.vacasEnOrdeñe ?? current.datosSincronizados.vacasEnOrdeñe),
+            litrosPromedioVO: Number(data.litrosPromedioVO ?? payload?.litrosPromedioVO ?? current.datosSincronizados.litrosPromedioVO),
+          },
+        };
+
+        localStorage.setItem(STORAGE_DELPRO_CONFIG, JSON.stringify(updatedConfig));
+        window.dispatchEvent(new CustomEvent(HJB_DELPRO_SYNC_EVENT, { detail: updatedConfig }));
+        if (onUpdate) onUpdate(updatedConfig);
+      }
+    }, (error) => {
+      console.warn("Error en listener Firestore DelPro:", error);
+    });
+  } catch (err) {
+    console.warn("No se pudo inicializar listener Firestore DelPro:", err);
+  }
+}
+
 export function saveDelProConfig(config: Partial<DelProConfig>): DelProConfig {
   if (typeof window === "undefined") return DELPRO_CONFIG_DEFAULT;
   const current = getDelProConfig();
@@ -158,6 +211,29 @@ export function saveDelProConfig(config: Partial<DelProConfig>): DelProConfig {
 
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(HJB_DELPRO_SYNC_EVENT, { detail: updated }));
+  }
+
+  // Persistir en Firestore en la nube para sincronización multidispositivo
+  if (typeof window !== "undefined" && db) {
+    try {
+      const firestoreData = {
+        estadoConexion: updated.estadoConexion,
+        tipoConexion: updated.tipoConexion,
+        servidorHost: updated.servidorHost || "localhost\\DELPRO",
+        baseDatosSql: updated.baseDatosSql || "DelProFarmManager",
+        fechaSincronizacion: updated.ultimaSincronizacion || new Date().toISOString(),
+        mensajeEstado: updated.mensajeEstado,
+        litrosTotalesDia: updated.datosSincronizados.litrosTotalesDia,
+        vacasEnOrdeñe: updated.datosSincronizados.vacasEnOrdeñe,
+        litrosPromedioVO: updated.datosSincronizados.litrosPromedioVO,
+        payloadJson: JSON.stringify(updated.datosSincronizados),
+      };
+      setDoc(doc(db, "delpro", "sincronizacion_actual"), sanitizeForFirestore(firestoreData), { merge: true }).catch((err) => {
+        console.warn("Error al persistir DelPro en Firestore:", err);
+      });
+    } catch (err) {
+      console.warn("No se pudo escribir en Firestore DelPro:", err);
+    }
   }
 
   return updated;
@@ -214,7 +290,7 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
     const payload: Partial<DelProSyncPayload> = {
       fechaSincronizacion: parsed.fechaSincronizacion || new Date().toISOString(),
       litrosTotalesDia: Number(parsed.litrosTotalesDia) || 0,
-      vacasEnOrdeñe: Number(parsed.vacasEnOrdeñe) || 0,
+      vacasEnOrdeñe: Number(parsed.vacasEnOrdeñe || parsed.vacasEnOrdenie) || 0,
       vacasSecasPreparto: Number(parsed.vacasSecasPreparto) || 0,
       litrosPromedioVO: Number(parsed.litrosPromedioVO) || (parsed.vacasEnOrdeñe > 0 ? Number((parsed.litrosTotalesDia / parsed.vacasEnOrdeñe).toFixed(2)) : 27.0),
       dietaAsignada: parsed.dietaAsignada,

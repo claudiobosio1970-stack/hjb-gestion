@@ -36,6 +36,7 @@ import {
   importarPayloadDesdeJson,
   DELPRO_SQL_QUERIES_SAMPLE,
   DELPRO_CONFIG_DEFAULT,
+  initDelProFirestoreSync,
 } from "@/lib/delproData";
 
 type TabDelProModal = "sql_extractor" | "resumen" | "queries";
@@ -167,6 +168,7 @@ export default function InicioPage() {
 
   useEffect(() => {
     cargarTodo();
+    initDelProFirestoreSync();
 
     function onSync() {
       cargarTodo();
