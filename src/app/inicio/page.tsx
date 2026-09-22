@@ -39,6 +39,49 @@ import {
 
 type TabDelProModal = "sql_extractor" | "resumen" | "queries";
 
+const OPCIONES_DESTINO_MAIZ = [
+  {
+    id: "a_definir",
+    label: "⏳ A definir a cosecha",
+    detalle: "Se decide a cosecha: Venta AFA o Consumo Tambo/Feedlot",
+    badgeBg: "#fef3c7",
+    badgeColor: "#92400e",
+    border: "#f59e0b",
+  },
+  {
+    id: "venta_afa",
+    label: "🌾 Venta Comercial (AFA Los Cardos)",
+    detalle: "100% entrega comercial a acopio AFA",
+    badgeBg: "#e0e7ff",
+    badgeColor: "#3730a3",
+    border: "#818cf8",
+  },
+  {
+    id: "consumo_tambo",
+    label: "🥛 Consumo Tambo (Grano Seco Mixer)",
+    detalle: "Molienda para mixer lechero (ahorro compra grano)",
+    badgeBg: "#dcfce7",
+    badgeColor: "#166534",
+    border: "#86efac",
+  },
+  {
+    id: "consumo_feedlot",
+    label: "🥩 Consumo Feedlot (Engorde Machos)",
+    detalle: "Molienda para corral de novillos en terminación",
+    badgeBg: "#fee2e2",
+    badgeColor: "#991b1b",
+    border: "#fca5a5",
+  },
+  {
+    id: "mixto",
+    label: "⚖️ Mixto (50% AFA / 50% Consumo)",
+    detalle: "Mitad venta comercial acopio y mitad reserva interna",
+    badgeBg: "#f3e8ff",
+    badgeColor: "#6b21a8",
+    border: "#d8b4fe",
+  },
+];
+
 export default function InicioPage() {
   // Estados reactivos sincronizados
   const [dieta, setDieta] = useState<DietaTamboConfig>(() => getDietaTambo());
@@ -47,6 +90,23 @@ export default function InicioPage() {
   const [tropas, setTropas] = useState<TropaGanadera[]>([]);
   const [delproConfig, setDelproConfig] = useState<DelProConfig>(() => getDelProConfig());
   const [novillosTerminacion, setNovillosTerminacion] = useState<NovilloTerminacion[]>(() => getNovillosTerminacion());
+
+  // Destino de Maíz Grano configurable a cosecha por el productor
+  const [destinoMaizGrano, setDestinoMaizGrano] = useState<string>("a_definir");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const guardado = localStorage.getItem("hjb_destino_maiz_grano");
+      if (guardado) setDestinoMaizGrano(guardado);
+    }
+  }, []);
+
+  function handleCambiarDestinoMaiz(val: string) {
+    setDestinoMaizGrano(val);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("hjb_destino_maiz_grano", val);
+    }
+  }
 
   // Modales
   const [modalParametrosOpen, setModalParametrosOpen] = useState(false);
@@ -211,19 +271,31 @@ export default function InicioPage() {
   // 2. CÁLCULOS AGRICULTURA — MATRIZ REAL AUDITADA (279 ha · 142 ha de MAÍZ)
   // =========================================================================
   const superficieTotalHa = 279;
+  const opcionMaizActual = OPCIONES_DESTINO_MAIZ.find((o) => o.id === destinoMaizGrano) || OPCIONES_DESTINO_MAIZ[0];
+
   const matrizAgricola = [
     {
-      cultivo: "Maíz Grano Comercial (AFA)",
+      cultivo: "Maíz Grano",
       lotes: "Racca L2 (50 ha), Kitty (29 ha), Aguilera (20 ha)",
-      destino: "Comercial (Granos AFA Los Cardos)",
+      destino: opcionMaizActual.label,
       ha: 99,
       pct: 35.5,
-      estado: "Campaña gruesa comercial",
-      tipo: "granos",
+      estado: "Campaña gruesa · Selección a cosecha",
+      tipo: "maiz_grano",
       esMaiz: true,
     },
     {
-      cultivo: "Soja 1ra / 2da (AFA)",
+      cultivo: "Maíz Forrajero (Silo / Picado)",
+      lotes: "Tambo L1 (7 ha), L2 (10 ha), L3 (11 ha), L4 (5 ha), L7 (10 ha)",
+      destino: "Forraje Tambo HJB (Picado fino & Silo)",
+      ha: 43,
+      pct: 15.4,
+      estado: "Embolsado / Silobolsa",
+      tipo: "maiz_forrajero",
+      esMaiz: true,
+    },
+    {
+      cultivo: "Soja 1ra / 2da",
       lotes: "Racca L1 (50 ha), Keuneke L1 (48 ha Avena/Soja)",
       destino: "Comercial (Granos AFA Los Cardos)",
       ha: 98,
@@ -231,16 +303,6 @@ export default function InicioPage() {
       estado: "En desarrollo vegetativo",
       tipo: "granos",
       esMaiz: false,
-    },
-    {
-      cultivo: "Maíz Silo / Doble Propósito (Tambo)",
-      lotes: "Tambo L1 (7 ha), L2 (10 ha), L3 (11 ha), L4 (5 ha), L7 (10 ha)",
-      destino: "Forraje Tambo HJB (Picado fino & Silo)",
-      ha: 43,
-      pct: 15.4,
-      estado: "Embolsado / Silobolsa",
-      tipo: "forraje",
-      esMaiz: true,
     },
     {
       cultivo: "Alfalfa Henificada (Rollos Tambo)",
@@ -254,9 +316,11 @@ export default function InicioPage() {
     },
   ];
 
-  const totalMaizHa = 99 + 43; // 142 ha de maíz en total
-  const haGranosComerciales = 99 + 98; // 197 ha para granos AFA
-  const haForrajesTambo = 43 + 39; // 82 ha para tambo
+  const totalMaizHa = 99 + 43; // 142 ha de maíz en total (50.9%)
+  const haMaizGrano = 99;
+  const haMaizForrajero = 43;
+  const haSoja = 98;
+  const haAlfalfa = 39;
 
   // =========================================================================
   // 3. CÁLCULOS GANADERÍA — NOVILLOS ESCALONADOS Y CONFIRMACIÓN DE FAENA
@@ -479,13 +543,13 @@ export default function InicioPage() {
             </Link>
           </div>
           <div style={{ fontSize: "28px", fontWeight: 900, color: "#c2410c", marginTop: "4px" }}>
-            {totalMaizHa} ha Maíz <span style={{ fontSize: "16px", color: "var(--slate-500)", fontWeight: 700 }}>(51%)</span>
+            {totalMaizHa} ha Maíz <span style={{ fontSize: "16px", color: "var(--slate-500)", fontWeight: 700 }}>(50,9%)</span>
           </div>
           <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "4px" }}>
-            <strong>99 ha</strong> Maíz Grano AFA · <strong>43 ha</strong> Maíz Silo Tambo · 98 ha Soja · 39 ha Alfalfa
+            <strong>99 ha</strong> Maíz Grano (a cosecha) · <strong>43 ha</strong> Maíz Forrajero · 98 ha Soja · 39 ha Alfalfa
           </div>
           <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
-            279 ha totales trabajadas en los 5 campos
+            279 ha totales auditadas en los 5 campos
           </div>
         </div>
 
@@ -658,11 +722,11 @@ export default function InicioPage() {
             <table className="dataTable">
               <thead>
                 <tr>
-                  <th style={{ minWidth: "220px" }}>Cultivo & Destino</th>
+                  <th style={{ minWidth: "200px" }}>Cultivo</th>
                   <th style={{ minWidth: "240px" }}>Lotes y Campos Asignados</th>
-                  <th style={{ width: "120px", textAlign: "right" }}>Superficie</th>
-                  <th style={{ width: "110px", textAlign: "right" }}>% Campo</th>
-                  <th style={{ width: "180px", textAlign: "center" }}>Destino Principal</th>
+                  <th style={{ width: "110px", textAlign: "right" }}>Superficie</th>
+                  <th style={{ width: "95px", textAlign: "right" }}>% Campo</th>
+                  <th style={{ width: "260px", textAlign: "center" }}>Destino Previsto / Selección a Cosecha</th>
                 </tr>
               </thead>
               <tbody>
@@ -688,19 +752,61 @@ export default function InicioPage() {
                       {item.pct}%
                     </td>
                     <td style={{ textAlign: "center" }}>
-                      <span
-                        style={{
-                          display: "inline-block",
-                          padding: "3px 8px",
-                          borderRadius: "4px",
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          background: item.tipo === "granos" ? "#fef3c7" : "#dbeafe",
-                          color: item.tipo === "granos" ? "#92400e" : "#1e40af",
-                        }}
-                      >
-                        {item.tipo === "granos" ? "Comercial AFA" : "Forraje Tambo HJB"}
-                      </span>
+                      {item.tipo === "maiz_grano" ? (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+                          <select
+                            value={destinoMaizGrano}
+                            onChange={(e) => handleCambiarDestinoMaiz(e.target.value)}
+                            style={{
+                              padding: "4px 8px",
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              borderRadius: "6px",
+                              border: `1.5px solid ${opcionMaizActual.border}`,
+                              background: opcionMaizActual.badgeBg,
+                              color: opcionMaizActual.badgeColor,
+                              cursor: "pointer",
+                              outline: "none",
+                              maxWidth: "240px",
+                              width: "100%",
+                            }}
+                            title="Seleccione el destino del grano a cosecha"
+                          >
+                            {OPCIONES_DESTINO_MAIZ.map((op) => (
+                              <option key={op.id} value={op.id}>
+                                {op.label}
+                              </option>
+                            ))}
+                          </select>
+                          <span style={{ fontSize: "10px", color: "var(--slate-500)", fontStyle: "italic" }}>
+                            {opcionMaizActual.detalle}
+                          </span>
+                        </div>
+                      ) : (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "3px 8px",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            background:
+                              item.tipo === "granos"
+                                ? "#fef3c7"
+                                : item.cultivo.includes("Alfalfa")
+                                ? "#dcfce7"
+                                : "#dbeafe",
+                            color:
+                              item.tipo === "granos"
+                                ? "#92400e"
+                                : item.cultivo.includes("Alfalfa")
+                                ? "#166534"
+                                : "#1e40af",
+                          }}
+                        >
+                          {item.destino}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -715,7 +821,7 @@ export default function InicioPage() {
                     100.0%
                   </td>
                   <td style={{ textAlign: "center", fontSize: "11.5px", color: "var(--slate-600)" }}>
-                    197 ha Granos AFA · 82 ha Forrajes Tambo
+                    99 ha Maíz Grano (a cosecha) · 43 ha Maíz Forrajero · 98 ha Soja · 39 ha Alfalfa
                   </td>
                 </tr>
               </tbody>
