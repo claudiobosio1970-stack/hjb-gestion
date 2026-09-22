@@ -55,6 +55,7 @@ export interface AnimalRecriaIndividual {
   corralId: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
   pesoActualKg: number;
   diasEnCorral: number;
+  diasVida?: number; // Días totales de vida estimados desde nacimiento
   fechaIngresoCorral: string;
   gdpvKgDia: number;
   origen: string;
@@ -198,76 +199,197 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
   return vacas;
 }
 
+/**
+ * Modelo Biológico de Crecimiento Acumulado para Novillos / Recría HJB.
+ * Calcula el peso estimativo del animal a lo largo de su vida sumando
+ * el peso de nacimiento (~38 kg) más la ganancia diaria esperada (GDPV) acumulada
+ * por cada etapa o corral atravesado.
+ */
+export function calcularPesoEstimativoVida(animal: {
+  corralId: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
+  diasEnCorral: number;
+  pesoNacimientoKg?: number;
+  diasVida?: number;
+}): {
+  pesoEstimadoKg: number;
+  diasVida: number;
+  gdpvEtapaKgDia: number;
+  pesoIngresoEtapaKg: number;
+  gananciaEtapaKg: number;
+  explicacionCurva: string;
+} {
+  const pesoNac = animal.pesoNacimientoKg || 38.0;
+
+  // Parámetros biológicos estándar HJB por etapa
+  // 1. Guachera: 0 a 60 días, GDPV 0.65 kg/d -> llega a ~77 kg al desleche
+  // 2. RM1: 47 días adicionales, GDPV 0.85 kg/d -> llega a ~117 kg
+  // 3. RM2: 53 días adicionales, GDPV 0.95 kg/d -> llega a ~167 kg
+  // 4. RM3: 91 días adicionales, GDPV 1.10 kg/d -> llega a ~267 kg
+  // 5. Terminación: feedlot intensivo grano+pellet, GDPV 1.45 kg/d -> supera 370 kg p/ faena
+  const diasGuacheraBase = 60;
+  const gdpvGuachera = 0.65;
+  const pesoFinGuachera = pesoNac + diasGuacheraBase * gdpvGuachera; // 38 + 39 = 77.0 kg
+
+  const diasRM1Base = 47;
+  const gdpvRM1 = 0.85;
+  const pesoFinRM1 = pesoFinGuachera + diasRM1Base * gdpvRM1; // 77 + 40 = 117.0 kg
+
+  const diasRM2Base = 53;
+  const gdpvRM2 = 0.95;
+  const pesoFinRM2 = pesoFinRM1 + diasRM2Base * gdpvRM2; // 117 + 50.35 = 167.35 kg
+
+  const diasRM3Base = 91;
+  const gdpvRM3 = 1.10;
+  const pesoFinRM3 = pesoFinRM2 + diasRM3Base * gdpvRM3; // 167.35 + 100.1 = 267.45 kg
+
+  const gdpvTerminacion = 1.45;
+
+  let pesoEstimado = pesoNac;
+  let diasVida = animal.diasEnCorral;
+  let gdpvEtapa = gdpvGuachera;
+  let pesoIngresoEtapa = pesoNac;
+  let explicacion = "";
+
+  switch (animal.corralId) {
+    case "guachera": {
+      diasVida = animal.diasEnCorral;
+      gdpvEtapa = gdpvGuachera;
+      pesoIngresoEtapa = pesoNac;
+      pesoEstimado = pesoNac + animal.diasEnCorral * gdpvGuachera;
+      explicacion = `Nacimiento (${pesoNac} kg) + ${animal.diasEnCorral}d en guachera (+${gdpvGuachera} kg/d)`;
+      break;
+    }
+    case "rm1": {
+      diasVida = diasGuacheraBase + animal.diasEnCorral;
+      gdpvEtapa = gdpvRM1;
+      pesoIngresoEtapa = pesoFinGuachera;
+      pesoEstimado = pesoFinGuachera + animal.diasEnCorral * gdpvRM1;
+      explicacion = `Guachera (${pesoFinGuachera.toFixed(1)} kg) + ${animal.diasEnCorral}d en RM1 (+${gdpvRM1} kg/d)`;
+      break;
+    }
+    case "rm2": {
+      diasVida = diasGuacheraBase + diasRM1Base + animal.diasEnCorral;
+      gdpvEtapa = gdpvRM2;
+      pesoIngresoEtapa = pesoFinRM1;
+      pesoEstimado = pesoFinRM1 + animal.diasEnCorral * gdpvRM2;
+      explicacion = `Recría RM1 (${pesoFinRM1.toFixed(1)} kg) + ${animal.diasEnCorral}d en RM2 (+${gdpvRM2} kg/d)`;
+      break;
+    }
+    case "rm3": {
+      diasVida = diasGuacheraBase + diasRM1Base + diasRM2Base + animal.diasEnCorral;
+      gdpvEtapa = gdpvRM3;
+      pesoIngresoEtapa = pesoFinRM2;
+      pesoEstimado = pesoFinRM2 + animal.diasEnCorral * gdpvRM3;
+      explicacion = `Recría RM2 (${pesoFinRM2.toFixed(1)} kg) + ${animal.diasEnCorral}d en RM3 (+${gdpvRM3} kg/d)`;
+      break;
+    }
+    case "terminacion": {
+      diasVida = diasGuacheraBase + diasRM1Base + diasRM2Base + diasRM3Base + animal.diasEnCorral;
+      gdpvEtapa = gdpvTerminacion;
+      pesoIngresoEtapa = pesoFinRM3;
+      pesoEstimado = pesoFinRM3 + animal.diasEnCorral * gdpvTerminacion;
+      explicacion = `Ingreso Engorde (${pesoFinRM3.toFixed(1)} kg) + ${animal.diasEnCorral}d en terminación (+${gdpvTerminacion} kg/d)`;
+      break;
+    }
+  }
+
+  const gananciaEtapa = pesoEstimado - pesoIngresoEtapa;
+
+  return {
+    pesoEstimadoKg: Number(pesoEstimado.toFixed(1)),
+    diasVida,
+    gdpvEtapaKgDia: gdpvEtapa,
+    pesoIngresoEtapaKg: Number(pesoIngresoEtapa.toFixed(1)),
+    gananciaEtapaKg: Number(gananciaEtapa.toFixed(1)),
+    explicacionCurva: explicacion,
+  };
+}
+
 export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   const animales: AnimalRecriaIndividual[] = [];
-  // Guachera: 24 animales (38 a 79 kg)
+
+  // Guachera: 24 animales (edad 10 a 58 días de vida)
   for (let i = 1; i <= 24; i++) {
-    const peso = Number((42.0 + (i * 1.5)).toFixed(1));
+    const dias = 10 + i * 2;
+    const calc = calcularPesoEstimativoVida({ corralId: "guachera", diasEnCorral: dias });
     animales.push({
       rp: `RP-${8800 + i}`,
       corralId: "guachera",
-      pesoActualKg: peso,
-      diasEnCorral: 10 + i * 2,
-      fechaIngresoCorral: new Date(Date.now() - (10 + i * 2) * 86400000).toLocaleDateString("es-AR"),
-      gdpvKgDia: 0.62,
+      pesoActualKg: calc.pesoEstimadoKg,
+      diasVida: calc.diasVida,
+      diasEnCorral: dias,
+      fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: "Nacimiento Tambo HJB",
       grupoDelPro: "Guachera (Lácteo)",
     });
   }
-  // RM1: 22 animales (80 a 119 kg)
+
+  // RM1: 22 animales (edad 68 a 108 días de vida)
   for (let i = 1; i <= 22; i++) {
-    const peso = Number((82.0 + (i * 1.7)).toFixed(1));
+    const dias = 8 + Math.round(i * 1.8);
+    const calc = calcularPesoEstimativoVida({ corralId: "rm1", diasEnCorral: dias });
     animales.push({
       rp: `RP-${8750 + i}`,
       corralId: "rm1",
-      pesoActualKg: peso,
-      diasEnCorral: 12 + i * 2,
-      fechaIngresoCorral: new Date(Date.now() - (12 + i * 2) * 86400000).toLocaleDateString("es-AR"),
-      gdpvKgDia: 1.29,
+      pesoActualKg: calc.pesoEstimadoKg,
+      diasVida: calc.diasVida,
+      diasEnCorral: dias,
+      fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: "Pase desde Guachera",
       grupoDelPro: "Recría 1 (RM1)",
     });
   }
-  // RM2: 28 animales (120 a 169 kg)
+
+  // RM2: 28 animales (edad 115 a 159 días de vida)
   for (let i = 1; i <= 28; i++) {
-    const peso = Number((122.0 + (i * 1.65)).toFixed(1));
+    const dias = 8 + Math.round(i * 1.6);
+    const calc = calcularPesoEstimativoVida({ corralId: "rm2", diasEnCorral: dias });
     animales.push({
       rp: `RP-${8700 + i}`,
       corralId: "rm2",
-      pesoActualKg: peso,
-      diasEnCorral: 15 + i * 2,
-      fechaIngresoCorral: new Date(Date.now() - (15 + i * 2) * 86400000).toLocaleDateString("es-AR"),
-      gdpvKgDia: 0.93,
+      pesoActualKg: calc.pesoEstimadoKg,
+      diasVida: calc.diasVida,
+      diasEnCorral: dias,
+      fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: "Pase desde RM1",
       grupoDelPro: "Recría 2 (RM2)",
     });
   }
-  // RM3: 30 animales (170 a 269 kg)
+
+  // RM3: 30 animales (edad 170 a 248 días de vida)
   for (let i = 1; i <= 30; i++) {
-    const peso = Number((172.0 + (i * 3.2)).toFixed(1));
+    const dias = 10 + Math.round(i * 2.6);
+    const calc = calcularPesoEstimativoVida({ corralId: "rm3", diasEnCorral: dias });
     animales.push({
       rp: `RP-${8650 + i}`,
       corralId: "rm3",
-      pesoActualKg: peso,
-      diasEnCorral: 20 + i * 3,
-      fechaIngresoCorral: new Date(Date.now() - (20 + i * 3) * 86400000).toLocaleDateString("es-AR"),
-      gdpvKgDia: 0.83,
+      pesoActualKg: calc.pesoEstimadoKg,
+      diasVida: calc.diasVida,
+      diasEnCorral: dias,
+      fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: "Pase desde RM2",
       grupoDelPro: "Recría 3 (RM3)",
     });
   }
-  // Terminación: 26 animales (270 a 415 kg)
+
+  // Terminación: 26 animales (edad 261 a 346 días de vida, peso 280 a 405 kg)
   for (let i = 1; i <= 26; i++) {
-    const peso = Number((280.0 + (i * 5.0)).toFixed(1));
+    const dias = 10 + Math.round(i * 3.3);
+    const calc = calcularPesoEstimativoVida({ corralId: "terminacion", diasEnCorral: dias });
     animales.push({
       rp: `RP-${8600 + i}`,
       corralId: "terminacion",
-      pesoActualKg: peso,
-      diasEnCorral: 15 + i * 2,
-      fechaIngresoCorral: new Date(Date.now() - (15 + i * 2) * 86400000).toLocaleDateString("es-AR"),
-      gdpvKgDia: 1.49,
+      pesoActualKg: calc.pesoEstimadoKg,
+      diasVida: calc.diasVida,
+      diasEnCorral: dias,
+      fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
+      gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: "Pase desde RM3",
-      listoFaena: peso >= 370,
+      listoFaena: calc.pesoEstimadoKg >= 370,
       grupoDelPro: "Terminación / Engorde",
     });
   }

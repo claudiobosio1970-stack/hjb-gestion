@@ -35,7 +35,9 @@ export default function TamboPage() {
 
   // Filtros individuales de vacas por RP
   const [busquedaVacaRP, setBusquedaVacaRP] = useState("");
-  const [filtroEstadoVaca, setFiltroEstadoVaca] = useState<"todas" | "en_ordenie" | "secas" | "preniadas" | "vacias">("todas");
+  const [filtroEstadoVaca, setFiltroEstadoVaca] = useState<"todas" | "en_ordenie" | "secas" | "preniadas" | "inseminadas" | "vacias">("todas");
+  const [ordenCenso, setOrdenCenso] = useState<"rp_asc" | "del_desc" | "del_asc" | "litros_desc" | "litros_asc" | "parto_proximo">("rp_asc");
+  const [elementosPorPagina, setElementosPorPagina] = useState(50);
   const [paginaVacas, setPaginaVacas] = useState(1);
 
   // Form local state
@@ -156,24 +158,49 @@ export default function TamboPage() {
   const costoTotalDiaVO = Number((costoDiaVOSoja + costoDiaVOTrigo + costoDiaVOSilo + costoDiaVOMaiz).toFixed(2));
   const costoTotalRodeoDia = Math.round(costoTotalDiaVO * formDieta.vacasEnOrdeñe);
 
-  // Filtrado y paginación del Censo Individual de Vacas
+  // Filtrado, ordenamiento y paginación del Censo Individual de Vacas
   const vacasDetalle = censoRodeo.detalleVacas || [];
-  const vacasFiltradas = vacasDetalle.filter((v) => {
-    if (busquedaVacaRP && !v.rp.toLowerCase().includes(busquedaVacaRP.toLowerCase())) {
-      return false;
-    }
-    if (filtroEstadoVaca === "en_ordenie") return v.estadoProductivo === "En Ordeñe";
-    if (filtroEstadoVaca === "secas") return v.estadoProductivo === "Seca";
-    if (filtroEstadoVaca === "preniadas") return v.estadoReproductivo === "Preñada";
-    if (filtroEstadoVaca === "vacias") return v.estadoReproductivo === "Vacía" || v.estadoReproductivo === "Inseminada";
-    return true;
-  });
+  const vacasFiltradas = vacasDetalle
+    .filter((v) => {
+      if (busquedaVacaRP.trim() && !v.rp.toLowerCase().includes(busquedaVacaRP.toLowerCase().trim())) {
+        return false;
+      }
+      if (filtroEstadoVaca === "en_ordenie") return v.estadoProductivo === "En Ordeñe";
+      if (filtroEstadoVaca === "secas") return v.estadoProductivo === "Seca";
+      if (filtroEstadoVaca === "preniadas") return v.estadoReproductivo === "Preñada";
+      if (filtroEstadoVaca === "inseminadas") return v.estadoReproductivo === "Inseminada";
+      if (filtroEstadoVaca === "vacias") return v.estadoReproductivo === "Vacía";
+      return true;
+    })
+    .sort((a, b) => {
+      if (ordenCenso === "del_desc") {
+        return (b.diasLactancia || 0) - (a.diasLactancia || 0);
+      }
+      if (ordenCenso === "del_asc") {
+        return (a.diasLactancia || 0) - (b.diasLactancia || 0);
+      }
+      if (ordenCenso === "litros_desc") {
+        return (b.litrosAyer || 0) - (a.litrosAyer || 0);
+      }
+      if (ordenCenso === "litros_asc") {
+        return (a.litrosAyer || 0) - (b.litrosAyer || 0);
+      }
+      if (ordenCenso === "parto_proximo") {
+        const diasFaltanA = a.diasGestacion ? Math.max(0, 282 - a.diasGestacion) : 99999;
+        const diasFaltanB = b.diasGestacion ? Math.max(0, 282 - b.diasGestacion) : 99999;
+        return diasFaltanA - diasFaltanB;
+      }
+      // "rp_asc": orden por número de caravana/RP
+      const numA = parseInt(a.rp.replace(/\D/g, "")) || 0;
+      const numB = parseInt(b.rp.replace(/\D/g, "")) || 0;
+      return numA - numB;
+    });
 
-  const elementosPorPagina = 12;
   const totalPaginasVacas = Math.ceil(vacasFiltradas.length / elementosPorPagina) || 1;
+  const paginaValida = Math.min(paginaVacas, totalPaginasVacas);
   const vacasPaginadas = vacasFiltradas.slice(
-    (paginaVacas - 1) * elementosPorPagina,
-    paginaVacas * elementosPorPagina
+    (paginaValida - 1) * elementosPorPagina,
+    paginaValida * elementosPorPagina
   );
 
   return (
@@ -271,9 +298,6 @@ export default function TamboPage() {
                     🟢 En Vivo · Conectado
                   </span>
                 </div>
-                <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "2px" }}>
-                  Extracción automática en PC de Tambo (07:30 y 18:30 hs) · Servidor: <code>{delproConfig.servidorHost || "localhost\\DELPRO"}</code>
-                </div>
               </div>
             </div>
 
@@ -338,18 +362,12 @@ export default function TamboPage() {
               <div style={{ fontSize: "22px", fontWeight: 900, color: "#15803d", marginTop: "4px" }}>
                 {delproConfig.datosSincronizados.litrosTotalesDia.toLocaleString("es-AR")} lts/día
               </div>
-              <div style={{ fontSize: "11px", color: "var(--slate-600)", marginTop: "2px" }}>
-                Últimas 24 hs (caudalímetros DelPro)
-              </div>
             </div>
 
             <div style={{ background: "#ffffff", padding: "14px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
               <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 600 }}>VACAS EN ORDEÑE (VO)</div>
               <div style={{ fontSize: "22px", fontWeight: 900, color: "#0369a1", marginTop: "4px" }}>
                 {delproConfig.datosSincronizados.vacasEnOrdeñe} VO
-              </div>
-              <div style={{ fontSize: "11px", color: "var(--slate-600)", marginTop: "2px" }}>
-                Rodeo lechero en lactancia activa
               </div>
             </div>
 
@@ -358,18 +376,12 @@ export default function TamboPage() {
               <div style={{ fontSize: "22px", fontWeight: 900, color: "#0f766e", marginTop: "4px" }}>
                 {delproConfig.datosSincronizados.litrosPromedioVO} lts/VO
               </div>
-              <div style={{ fontSize: "11px", color: "var(--slate-600)", marginTop: "2px" }}>
-                Litros diarios promedio por vaca activa
-              </div>
             </div>
 
             <div style={{ background: "#ffffff", padding: "14px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
               <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 600 }}>VACAS SECAS PREPARTO</div>
               <div style={{ fontSize: "22px", fontWeight: 900, color: "#475569", marginTop: "4px" }}>
                 {delproConfig.datosSincronizados.vacasSecasPreparto || 25} cab.
-              </div>
-              <div style={{ fontSize: "11px", color: "var(--slate-600)", marginTop: "2px" }}>
-                Próximas a parir (maternidad HJB)
               </div>
             </div>
           </div>
@@ -381,9 +393,6 @@ export default function TamboPage() {
                 <div style={{ fontSize: "13px", fontWeight: 800, color: "#166534", display: "flex", alignItems: "center", gap: "6px" }}>
                   <span>🐣</span> Últimos Partos Registrados en DelPro & Segregación HJB:
                 </div>
-                <span style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
-                  Regla HJB: Machos ➔ Engorde / Hembras ➔ Reposición Tambo
-                </span>
               </div>
               <div className="tableWrap" style={{ background: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
                 <table className="dataTable compact">
@@ -553,7 +562,7 @@ export default function TamboPage() {
               />
             </div>
 
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
               <button
                 type="button"
                 className={`ghostButton ${filtroEstadoVaca === "todas" ? "active" : ""}`}
@@ -566,6 +575,7 @@ export default function TamboPage() {
                   color: filtroEstadoVaca === "todas" ? "#ffffff" : "#475569",
                   border: "1px solid #cbd5e1",
                   borderRadius: "6px",
+                  cursor: "pointer",
                 }}
               >
                 Todas ({censoRodeo.detalleVacas?.length || 0})
@@ -581,6 +591,7 @@ export default function TamboPage() {
                   color: filtroEstadoVaca === "en_ordenie" ? "#ffffff" : "#166534",
                   border: "1px solid #86efac",
                   borderRadius: "6px",
+                  cursor: "pointer",
                 }}
               >
                 En Ordeñe ({censoRodeo.vacasEnOrdenie})
@@ -596,6 +607,7 @@ export default function TamboPage() {
                   color: filtroEstadoVaca === "secas" ? "#ffffff" : "#92400e",
                   border: "1px solid #fcd34d",
                   borderRadius: "6px",
+                  cursor: "pointer",
                 }}
               >
                 Secas ({censoRodeo.vacasSecas})
@@ -611,9 +623,26 @@ export default function TamboPage() {
                   color: filtroEstadoVaca === "preniadas" ? "#ffffff" : "#1d4ed8",
                   border: "1px solid #93c5fd",
                   borderRadius: "6px",
+                  cursor: "pointer",
                 }}
               >
                 Preñadas ({censoRodeo.vacasPreniadas})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFiltroEstadoVaca("inseminadas"); setPaginaVacas(1); }}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  background: filtroEstadoVaca === "inseminadas" ? "#d97706" : "#ffffff",
+                  color: filtroEstadoVaca === "inseminadas" ? "#ffffff" : "#d97706",
+                  border: "1px solid #fcd34d",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                Inseminadas ({censoRodeo.detalleVacas?.filter((v) => v.estadoReproductivo === "Inseminada").length || 0})
               </button>
               <button
                 type="button"
@@ -626,10 +655,40 @@ export default function TamboPage() {
                   color: filtroEstadoVaca === "vacias" ? "#ffffff" : "#be185d",
                   border: "1px solid #f9a8d4",
                   borderRadius: "6px",
+                  cursor: "pointer",
                 }}
               >
                 Vacías ({censoRodeo.vacasVacias})
               </button>
+
+              {/* Selector de Criterio de Orden */}
+              <div style={{ marginLeft: "8px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-600)" }}>Ordenar:</span>
+                <select
+                  value={ordenCenso}
+                  onChange={(e) => {
+                    setOrdenCenso(e.target.value as any);
+                    setPaginaVacas(1);
+                  }}
+                  style={{
+                    padding: "5px 10px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    background: "#ffffff",
+                    color: "#0f172a",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="rp_asc">🏷️ Caravana / RP (Ascendente)</option>
+                  <option value="del_desc">⏱️ Días Lactancia: Mayor a Menor (DEL ↓)</option>
+                  <option value="del_asc">⏱️ Días Lactancia: Menor a Mayor (DEL ↑)</option>
+                  <option value="litros_desc">🥛 Producción Ayer: Mayor a Menor (Litros ↓)</option>
+                  <option value="litros_asc">🥛 Producción Ayer: Menor a Mayor (Litros ↑)</option>
+                  <option value="parto_proximo">🤰 Fecha más próxima a parir</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -638,13 +697,43 @@ export default function TamboPage() {
             <table className="dataTable">
               <thead>
                 <tr>
-                  <th>Caravana / RP</th>
+                  <th
+                    style={{ cursor: "pointer", userSelect: "none" }}
+                    onClick={() => { setOrdenCenso("rp_asc"); setPaginaVacas(1); }}
+                    title="Click para ordenar por Caravana / RP"
+                  >
+                    Caravana / RP {ordenCenso === "rp_asc" && "▲"}
+                  </th>
                   <th>Estado Productivo</th>
                   <th>Estado Reproductivo</th>
-                  <th style={{ textAlign: "right" }}>Días Lactancia (DEL)</th>
+                  <th
+                    style={{ textAlign: "right", cursor: "pointer", userSelect: "none" }}
+                    onClick={() => {
+                      setOrdenCenso(ordenCenso === "del_desc" ? "del_asc" : "del_desc");
+                      setPaginaVacas(1);
+                    }}
+                    title="Click para ordenar por DEL (Mayor/Menor)"
+                  >
+                    Días Lactancia (DEL) {ordenCenso === "del_desc" ? "▼" : ordenCenso === "del_asc" ? "▲" : ""}
+                  </th>
                   <th style={{ textAlign: "right" }}>Días Gestación</th>
-                  <th>Fecha Estimada Parto</th>
-                  <th style={{ textAlign: "right" }}>Producción Ayer</th>
+                  <th
+                    style={{ cursor: "pointer", userSelect: "none" }}
+                    onClick={() => { setOrdenCenso("parto_proximo"); setPaginaVacas(1); }}
+                    title="Click para ordenar por fecha más próxima a parir"
+                  >
+                    Fecha Estimada Parto {ordenCenso === "parto_proximo" && "★ Próximas"}
+                  </th>
+                  <th
+                    style={{ textAlign: "right", cursor: "pointer", userSelect: "none" }}
+                    onClick={() => {
+                      setOrdenCenso(ordenCenso === "litros_desc" ? "litros_asc" : "litros_desc");
+                      setPaginaVacas(1);
+                    }}
+                    title="Click para ordenar por Litros (Mayor/Menor)"
+                  >
+                    Producción Ayer {ordenCenso === "litros_desc" ? "▼" : ordenCenso === "litros_asc" ? "▲" : ""}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -744,25 +833,28 @@ export default function TamboPage() {
                 color: "var(--slate-600)",
               }}
             >
-              <div>
-                Mostrando página <strong>{paginaVacas}</strong> de <strong>{totalPaginasVacas}</strong> ({vacasFiltradas.length} vacas en total)
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>
+                  Mostrando <strong>{vacasPaginadas.length}</strong> de <strong>{vacasFiltradas.length}</strong> vacas (Página <strong>{paginaValida}</strong> de <strong>{totalPaginasVacas}</strong>)
+                </span>
+                <span className="pill badgeSlate" style={{ fontSize: "11px", fontWeight: 700 }}>50 por página</span>
               </div>
               <div style={{ display: "flex", gap: "6px" }}>
                 <button
                   type="button"
                   className="ghostButton"
-                  disabled={paginaVacas <= 1}
-                  onClick={() => setPaginaVacas(paginaVacas - 1)}
-                  style={{ padding: "4px 10px", fontSize: "12px" }}
+                  disabled={paginaValida <= 1}
+                  onClick={() => setPaginaVacas(paginaValida - 1)}
+                  style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
                 >
                   ← Anterior
                 </button>
                 <button
                   type="button"
                   className="ghostButton"
-                  disabled={paginaVacas >= totalPaginasVacas}
-                  onClick={() => setPaginaVacas(paginaVacas + 1)}
-                  style={{ padding: "4px 10px", fontSize: "12px" }}
+                  disabled={paginaValida >= totalPaginasVacas}
+                  onClick={() => setPaginaVacas(paginaValida + 1)}
+                  style={{ padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
                 >
                   Siguiente →
                 </button>

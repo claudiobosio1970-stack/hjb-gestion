@@ -35,6 +35,7 @@ import {
   getTraspasosCorrales,
   saveTraspasosCorrales,
   evaluarYEjecutarTraspasosAutomaticos,
+  calcularPesoEstimativoVida,
 } from "@/lib/delproData";
 
 export default function GanaderiaPage() {
@@ -722,167 +723,7 @@ export default function GanaderiaPage() {
             })}
           </div>
 
-          {/* ========================================================================= */}
-          {/* MOTOR DE TRASPASOS AUTOMÁTICOS DE CORRALES (ESCALA HJB)                   */}
-          {/* ========================================================================= */}
-          <div
-            style={{
-              background: "#ffffff",
-              border: "1px solid var(--line)",
-              borderRadius: "12px",
-              padding: "18px 20px",
-              boxShadow: "var(--shadow-sm)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                flexWrap: "wrap",
-                gap: "14px",
-                marginBottom: "16px",
-              }}
-            >
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "20px" }}>🔄</span>
-                  <h3 style={{ fontSize: "16px", margin: 0, fontWeight: 800, color: "var(--slate-950)" }}>
-                    Motor de Traspasos Automáticos entre Corrales de Recría (Escala HJB)
-                  </h3>
-                  <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
-                    100% Automatizado
-                  </span>
-                </div>
-                <p className="muted" style={{ fontSize: "12.5px", margin: 0, maxWidth: "750px" }}>
-                  Evalúa periódicamente el peso individual por caravana y días en corral. Cuando un ternero supera el umbral biológico o tiempo de desleche, el sistema ejecuta el traspaso automático a la etapa siguiente y recalcula las dietas.
-                </p>
-              </div>
 
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="ghostButton"
-                  onClick={() => setMostrarHistorialTraspasos(!mostrarHistorialTraspasos)}
-                  style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 12px" }}
-                >
-                  <span>📜</span>
-                  <span>{mostrarHistorialTraspasos ? "Ocultar Historial" : `Ver Historial (${traspasosCorrales.length})`}</span>
-                </button>
-                <button
-                  type="button"
-                  className="primaryButton"
-                  onClick={handleEjecutarTraspasosAutomaticos}
-                  style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 14px", background: "#166534" }}
-                >
-                  <span>⚡</span>
-                  <span>Evaluar y Ejecutar Traspasos de Escala</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Escala HJB Visual Pipeline */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-                gap: "10px",
-                background: "#f8fafc",
-                padding: "12px",
-                borderRadius: "10px",
-                border: "1px solid #e2e8f0",
-              }}
-            >
-              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#0284c7" }}>1. GUACHERA ➔ RM1</div>
-                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 80 kg ó 60 d</div>
-                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Desleche & arranque</div>
-              </div>
-              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#16a34a" }}>2. RM1 ➔ RM2</div>
-                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 120 kg</div>
-                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Desarrollo inicial</div>
-              </div>
-              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#d97706" }}>3. RM2 ➔ RM3</div>
-                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 170 kg</div>
-                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Crecimiento medio</div>
-              </div>
-              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#7c3aed" }}>4. RM3 ➔ TERMINACIÓN</div>
-                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 270 kg</div>
-                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Entrada engorde intensivo</div>
-              </div>
-              <div style={{ padding: "8px 10px", background: "#ffffff", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#dc2626" }}>5. TERMINACIÓN ➔ FAENA</div>
-                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>≥ 370 kg</div>
-                <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Venta a Frigorífico</div>
-              </div>
-            </div>
-
-            {/* Historial Desplegable */}
-            {mostrarHistorialTraspasos && (
-              <div style={{ marginTop: "14px", borderTop: "1px solid var(--line)", paddingTop: "14px" }}>
-                <h4 style={{ fontSize: "13.5px", margin: "0 0 8px 0", fontWeight: 700, color: "var(--slate-800)" }}>
-                  Últimos Traspasos Automáticos Registrados ({traspasosCorrales.length})
-                </h4>
-                {traspasosCorrales.length === 0 ? (
-                  <div style={{ padding: "12px", color: "var(--slate-500)", fontSize: "12px" }}>
-                    No hay traspasos registrados aún.
-                  </div>
-                ) : (
-                  <div className="tableWrap" style={{ maxHeight: "220px", overflowY: "auto" }}>
-                    <table className="dataTable">
-                      <thead>
-                        <tr>
-                          <th>Fecha</th>
-                          <th>Animal (Caravana / RP)</th>
-                          <th>Traspaso de Corral</th>
-                          <th style={{ textAlign: "right" }}>Peso al Traspaso</th>
-                          <th>Origen del Cambio</th>
-                          <th>Motivo / Regla</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {traspasosCorrales.map((tr) => (
-                          <tr key={tr.id}>
-                            <td>{tr.fecha}</td>
-                            <td>
-                              <strong style={{ fontFamily: "monospace", fontSize: "13px" }}>{tr.rpAnimal}</strong>
-                            </td>
-                            <td>
-                              <span className="pill badgeSlate" style={{ textTransform: "uppercase", fontSize: "11px", fontWeight: 700 }}>
-                                {tr.corralOrigen} ➔ {tr.corralDestino}
-                              </span>
-                            </td>
-                            <td style={{ textAlign: "right" }}>
-                              <strong>{tr.pesoAlTraspaso} kg</strong>
-                            </td>
-                            <td>
-                              {tr.origenMovimiento === "delpro_farm_manager" || tr.motivo.toLowerCase().includes("delpro") ? (
-                                <span className="pill badgeBlue" style={{ fontSize: "11px", fontWeight: 700 }}>
-                                  🚜 DeLaval DelPro (PC Tambo)
-                                </span>
-                              ) : tr.origenMovimiento === "manual_operador" ? (
-                                <span className="pill badgeSlate" style={{ fontSize: "11px", fontWeight: 700 }}>
-                                  👤 Manual Operario
-                                </span>
-                              ) : (
-                                <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
-                                  ⚡ Escala Automática HJB
-                                </span>
-                              )}
-                            </td>
-                            <td style={{ fontSize: "12px", color: "var(--slate-600)" }}>{tr.motivo}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
 
           {/* ========================================================================= */}
           {/* TABLA DE TRAZABILIDAD INDIVIDUAL Y CENSO DE TERNEROS POR CARAVANA / RP     */}
@@ -938,7 +779,7 @@ export default function GanaderiaPage() {
                       <span>Trazabilidad Individual de Animales por Caravana / RP ({animalesRecria.length} cabezas)</span>
                     </h3>
                     <p className="muted" style={{ fontSize: "12px", margin: "2px 0 0 0" }}>
-                      Registro individual por caravana, corral asignado, peso actual, ganancia diaria y alertas de traspaso.
+                      Trazabilidad individual con cálculo de peso estimativo continuo según días de vida acumulados y curva de ganancia biológica (+0.65 kg/d Guachera, +0.85 RM1, +0.95 RM2, +1.10 RM3, +1.45 Terminación).
                     </p>
                   </div>
 
@@ -1096,9 +937,9 @@ export default function GanaderiaPage() {
                       <tr>
                         <th>Caravana / RP</th>
                         <th>Corral Actual</th>
-                        <th style={{ textAlign: "right" }}>Peso Actual</th>
+                        <th style={{ textAlign: "right" }}>Peso Estimado (Vida)</th>
                         <th style={{ textAlign: "right" }}>Ganancia (GDPV)</th>
-                        <th style={{ textAlign: "right" }}>Días en Corral</th>
+                        <th style={{ textAlign: "right" }}>Edad / Días Corral</th>
                         <th>Fecha Ingreso</th>
                         <th>Estado / Próximo Traspaso</th>
                         <th style={{ textAlign: "center" }}>Traspaso Manual</th>
@@ -1106,13 +947,16 @@ export default function GanaderiaPage() {
                     </thead>
                     <tbody>
                       {animalesPaginados.map((a) => {
+                        const calc = calcularPesoEstimativoVida(a);
                         const corralObj = corrales.find((c) => c.id === a.corralId);
+                        const pesoMostrar = a.pesoActualKg || calc.pesoEstimadoKg;
+                        const diasVidaMostrar = a.diasVida || calc.diasVida;
                         const superaCorte =
-                          (a.corralId === "guachera" && (a.pesoActualKg >= 80 || a.diasEnCorral >= 60)) ||
-                          (a.corralId === "rm1" && a.pesoActualKg >= 120) ||
-                          (a.corralId === "rm2" && a.pesoActualKg >= 170) ||
-                          (a.corralId === "rm3" && a.pesoActualKg >= 270) ||
-                          (a.corralId === "terminacion" && a.pesoActualKg >= 370);
+                          (a.corralId === "guachera" && (pesoMostrar >= 80 || a.diasEnCorral >= 60)) ||
+                          (a.corralId === "rm1" && pesoMostrar >= 120) ||
+                          (a.corralId === "rm2" && pesoMostrar >= 170) ||
+                          (a.corralId === "rm3" && pesoMostrar >= 270) ||
+                          (a.corralId === "terminacion" && pesoMostrar >= 370);
 
                         return (
                           <tr key={a.rp}>
@@ -1139,23 +983,29 @@ export default function GanaderiaPage() {
                               </span>
                             </td>
                             <td style={{ textAlign: "right" }}>
-                              <strong style={{ fontSize: "13.5px", color: "#0f172a" }}>{a.pesoActualKg} kg</strong>
+                              <strong style={{ fontSize: "14px", color: "#0f172a" }}>{pesoMostrar} kg</strong>
+                              <div style={{ fontSize: "10.5px", color: "#0284c7", fontWeight: 600 }} title={calc.explicacionCurva}>
+                                📈 {calc.explicacionCurva}
+                              </div>
                             </td>
                             <td style={{ textAlign: "right" }}>
-                              <span className="pill badgeGreen">+{a.gdpvKgDia} kg/d</span>
+                              <span className="pill badgeGreen">+{calc.gdpvEtapaKgDia} kg/d</span>
                             </td>
                             <td style={{ textAlign: "right" }}>
-                              <strong>{a.diasEnCorral} d</strong>
+                              <strong style={{ fontSize: "13px", color: "#0f172a" }}>{diasVidaMostrar} d vida</strong>
+                              <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                                {a.diasEnCorral} d en corral
+                              </div>
                             </td>
                             <td style={{ fontSize: "12px" }}>{a.fechaIngresoCorral}</td>
                             <td>
-                              {a.listoFaena ? (
-                                <span className="pill badgeGreen" style={{ fontWeight: 800 }}>🥩 Listo Faena (≥370 kg)</span>
+                              {pesoMostrar >= 370 ? (
+                                <span className="pill badgeGreen" style={{ fontWeight: 800 }}>🥩 Listo Faena ({pesoMostrar} kg)</span>
                               ) : superaCorte ? (
                                 <span className="pill badgeAmber" style={{ fontWeight: 700 }}>⚡ Cumple corte de traspaso</span>
                               ) : (
                                 <span className="pill badgeSlate" style={{ fontSize: "11.5px" }}>
-                                  Meta: {corralObj?.pesoObjetivoKg} kg ({Math.max(0, Math.round((corralObj?.pesoObjetivoKg || 0) - a.pesoActualKg))} kg faltantes)
+                                  Meta: {corralObj?.pesoObjetivoKg} kg ({Math.max(0, Math.round((corralObj?.pesoObjetivoKg || 0) - pesoMostrar))} kg faltantes)
                                 </span>
                               )}
                             </td>

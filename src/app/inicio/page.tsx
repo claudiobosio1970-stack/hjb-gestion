@@ -493,49 +493,7 @@ export default function InicioPage() {
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {/* Botón DelPro */}
-          <button
-            type="button"
-            onClick={() => {
-              setTabDelProModal("sql_extractor");
-              setModalDelProOpen(true);
-            }}
-            className="secondaryBtn"
-            style={{
-              padding: "7px 13px",
-              fontSize: "12.5px",
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <span>🔗</span>
-            <span>DeLaval DelPro</span>
-            <span
-              style={{
-                fontSize: "10.5px",
-                padding: "2px 6px",
-                borderRadius: "4px",
-                background: delproConfig.estadoConexion === "conectado" ? "#dcfce7" : "#fef08a",
-                color: delproConfig.estadoConexion === "conectado" ? "#166534" : "#854d0e",
-              }}
-            >
-              {delproConfig.estadoConexion === "conectado" ? "Conectado" : "En vinculación"}
-            </span>
-          </button>
 
-          {/* Botón Parámetros */}
-          <button
-            type="button"
-            onClick={() => setModalParametrosOpen(true)}
-            className="secondaryBtn"
-            style={{ padding: "7px 13px", fontSize: "12.5px", fontWeight: 700 }}
-          >
-            ⚙️ Parámetros
-          </button>
-        </div>
       </div>
 
 
@@ -606,9 +564,6 @@ export default function InicioPage() {
           <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "4px" }}>
             <strong>99 ha</strong> Maíz Grano · <strong>43 ha</strong> Maíz Forrajero · 98 ha Soja · 39 ha Alfalfa
           </div>
-          <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
-            279 ha totales auditadas en los 5 campos
-          </div>
         </div>
 
         {/* KPI 3: GANADERÍA */}
@@ -669,12 +624,7 @@ export default function InicioPage() {
                 1. Lechería — Balance Económico y Producción
               </h2>
             </div>
-            <div style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
-              Fuente: DeLaval DelPro (Caudalímetros & Raciones)
-            </div>
           </div>
-
-
 
           <div className="tableWrap">
             <table className="dataTable">
@@ -690,11 +640,9 @@ export default function InicioPage() {
                 <tr>
                   <td>
                     <strong>1. Facturación Bruta Leche</strong>
-                    <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Liquidación usina HJB (${precioLitroLeche}/lt)</div>
                   </td>
                   <td>
                     {litrosTotalesDia.toLocaleString("es-AR")} lts/día totales
-                    <div style={{ fontSize: "11px", color: "var(--slate-400)" }}>Control DelPro: {litrosPromedioVO} lts/VO/día</div>
                   </td>
                   <td style={{ textAlign: "right", fontWeight: 700, color: "var(--slate-700)" }}>
                     {litrosPromedioVO} lts / VO
@@ -707,11 +655,9 @@ export default function InicioPage() {
                 <tr>
                   <td>
                     <span style={{ color: "#b91c1c", fontWeight: 700 }}>2. [-] Costo Alimentación (Ración DelPro)</span>
-                    <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Soja, Trigo, Silo, Maíz, Rollos y Sal</div>
                   </td>
                   <td>
                     ${costoAlimentacionVODia.toLocaleString("es-AR")} / VO / día
-                    <div style={{ fontSize: "11px", color: "var(--slate-400)" }}>Formulación asignada en comederos</div>
                   </td>
                   <td style={{ textAlign: "right", fontWeight: 700, color: "#b91c1c" }}>
                     {costoAlimentacionEnLitros} lts / VO
@@ -728,7 +674,6 @@ export default function InicioPage() {
                   </td>
                   <td>
                     <strong>10,0 litros de leche por vaca</strong>
-                    <div style={{ fontSize: "11px", color: "var(--slate-400)" }}>${costoOperativoVODia.toLocaleString("es-AR")} / VO / día</div>
                   </td>
                   <td style={{ textAlign: "right", fontWeight: 700, color: "#c2410c" }}>
                     10,00 lts / VO
