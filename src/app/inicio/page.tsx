@@ -1097,10 +1097,37 @@ export default function InicioPage() {
       {/* MODAL: CONFIRMAR NOVILLOS PARA SALIDA A FRIGORÍFICO (DELPRO ESCALONADO)   */}
       {/* ========================================================================= */}
       {modalConfirmarFaenaOpen && (
-        <div className="modalOverlay" onClick={() => setModalConfirmarFaenaOpen(false)}>
+        <div
+          className="modalOverlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(4px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setModalConfirmarFaenaOpen(false)}
+        >
           <div
             className="modalContent"
-            style={{ maxWidth: "780px", padding: "24px" }}
+            style={{
+              background: "#ffffff",
+              borderRadius: "14px",
+              maxWidth: "780px",
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              border: "1px solid var(--line)",
+              padding: "24px",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
@@ -1295,10 +1322,37 @@ export default function InicioPage() {
       {/* MODAL: PARÁMETROS REALES HJB                                              */}
       {/* ========================================================================= */}
       {modalParametrosOpen && (
-        <div className="modalOverlay" onClick={() => setModalParametrosOpen(false)}>
+        <div
+          className="modalOverlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(4px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setModalParametrosOpen(false)}
+        >
           <div
             className="modalContent"
-            style={{ maxWidth: "520px", padding: "24px" }}
+            style={{
+              background: "#ffffff",
+              borderRadius: "14px",
+              maxWidth: "520px",
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              border: "1px solid var(--line)",
+              padding: "24px",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
@@ -1382,10 +1436,37 @@ export default function InicioPage() {
       {/* MODAL: INTEGRACIÓN DELAVAL DELPRO (SQL SERVER)                            */}
       {/* ========================================================================= */}
       {modalDelProOpen && (
-        <div className="modalOverlay" onClick={() => setModalDelProOpen(false)}>
+        <div
+          className="modalOverlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(4px)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={() => setModalDelProOpen(false)}
+        >
           <div
             className="modalContent"
-            style={{ maxWidth: "620px", padding: "24px" }}
+            style={{
+              background: "#ffffff",
+              borderRadius: "14px",
+              maxWidth: "640px",
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              border: "1px solid var(--line)",
+              padding: "24px",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
