@@ -168,23 +168,23 @@ ORDER BY TotalAnimals DESC;
 
 // C. Censo Maestro Integral de Animales (DeLaval q_animals)
 const queryAnimalsOficial = `
-DROP TABLE IF EXISTS #BasicAnimalBase;
-DROP TABLE IF EXISTS #PedigreeInfoBase;
-DROP TABLE IF EXISTS #FirstCalving;
-DROP TABLE IF EXISTS #AgeFirstPregnancy;
-DROP TABLE IF EXISTS #AgeFirstInsemination;
-DROP TABLE IF EXISTS #CountAbortions;
-DROP TABLE IF EXISTS #CalvingsKpi;
-DROP TABLE IF EXISTS #DryOffsKpi;
-DROP TABLE IF EXISTS #ExitsInformation;
-DROP TABLE IF EXISTS #LastMilkTest;
-DROP TABLE IF EXISTS #Inseminations;
-DROP TABLE IF EXISTS #Yields7d;
-DROP TABLE IF EXISTS #DIM;
-DROP TABLE IF EXISTS #LastAnimalDailyGroup;
-DROP TABLE IF EXISTS #ResolveGroup;
-DROP TABLE IF EXISTS #HistoryFarmMasterGroup;
-DROP TABLE IF EXISTS #LastGroupHistoryAnimal;
+IF OBJECT_ID('tempdb..#BasicAnimalBase') IS NOT NULL DROP TABLE #BasicAnimalBase;
+IF OBJECT_ID('tempdb..#PedigreeInfoBase') IS NOT NULL DROP TABLE #PedigreeInfoBase;
+IF OBJECT_ID('tempdb..#FirstCalving') IS NOT NULL DROP TABLE #FirstCalving;
+IF OBJECT_ID('tempdb..#AgeFirstPregnancy') IS NOT NULL DROP TABLE #AgeFirstPregnancy;
+IF OBJECT_ID('tempdb..#AgeFirstInsemination') IS NOT NULL DROP TABLE #AgeFirstInsemination;
+IF OBJECT_ID('tempdb..#CountAbortions') IS NOT NULL DROP TABLE #CountAbortions;
+IF OBJECT_ID('tempdb..#CalvingsKpi') IS NOT NULL DROP TABLE #CalvingsKpi;
+IF OBJECT_ID('tempdb..#DryOffsKpi') IS NOT NULL DROP TABLE #DryOffsKpi;
+IF OBJECT_ID('tempdb..#ExitsInformation') IS NOT NULL DROP TABLE #ExitsInformation;
+IF OBJECT_ID('tempdb..#LastMilkTest') IS NOT NULL DROP TABLE #LastMilkTest;
+IF OBJECT_ID('tempdb..#Inseminations') IS NOT NULL DROP TABLE #Inseminations;
+IF OBJECT_ID('tempdb..#Yields7d') IS NOT NULL DROP TABLE #Yields7d;
+IF OBJECT_ID('tempdb..#DIM') IS NOT NULL DROP TABLE #DIM;
+IF OBJECT_ID('tempdb..#LastAnimalDailyGroup') IS NOT NULL DROP TABLE #LastAnimalDailyGroup;
+IF OBJECT_ID('tempdb..#ResolveGroup') IS NOT NULL DROP TABLE #ResolveGroup;
+IF OBJECT_ID('tempdb..#HistoryFarmMasterGroup') IS NOT NULL DROP TABLE #HistoryFarmMasterGroup;
+IF OBJECT_ID('tempdb..#LastGroupHistoryAnimal') IS NOT NULL DROP TABLE #LastGroupHistoryAnimal;
 
 -- Animales Base
 SELECT
