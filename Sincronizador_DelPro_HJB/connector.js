@@ -466,7 +466,7 @@ async function ejecutar() {
       litrosTotalesDia: Number(litrosTotales.toFixed(1)),
       vacasEnOrdeñe: totalVacasLeche,
       litrosPromedioVO: Number(promVO.toFixed(2)),
-      vacasSecasPreparto: cantVacasSecas,
+      vacasSecasPreparto: vacasSecasCount,
       stockCorrales: resStockGrupos,
       censoRodeoTambo: censoRodeoTambo,
       animalesRecria: animalesRecriaParaNube,
