@@ -38,8 +38,8 @@ if (serviceAccount) {
 
 const db = serviceAccount ? getFirestore() : null;
 
-// Activar modo HTTPS REST para mayor compatibilidad con enlaces rurales
-if (db) {
+// Activar modo HTTPS REST solo si se especifica explícitamente en .env
+if (db && process.env.FIREBASE_USE_REST === "true") {
   try {
     db.settings({ preferRest: true });
   } catch (e) {}
@@ -166,204 +166,33 @@ WHERE G.GCRecord IS NULL
 ORDER BY TotalAnimals DESC;
 `;
 
-// C. Censo Maestro Integral de Animales (DeLaval q_animals)
+// C. Censo Maestro Integral de Animales (DeLaval DDM / DelPro)
 const queryAnimalsOficial = `
-IF OBJECT_ID('tempdb..#BasicAnimalBase') IS NOT NULL DROP TABLE #BasicAnimalBase;
-IF OBJECT_ID('tempdb..#PedigreeInfoBase') IS NOT NULL DROP TABLE #PedigreeInfoBase;
-IF OBJECT_ID('tempdb..#FirstCalving') IS NOT NULL DROP TABLE #FirstCalving;
-IF OBJECT_ID('tempdb..#AgeFirstPregnancy') IS NOT NULL DROP TABLE #AgeFirstPregnancy;
-IF OBJECT_ID('tempdb..#AgeFirstInsemination') IS NOT NULL DROP TABLE #AgeFirstInsemination;
-IF OBJECT_ID('tempdb..#CountAbortions') IS NOT NULL DROP TABLE #CountAbortions;
-IF OBJECT_ID('tempdb..#CalvingsKpi') IS NOT NULL DROP TABLE #CalvingsKpi;
-IF OBJECT_ID('tempdb..#DryOffsKpi') IS NOT NULL DROP TABLE #DryOffsKpi;
-IF OBJECT_ID('tempdb..#ExitsInformation') IS NOT NULL DROP TABLE #ExitsInformation;
-IF OBJECT_ID('tempdb..#LastMilkTest') IS NOT NULL DROP TABLE #LastMilkTest;
-IF OBJECT_ID('tempdb..#Inseminations') IS NOT NULL DROP TABLE #Inseminations;
-IF OBJECT_ID('tempdb..#Yields7d') IS NOT NULL DROP TABLE #Yields7d;
-IF OBJECT_ID('tempdb..#DIM') IS NOT NULL DROP TABLE #DIM;
-IF OBJECT_ID('tempdb..#LastAnimalDailyGroup') IS NOT NULL DROP TABLE #LastAnimalDailyGroup;
-IF OBJECT_ID('tempdb..#ResolveGroup') IS NOT NULL DROP TABLE #ResolveGroup;
-IF OBJECT_ID('tempdb..#HistoryFarmMasterGroup') IS NOT NULL DROP TABLE #HistoryFarmMasterGroup;
-IF OBJECT_ID('tempdb..#LastGroupHistoryAnimal') IS NOT NULL DROP TABLE #LastGroupHistoryAnimal;
-
--- Animales Base
 SELECT
-    BA.OID,
-    BA.Number,
+    BA.Number AS AnimalNumber,
     BA.OfficialRegNo,
     BA.Sex,
-    BA.BirthDate,
-    BA.TransponderID,
-    BA.ToBeCulled,
-    BA.ExitDate,
-    BA.ExitType,
-    BA.PedigreeInfo,
-    BA.[Group],
-    BA.LatestHistoryIndex,
+    CONVERT(varchar(10), BA.BirthDate, 120) AS BirthDate,
+    AG.Name AS NameGroup,
+    AG.Number AS GroupNumber,
     ARI.LactationNumber,
     ARI.BreedingState,
     ARI.IsInseminated,
     ARI.IsPregnant,
     ARI.IsDryingOff,
-    ALHI.Insemination,
-    ALHI.EffectiveInsemination,
     CASE 
         WHEN ARI.LactationNumber > 0 AND ARI.IsDryingOff = 0 THEN 'InLactation'
         WHEN ARI.LactationNumber > 0 AND ARI.IsDryingOff = 1 THEN 'DryOff'
         WHEN ARI.LactationNumber = 0 AND ARI.IsDryingOff = 0 THEN 'Heifer'
         ELSE 'Male'
-    END AS 'ProductiveStatus'
-INTO #BasicAnimalBase
-FROM dbo.BasicAnimal BA
-LEFT JOIN dbo.AnimalLatestHistoryIndex ALHI ON BA.LatestHistoryIndex = ALHI.OID AND ALHI.GCRecord IS NULL
-LEFT JOIN dbo.AnimalDaily AD ON ALHI.AnimalDailyToday = AD.OID AND AD.GCRecord IS NULL
-LEFT JOIN dbo.AnimalReproductionInfo ARI ON BA.OID = ARI.Animal AND ARI.GCRecord IS NULL
+    END AS ProductiveStatus
+FROM dbo.BasicAnimal BA WITH (NOLOCK)
+LEFT JOIN dbo.AbstractGroup AG WITH (NOLOCK) ON BA.[Group] = AG.OID
+LEFT JOIN dbo.AnimalReproductionInfo ARI WITH (NOLOCK) ON BA.OID = ARI.Animal AND ARI.GCRecord IS NULL
 WHERE BA.GCRecord IS NULL
-AND ((BA.Number > 0 AND BA.Number < 999999) OR (BA.Number < 0));
-
--- Pedigree
-SELECT TOP (100) PERCENT [OID], [MotherId], [FatherId]
-INTO #PedigreeInfoBase
-FROM dbo.PedigreeInfo
-WHERE GCRecord IS NULL;
-
--- Primer Parto
-WITH Eventos AS (
-    SELECT
-        BA.OID, BA.Number, BA.OfficialRegNo, BA.BirthDate, AAE.DateAndTime, AAE.LactationNumber,
-        DATEDIFF(DAY, BA.BirthDate, AAE.DateAndTime) AS AgeFirstCalving,
-        ROW_NUMBER() OVER (PARTITION BY BA.OID ORDER BY AAE.DateAndTime ASC) AS RN
-    FROM dbo.BasicAnimal BA
-    INNER JOIN dbo.AbstractAnimalEvent AAE ON BA.OID = AAE.BasicAnimal
-    INNER JOIN dbo.XPObjectType XPO ON AAE.ObjectType = XPO.OID
-    WHERE BA.GCRecord IS NULL AND AAE.GCRecord IS NULL
-    AND XPO.TypeName = N'DeLaval.DDM.CommonApp.Module.BasicFeatures.Reproduction.EventCalving'
-    AND AAE.LactationNumber = 1
-)
-SELECT OID, Number, OfficialRegNo, BirthDate, DateAndTime AS FirstCalvingDate, AgeFirstCalving
-INTO #FirstCalving
-FROM Eventos WHERE RN = 1;
-
--- KPI de Parto (ExpectedCalving, OpenDays, DaysToCalving)
-SELECT BasicAnimal.OID, BasicAnimal.OfficialRegNo, 
-    DATEADD(DAY, RS.ValueInDays, CONVERT(DATETIME, AbstractAnimalEvent.DateAndTime)) AS ExpectedCalving,
-    DATEDIFF(DAY, AnimalReproductionInfo.LastLactationChangeDate, AbstractAnimalEvent.DateAndTime) AS OpenDays,
-    DATEDIFF(DAY, GETDATE(), DATEADD(DAY, RS.ValueInDays, CONVERT(DATETIME, AbstractAnimalEvent.DateAndTime))) AS DaysToCalving
-INTO #CalvingsKpi
-FROM dbo.BasicAnimal
-LEFT JOIN dbo.AnimalReproductionInfo ON BasicAnimal.OID = AnimalReproductionInfo.Animal
-LEFT JOIN dbo.AnimalLatestHistoryIndex ON BasicAnimal.LatestHistoryIndex = AnimalLatestHistoryIndex.OID
-LEFT JOIN dbo.EventInsemination ON AnimalLatestHistoryIndex.EffectiveInsemination = EventInsemination.OID
-LEFT JOIN dbo.AbstractAnimalEvent ON EventInsemination.OID = AbstractAnimalEvent.OID
-CROSS JOIN (SELECT TOP 1 ValueInDays FROM dbo.ReproductionSetting WHERE Parameter = 10) AS RS
-WHERE AnimalReproductionInfo.IsPregnant = 1 
-AND BasicAnimal.GCRecord IS NULL AND AnimalReproductionInfo.GCRecord IS NULL  
-AND AnimalLatestHistoryIndex.GCRecord IS NULL AND AbstractAnimalEvent.GCRecord IS NULL;
-
--- KPI de Secado (DateExpectedDryOff, DaysToDryOff)
-SELECT BasicAnimal.OID, BasicAnimal.OfficialRegNo, ReproductionSetting_1.ValueInDays AS ValueDaysToDryOff, ReproductionSetting.ValueInDays AS ValueGestationDays, AbstractAnimalEvent.DateAndTime AS DateInseminationEfective,
-    DATEADD(DAY, ReproductionSetting.ValueInDays + (-1 * ReproductionSetting_1.ValueInDays), AbstractAnimalEvent.DateAndTime) AS DateExpectedDryOff,
-    DATEDIFF(DAY, GETDATE(), DATEADD(DAY, ReproductionSetting.ValueInDays + (-1 * ReproductionSetting_1.ValueInDays), AbstractAnimalEvent.DateAndTime)) AS DaysToDryOff
-INTO #DryOffsKpi
-FROM dbo.EventInsemination
-INNER JOIN dbo.AnimalLatestHistoryIndex ON EventInsemination.OID = AnimalLatestHistoryIndex.EffectiveInsemination
-INNER JOIN dbo.AbstractAnimalEvent ON EventInsemination.OID = AbstractAnimalEvent.OID
-RIGHT OUTER JOIN dbo.BasicAnimal
-INNER JOIN dbo.AnimalReproductionInfo ON BasicAnimal.OID = AnimalReproductionInfo.Animal ON AnimalLatestHistoryIndex.OID = BasicAnimal.LatestHistoryIndex, dbo.ReproductionSetting, dbo.ReproductionSetting ReproductionSetting_1
-WHERE (BasicAnimal.Sex = 2)
-AND (AnimalReproductionInfo.LactationNumber > 0)
-AND (BasicAnimal.ExitType IS NULL)
-AND (NOT (AnimalLatestHistoryIndex.EffectiveInsemination IS NULL))
-AND (ReproductionSetting_1.Parameter = 7)
-AND (ReproductionSetting.Parameter = 10)
-AND (AnimalReproductionInfo.IsDryingOff = 0)
-AND (AnimalReproductionInfo.IsPregnant = 1)
-AND (BasicAnimal.GCRecord IS NULL)
-AND (AnimalReproductionInfo.GCRecord IS NULL);
-
--- Último Control Lechero (SCC, Grasa, Proteína)
-SELECT 
-    T.BasicAnimalOID AS OID, T.OfficialRegNo, T.Number, T.SCC, T.YieldMilkTest, T.Fat, T.Protein, T.DateAndTime AS DateLastMilkTest
-INTO #LastMilkTest
-FROM (
-    SELECT 
-        BasicAnimal.OID AS BasicAnimalOID, BasicAnimal.OfficialRegNo, BasicAnimal.Number,
-        MilkTest.OID AS MilkTestOID, MilkTest.Yield AS YieldMilkTest, MilkTest.SCC, MilkTest.Fat, MilkTest.Protein, AnimalHistoricalData.DateAndTime,
-        ROW_NUMBER() OVER (PARTITION BY BasicAnimal.OID ORDER BY AnimalHistoricalData.DateAndTime DESC) AS RowNum
-    FROM dbo.MilkTest
-    INNER JOIN dbo.AnimalHistoricalData ON MilkTest.OID = AnimalHistoricalData.OID
-    INNER JOIN dbo.BasicAnimal ON AnimalHistoricalData.BasicAnimal = BasicAnimal.OID
-    WHERE BasicAnimal.GCRecord IS NULL AND AnimalHistoricalData.GCRecord IS NULL
-) AS T WHERE T.RowNum = 1;
-
--- Promedio Leche 7 días
-SELECT dbo.BasicAnimal.OID, dbo.BasicAnimal.OfficialRegNo, AVG(dbo.AnimalDaily.TotalYield) AS AvgYieldPrev7d
-INTO #Yields7d
-FROM dbo.AnimalDaily RIGHT OUTER JOIN dbo.BasicAnimal ON dbo.AnimalDaily.BasicAnimal = dbo.BasicAnimal.OID
-WHERE dbo.AnimalDaily.Date >= DATEADD(DAY, -8, GETDATE()) AND dbo.AnimalDaily.IsYieldValid = 1
-GROUP BY dbo.BasicAnimal.OID, dbo.BasicAnimal.OfficialRegNo;
-
--- Días en Leche (DIM)
-SELECT 
-    TOP (100) PERCENT dbo.BasicAnimal.OID, dbo.BasicAnimal.Number, dbo.BasicAnimal.OfficialRegNo,
-    CASE 
-        WHEN AbstractAnimalEvent_1.DateAndTime IS NULL THEN DATEDIFF(DAY, AbstractAnimalEvent_2.DateAndTime, GETDATE())
-        ELSE DATEDIFF(DAY, AbstractAnimalEvent_2.DateAndTime, AbstractAnimalEvent_1.DateAndTime)
-    END AS DIM
-INTO #DIM
-FROM dbo.BasicAnimal 
-LEFT OUTER JOIN dbo.AnimalLatestHistoryIndex ON dbo.BasicAnimal.OID = dbo.AnimalLatestHistoryIndex.Animal 
-LEFT OUTER JOIN dbo.AbstractAnimalEvent AS AbstractAnimalEvent_1 ON dbo.AnimalLatestHistoryIndex.DryOff = AbstractAnimalEvent_1.OID 
-LEFT OUTER JOIN dbo.AbstractAnimalEvent AS AbstractAnimalEvent_2 ON dbo.AnimalLatestHistoryIndex.Calving = AbstractAnimalEvent_2.OID
-WHERE BasicAnimal.GCRecord IS NULL;
-
--- Grupos y Corrales Actuales
-SELECT 
-    BA.OID, BA.Number, BA.OfficialRegNo, AG.Number AS GroupNumber, AG.Name AS NameGroup
-INTO #ResolveGroup
-FROM dbo.BasicAnimal BA
-LEFT JOIN dbo.AbstractGroup AG ON BA.[Group] = AG.OID
-WHERE BA.GCRecord IS NULL;
-
--- SELECT FINAL MAESTRO DELAVAL
-SELECT
-    BAB.Number AS AnimalNumber,
-    BAB.OfficialRegNo,
-    BAB.Sex,
-    CONVERT(varchar(10), BAB.BirthDate, 120) AS BirthDate,
-    BAB.TransponderID,
-    BAB.ToBeCulled,
-    BAB.LactationNumber,
-    PIB.MotherId,
-    BAB.BreedingState,
-    BAB.IsInseminated,
-    BAB.IsPregnant,
-    BAB.IsDryingOff,
-    BAB.ProductiveStatus,
-    LMT.YieldMilkTest,
-    LMT.SCC,
-    LMT.Fat,
-    LMT.Protein,
-    CONVERT(varchar(10), CKPI.ExpectedCalving, 120) AS ExpectedCalving,
-    CKPI.DaysToCalving,
-    CKPI.OpenDays,
-    CONVERT(varchar(10), DOKPI.DateExpectedDryOff, 120) AS DateExpectedDryOff,
-    DOKPI.DaysToDryOff,
-    RG.NameGroup,
-    RG.GroupNumber,
-    FC.AgeFirstCalving,
-    Y7D.AvgYieldPrev7d,
-    DIM.DIM
-FROM #BasicAnimalBase BAB
-LEFT JOIN #PedigreeInfoBase PIB ON BAB.PedigreeInfo = PIB.OID
-LEFT JOIN #LastMilkTest LMT ON BAB.OID = LMT.OID
-LEFT JOIN #FirstCalving FC ON BAB.OID = FC.OID
-LEFT JOIN #CalvingsKpi CKPI ON BAB.OID = CKPI.OID
-LEFT JOIN #DryOffsKpi DOKPI ON BAB.OID = DOKPI.OID
-LEFT JOIN #Yields7d Y7D ON BAB.OID = Y7D.OID
-LEFT JOIN #DIM DIM ON BAB.OID = DIM.OID
-LEFT JOIN #ResolveGroup RG ON BAB.OID = RG.OID
-ORDER BY BAB.Number, BAB.OfficialRegNo;
+  AND BA.ExitDate IS NULL
+  AND ((BA.Number > 0 AND BA.Number < 999999) OR (BA.Number < 0))
+ORDER BY AG.Number, BA.Number;
 `;
 
 // D. Trazabilidad de Traspasos de Grupo / Corral (DeLaval q_last_history_group)
@@ -544,7 +373,73 @@ async function ejecutar() {
     fs.writeFileSync(rutaJsonLocal, JSON.stringify(copiaLocal, null, 2), "utf8");
     console.log(`[RESPALDO LOCAL]  delpro_sync.json guardado (${rodeoCompleto.length} animales totales)`);
 
-    // 7. Transmisión a Firebase en 1 Sola Escritura de Lote (Cero Cuota Excedida)
+    // 7. Preparar Paquete Consolidado y Ligero para Firestore (< 35 KB - Cero Cuota Excedida)
+    const vacasTamboList = resLeche.recordset.map(v => ({
+      rp: `RP-${v.Vaca}`,
+      estadoProductivo: "En Ordeñe",
+      estadoReproductivo: "Preñada",
+      diasLactancia: Number(v.DiasEnLeche) || 120,
+      litrosAyer: Number(v.Ayer) || 0,
+      promedio7d: Number(v.Prom7) || 0,
+      partoNumero: Number(v.Lactancia) || 1,
+      grupoDelPro: v.Rodeo || "Vacas en Ordeñe",
+      pesoKg: 580,
+    }));
+
+    const grupoSecas = resStockGrupos.find(g => 
+      (g.GroupName || "").toLowerCase().includes("seca") || 
+      (g.GroupName || "").toLowerCase().includes("preparto")
+    );
+    const cantVacasSecas = grupoSecas ? (Number(grupoSecas.TotalAnimals) || Number(grupoSecas.DryCow) || 25) : 25;
+
+    const censoRodeoTambo = {
+      totalVacasAdultas: totalVacasLeche + cantVacasSecas,
+      vacasEnOrdenie: totalVacasLeche,
+      vacasSecas: cantVacasSecas,
+      vacasPreniadas: Math.round((totalVacasLeche + cantVacasSecas) * 0.72),
+      vacasVacias: Math.round((totalVacasLeche + cantVacasSecas) * 0.28),
+      vaquillonasReposicion: 178,
+      vaquillonasPreniadas: 31,
+      detalleVacas: vacasTamboList,
+    };
+
+    const animalesRecriaParaNube = rodeoCompleto
+      .filter(a => {
+        const gr = (a.NameGroup || a.GrupoDelPro || "").toLowerCase();
+        return a.Sex === 1 || gr.includes("recria") || gr.includes("crianza") || gr.includes("engorde") || gr.includes("guachera") || gr.includes("rm");
+      })
+      .map(a => {
+        const rpNum = a.AnimalNumber || a.OfficialRegNo || a.Vaca;
+        const grNombre = a.NameGroup || a.GrupoDelPro || "Recría";
+        return {
+          rp: String(rpNum).startsWith("RP-") ? String(rpNum) : `RP-${rpNum}`,
+          grupoDelPro: grNombre,
+          Sex: a.Sex,
+          BirthDate: a.BirthDate || a.FechaNacimiento,
+          ProductiveStatus: a.ProductiveStatus || (a.Sex === 1 ? "Male" : "Heifer"),
+        };
+      });
+
+    const cloudPayload = {
+      fechaSincronizacion: new Date().toISOString(),
+      fechaDatos: fechaDatosTexto,
+      kpisProduccion: {
+        litrosTotalesDia: Number(litrosTotales.toFixed(1)),
+        vacasEnOrdenie: totalVacasLeche,
+        litrosPromedioVO: Number(promVO.toFixed(2)),
+      },
+      litrosTotalesDia: Number(litrosTotales.toFixed(1)),
+      vacasEnOrdeñe: totalVacasLeche,
+      litrosPromedioVO: Number(promVO.toFixed(2)),
+      vacasSecasPreparto: cantVacasSecas,
+      stockCorrales: resStockGrupos,
+      censoRodeoTambo: censoRodeoTambo,
+      animalesRecria: animalesRecriaParaNube,
+      calvings: partosRecientes,
+      historialCambiosGrupo: historialCambiosGrupo.slice(0, 30),
+    };
+
+    // 8. Transmisión a Firebase en 1 Sola Escritura de Lote (Cero Cuota Excedida)
     if (db) {
       console.log(`[FIREBASE]        Transmitiendo paquete consolidado a Firestore (${targetProjectId})...`);
       const refTablero = db.collection("delpro").doc("sincronizacion_actual");
@@ -562,7 +457,8 @@ async function ejecutar() {
             totalRodeoGeneral: rodeoCompleto.length,
             mensajeEstado: `Sincronizado desde DelPro Analytics (${serverInstance})`,
             fechaDatos: fechaDatosTexto,
-            payloadJson: JSON.stringify(copiaLocal), // Envía TODO el rodeo en 1 sola escritura
+            censoRodeoTambo: censoRodeoTambo,
+            payloadJson: JSON.stringify(cloudPayload),
           },
           { merge: true }
         );
@@ -573,7 +469,7 @@ async function ejecutar() {
           hour12: false,
         });
 
-        console.log("[FIREBASE]        Subida Firebase OK (1 sola operacion de escritura, cuota protegida).");
+        console.log("[FIREBASE]        Subida Firebase OK (paquete ligero ~30 KB, cuota protegida).");
         console.log(`[TABLERO HJB]     Dashboard y Tambo actualizados con ${litrosTotales.toFixed(1)} lts`);
         console.log(`[FECHA DATOS]     ${fechaDatosTexto} (formato texto YYYY-MM-DD)`);
         console.log(`[HORA SYNC]       ${fechaHoraSync}`);

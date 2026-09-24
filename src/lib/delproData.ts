@@ -844,6 +844,18 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
     onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
+        if (data.payloadJson) {
+          try {
+            const res = importarPayloadDesdeJson(data.payloadJson);
+            if (res.success && res.config) {
+              if (onUpdate) onUpdate(res.config);
+              return;
+            }
+          } catch {
+            // fallback si no es json valido
+          }
+        }
+
         let payload: DelProSyncPayload | null = null;
         if (data.payloadJson) {
           try {
@@ -854,14 +866,27 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
         }
         
         const current = getDelProConfig();
+        const vacasVO = Number(data.vacasEnOrdeñe ?? payload?.vacasEnOrdeñe ?? current.datosSincronizados.vacasEnOrdeñe);
+        const litros = Number(data.litrosTotalesDia ?? payload?.litrosTotalesDia ?? current.datosSincronizados.litrosTotalesDia);
+        const prom = Number(data.litrosPromedioVO ?? payload?.litrosPromedioVO ?? current.datosSincronizados.litrosPromedioVO);
+
+        let censo = data.censoRodeoTambo || payload?.censoRodeoTambo || current.datosSincronizados.censoRodeoTambo;
+        if (censo && vacasVO > 0) {
+          censo = {
+            ...censo,
+            vacasEnOrdenie: vacasVO,
+            totalVacasAdultas: vacasVO + (censo.vacasSecas || 25),
+          };
+        }
+
         const payloadData: Partial<DelProSyncPayload> = {
           ...(payload || {}),
-          litrosTotalesDia: Number(data.litrosTotalesDia ?? payload?.litrosTotalesDia ?? current.datosSincronizados.litrosTotalesDia),
-          vacasEnOrdeñe: Number(data.vacasEnOrdeñe ?? payload?.vacasEnOrdeñe ?? current.datosSincronizados.vacasEnOrdeñe),
-          litrosPromedioVO: Number(data.litrosPromedioVO ?? payload?.litrosPromedioVO ?? current.datosSincronizados.litrosPromedioVO),
+          litrosTotalesDia: litros,
+          vacasEnOrdeñe: vacasVO,
+          litrosPromedioVO: prom,
           fechaSincronizacion: data.fechaSincronizacion || current.ultimaSincronizacion || new Date().toISOString(),
-          censoRodeoTambo: payload?.censoRodeoTambo || current.datosSincronizados.censoRodeoTambo,
-          animalesRecria: payload?.animalesRecria || current.datosSincronizados.animalesRecria,
+          censoRodeoTambo: censo,
+          animalesRecria: payload?.animalesRecria || data.animalesRecria || current.datosSincronizados.animalesRecria,
           traspasosAutomaticos: payload?.traspasosAutomaticos || current.datosSincronizados.traspasosAutomaticos,
           movimientosCorralDelPro: payload?.movimientosCorralDelPro || current.datosSincronizados.movimientosCorralDelPro,
         };
@@ -946,6 +971,15 @@ export function propagarDatosDelProATodoElSistema(
   // Calcular litros promedio si vienen litros y vacas
   if (mergedDatos.litrosTotalesDia > 0 && mergedDatos.vacasEnOrdeñe > 0) {
     mergedDatos.litrosPromedioVO = Number((mergedDatos.litrosTotalesDia / mergedDatos.vacasEnOrdeñe).toFixed(2));
+  }
+
+  // Asegurar consistencia absoluta entre vacasEnOrdeñe y el censo del rodeo
+  if (mergedDatos.censoRodeoTambo && mergedDatos.vacasEnOrdeñe > 0) {
+    mergedDatos.censoRodeoTambo = {
+      ...mergedDatos.censoRodeoTambo,
+      vacasEnOrdenie: mergedDatos.vacasEnOrdeñe,
+      totalVacasAdultas: mergedDatos.vacasEnOrdeñe + (mergedDatos.censoRodeoTambo.vacasSecas || mergedDatos.vacasSecasPreparto || 25),
+    };
   }
 
   // 1. Sincronizar Módulo Tambo & Dieta / Stock
