@@ -26,6 +26,11 @@ import {
   resolverPesoAnimal,
 } from "@/lib/delproData";
 
+function formatearCaravana(rp?: string | null): string {
+  if (!rp) return "";
+  return String(rp).replace(/^RP[-_ ]?/i, "").trim();
+}
+
 export default function TamboPage() {
   const [dieta, setDieta] = useState<DietaTamboConfig>(getDietaTambo());
   const [delproConfig, setDelproConfig] = useState<DelProConfig>(() => getDelProConfig());
@@ -34,10 +39,20 @@ export default function TamboPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Filtros individuales de vacas por RP
+  // Filtros individuales e interactivos por columna ("cuadritos")
+  const [filtroCaravana, setFiltroCaravana] = useState("");
+  const [filtroProdCol, setFiltroProdCol] = useState<"todos" | "en_ordenie" | "secas" | "vaquillonas" | "terneras">("todos");
+  const [filtroReproCol, setFiltroReproCol] = useState<"todos" | "preniada" | "inseminada" | "vacia">("todos");
+  const [filtroDELCol, setFiltroDELCol] = useState<"todos" | "del_desc" | "del_asc" | "alta" | "media" | "baja">("todos");
+  const [filtroGestacionCol, setFiltroGestacionCol] = useState<"todos" | "con_gestacion" | "sin_gestacion" | "gest_desc" | "gest_asc">("todos");
+  const [filtroPartoCol, setFiltroPartoCol] = useState<"todos" | "proximas" | "con_fecha" | "sin_fecha">("todos");
+  const [filtroLitrosCol, setFiltroLitrosCol] = useState<"todos" | "litros_desc" | "litros_asc" | "alta" | "baja">("todos");
+  const [filtroPesoCol, setFiltroPesoCol] = useState<"todos" | "peso_desc" | "peso_asc" | "oficial">("todos");
+
+  // Filtros rápidos superiores
   const [busquedaVacaRP, setBusquedaVacaRP] = useState("");
   const [filtroEstadoVaca, setFiltroEstadoVaca] = useState<"todas" | "en_ordenie" | "secas" | "vaquillonas" | "terneras" | "preniadas" | "inseminadas" | "vacias">("todas");
-  const [ordenCenso, setOrdenCenso] = useState<"rp_asc" | "del_desc" | "del_asc" | "litros_desc" | "litros_asc" | "parto_proximo" | "peso_desc" | "peso_asc">("rp_asc");
+  const [ordenCenso, setOrdenCenso] = useState<"rp_asc" | "caravana_desc" | "del_desc" | "del_asc" | "litros_desc" | "litros_asc" | "parto_proximo" | "peso_desc" | "peso_asc" | "gest_desc" | "gest_asc">("rp_asc");
   const [elementosPorPagina, setElementosPorPagina] = useState(50);
   const [paginaVacas, setPaginaVacas] = useState(1);
 
@@ -212,60 +227,139 @@ export default function TamboPage() {
   const totalAnimalesHembra = vacasDetalle.length || (totalVacasAdultas + vaquillonasReposicionCount + ternerasCrianzaHembrasCount); // 421
   const totalAnimalesMacho = totalRodeoGeneral - totalAnimalesHembra; // 93
 
+  const hayFiltrosActivos =
+    filtroCaravana.trim() !== "" ||
+    busquedaVacaRP.trim() !== "" ||
+    filtroProdCol !== "todos" ||
+    filtroReproCol !== "todos" ||
+    filtroDELCol !== "todos" ||
+    filtroGestacionCol !== "todos" ||
+    filtroPartoCol !== "todos" ||
+    filtroLitrosCol !== "todos" ||
+    filtroPesoCol !== "todos" ||
+    filtroEstadoVaca !== "todas";
+
+  const limpiarFiltros = () => {
+    setFiltroCaravana("");
+    setBusquedaVacaRP("");
+    setFiltroProdCol("todos");
+    setFiltroReproCol("todos");
+    setFiltroDELCol("todos");
+    setFiltroGestacionCol("todos");
+    setFiltroPartoCol("todos");
+    setFiltroLitrosCol("todos");
+    setFiltroPesoCol("todos");
+    setFiltroEstadoVaca("todas");
+    setOrdenCenso("rp_asc");
+    setPaginaVacas(1);
+  };
+
   const vacasFiltradas = vacasDetalle
     .filter((v) => {
-      if (busquedaVacaRP.trim() && !v.rp.toLowerCase().includes(busquedaVacaRP.toLowerCase().trim())) {
-        return false;
+      // 1. Filtro por número de caravana
+      const busq = (filtroCaravana || busquedaVacaRP).trim().toLowerCase();
+      if (busq) {
+        const numStr = formatearCaravana(v.rp).toLowerCase();
+        const rpLower = v.rp.toLowerCase();
+        if (!numStr.includes(busq) && !rpLower.includes(busq)) {
+          return false;
+        }
       }
+
       const gr = (v.grupoDelPro || "").toLowerCase();
-      if (filtroEstadoVaca === "en_ordenie") {
-        return v.estadoProductivo === "En Ordeñe" || (v.litrosAyer !== undefined && v.litrosAyer > 0) || gr.includes("ordeñ") || gr.includes("punta");
+
+      // 2. Filtro Estado Productivo (cuadrito columna o pill superior)
+      const prodFiltro = filtroProdCol !== "todos" ? filtroProdCol : (
+        filtroEstadoVaca === "en_ordenie" ? "en_ordenie" :
+        filtroEstadoVaca === "secas" ? "secas" :
+        filtroEstadoVaca === "vaquillonas" ? "vaquillonas" :
+        filtroEstadoVaca === "terneras" ? "terneras" : "todos"
+      );
+      if (prodFiltro === "en_ordenie") {
+        const esOrde = v.estadoProductivo === "En Ordeñe" || (v.litrosAyer !== undefined && v.litrosAyer > 0) || gr.includes("ordeñ") || gr.includes("punta");
+        if (!esOrde) return false;
+      } else if (prodFiltro === "secas") {
+        const esSec = v.estadoProductivo === "Seca" || gr.includes("seca") || gr.includes("preparto");
+        if (!esSec) return false;
+      } else if (prodFiltro === "vaquillonas") {
+        const esVq = v.estadoProductivo === "Vaquillona" || gr.includes("vaquillona") || gr.includes("vq") || gr.includes("recria hembra");
+        if (!esVq) return false;
+      } else if (prodFiltro === "terneras") {
+        const esTer = v.estadoProductivo === "Crianza" || gr.includes("crianza") || gr.includes("guachera") || gr.includes("terner");
+        if (!esTer) return false;
       }
-      if (filtroEstadoVaca === "secas") {
-        return v.estadoProductivo === "Seca" || gr.includes("seca") || gr.includes("preparto");
-      }
-      if (filtroEstadoVaca === "vaquillonas") {
-        return v.estadoProductivo === "Vaquillona" || gr.includes("vaquillona") || gr.includes("vq") || gr.includes("recria hembra");
-      }
-      if (filtroEstadoVaca === "terneras") {
-        return v.estadoProductivo === "Crianza" || gr.includes("crianza") || gr.includes("guachera") || gr.includes("terner");
-      }
-      if (filtroEstadoVaca === "preniadas") return v.estadoReproductivo === "Preñada";
-      if (filtroEstadoVaca === "inseminadas") return v.estadoReproductivo === "Inseminada";
-      if (filtroEstadoVaca === "vacias") return v.estadoReproductivo === "Vacía";
+
+      // 3. Filtro Estado Reproductivo (cuadrito columna o pill superior)
+      const reproFiltro = filtroReproCol !== "todos" ? filtroReproCol : (
+        filtroEstadoVaca === "preniadas" ? "preniada" :
+        filtroEstadoVaca === "inseminadas" ? "inseminada" :
+        filtroEstadoVaca === "vacias" ? "vacia" : "todos"
+      );
+      if (reproFiltro === "preniada" && v.estadoReproductivo !== "Preñada") return false;
+      if (reproFiltro === "inseminada" && v.estadoReproductivo !== "Inseminada") return false;
+      if (reproFiltro === "vacia" && v.estadoReproductivo !== "Vacía") return false;
+
+      // 4. Filtro DEL Rango
+      if (filtroDELCol === "alta" && (v.diasLactancia || 0) <= 200) return false;
+      if (filtroDELCol === "media" && ((v.diasLactancia || 0) < 100 || (v.diasLactancia || 0) > 200)) return false;
+      if (filtroDELCol === "baja" && ((v.diasLactancia || 0) <= 0 || (v.diasLactancia || 0) >= 100)) return false;
+
+      // 5. Filtro Gestación
+      if (filtroGestacionCol === "con_gestacion" && !(v.diasGestacion && v.diasGestacion > 0)) return false;
+      if (filtroGestacionCol === "sin_gestacion" && (v.diasGestacion && v.diasGestacion > 0)) return false;
+
+      // 6. Filtro Fecha Parto
+      if (filtroPartoCol === "proximas" && !(v.diasParaParto !== undefined && v.diasParaParto <= 30 && v.diasParaParto >= 0)) return false;
+      if (filtroPartoCol === "con_fecha" && !v.fechaProbableParto) return false;
+      if (filtroPartoCol === "sin_fecha" && v.fechaProbableParto) return false;
+
+      // 7. Filtro Litros Ayer
+      if (filtroLitrosCol === "alta" && (v.litrosAyer || 0) < 25) return false;
+      if (filtroLitrosCol === "baja" && ((v.litrosAyer || 0) <= 0 || (v.litrosAyer || 0) >= 20)) return false;
+
+      // 8. Filtro Peso
+      if (filtroPesoCol === "oficial" && v.origenPeso !== "delpro_oficial") return false;
+
       return true;
     })
     .sort((a, b) => {
-      if (ordenCenso === "del_desc") {
-        return (b.diasLactancia || 0) - (a.diasLactancia || 0);
-      }
-      if (ordenCenso === "del_asc") {
-        return (a.diasLactancia || 0) - (b.diasLactancia || 0);
-      }
-      if (ordenCenso === "litros_desc") {
-        return (b.litrosAyer || 0) - (a.litrosAyer || 0);
-      }
-      if (ordenCenso === "litros_asc") {
-        return (a.litrosAyer || 0) - (b.litrosAyer || 0);
-      }
-      if (ordenCenso === "peso_desc") {
+      const criterio =
+        filtroDELCol === "del_desc" || filtroDELCol === "del_asc" ? filtroDELCol :
+        filtroLitrosCol === "litros_desc" || filtroLitrosCol === "litros_asc" ? filtroLitrosCol :
+        filtroPesoCol === "peso_desc" || filtroPesoCol === "peso_asc" ? filtroPesoCol :
+        filtroGestacionCol === "gest_desc" || filtroGestacionCol === "gest_asc" ? filtroGestacionCol :
+        filtroPartoCol === "proximas" ? "parto_proximo" :
+        ordenCenso;
+
+      if (criterio === "del_desc") return (b.diasLactancia || 0) - (a.diasLactancia || 0);
+      if (criterio === "del_asc") return (a.diasLactancia || 0) - (b.diasLactancia || 0);
+      if (criterio === "litros_desc") return (b.litrosAyer || 0) - (a.litrosAyer || 0);
+      if (criterio === "litros_asc") return (a.litrosAyer || 0) - (b.litrosAyer || 0);
+      if (criterio === "gest_desc") return (b.diasGestacion || 0) - (a.diasGestacion || 0);
+      if (criterio === "gest_asc") return (a.diasGestacion || 0) - (b.diasGestacion || 0);
+      if (criterio === "peso_desc") {
         const pA = a.pesoOficialDelPro || a.pesoKg || 0;
         const pB = b.pesoOficialDelPro || b.pesoKg || 0;
         return pB - pA;
       }
-      if (ordenCenso === "peso_asc") {
+      if (criterio === "peso_asc") {
         const pA = a.pesoOficialDelPro || a.pesoKg || 0;
         const pB = b.pesoOficialDelPro || b.pesoKg || 0;
         return pA - pB;
       }
-      if (ordenCenso === "parto_proximo") {
+      if (criterio === "parto_proximo") {
         const diasFaltanA = a.diasGestacion ? Math.max(0, 282 - a.diasGestacion) : 99999;
         const diasFaltanB = b.diasGestacion ? Math.max(0, 282 - b.diasGestacion) : 99999;
         return diasFaltanA - diasFaltanB;
       }
-      // "rp_asc": orden por número de caravana/RP
-      const numA = parseInt(a.rp.replace(/\D/g, "")) || 0;
-      const numB = parseInt(b.rp.replace(/\D/g, "")) || 0;
+      if (criterio === "caravana_desc") {
+        const numA = parseInt(formatearCaravana(a.rp).replace(/\D/g, "")) || 0;
+        const numB = parseInt(formatearCaravana(b.rp).replace(/\D/g, "")) || 0;
+        return numB - numA;
+      }
+      // "rp_asc" por defecto
+      const numA = parseInt(formatearCaravana(a.rp).replace(/\D/g, "")) || 0;
+      const numB = parseInt(formatearCaravana(b.rp).replace(/\D/g, "")) || 0;
       return numA - numB;
     });
 
@@ -472,8 +566,8 @@ export default function TamboPage() {
                   <thead>
                     <tr>
                       <th>Fecha</th>
-                      <th>RP Madre</th>
-                      <th>RP Cría</th>
+                      <th>Caravana Madre</th>
+                      <th>Caravana Cría</th>
                       <th style={{ textAlign: "center" }}>Sexo</th>
                       <th style={{ textAlign: "right" }}>Peso Nac.</th>
                       <th>Destino HJB</th>
@@ -484,8 +578,8 @@ export default function TamboPage() {
                     {delproConfig.datosSincronizados.partosRecientes.slice(0, 5).map((p) => (
                       <tr key={p.id}>
                         <td>{p.fecha}</td>
-                        <td><strong>{p.rpMadre}</strong></td>
-                        <td>{p.rpCria}</td>
+                        <td><strong>{formatearCaravana(p.rpMadre)}</strong></td>
+                        <td>{formatearCaravana(p.rpCria)}</td>
                         <td style={{ textAlign: "center" }}>
                           <span
                             className={`pill ${p.sexo === "Macho" ? "badgeBlue" : "badgeGreen"}`}
@@ -649,7 +743,7 @@ export default function TamboPage() {
             </div>
           </div>
 
-          {/* Barra de Filtro y Búsqueda por RP */}
+          {/* Barra de Filtro y Búsqueda por Caravana */}
           <div
             style={{
               background: "#f8fafc",
@@ -668,9 +762,10 @@ export default function TamboPage() {
               <span style={{ fontSize: "16px" }}>🔍</span>
               <input
                 type="text"
-                placeholder="Buscar vaca por número de caravana o RP (ej: RP-3101)..."
-                value={busquedaVacaRP}
+                placeholder="Buscar por número de caravana (ej: 3101)..."
+                value={filtroCaravana || busquedaVacaRP}
                 onChange={(e) => {
+                  setFiltroCaravana(e.target.value);
                   setBusquedaVacaRP(e.target.value);
                   setPaginaVacas(1);
                 }}
@@ -678,23 +773,35 @@ export default function TamboPage() {
                   width: "100%",
                   padding: "6px 10px",
                   borderRadius: "6px",
-                  border: "1px solid #cbd5e1",
+                  border: (filtroCaravana || busquedaVacaRP) ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                  background: (filtroCaravana || busquedaVacaRP) ? "#eff6ff" : "#ffffff",
                   fontSize: "13px",
+                  fontWeight: 600,
                 }}
               />
+              {(filtroCaravana || busquedaVacaRP) && (
+                <button
+                  type="button"
+                  onClick={() => { setFiltroCaravana(""); setBusquedaVacaRP(""); setPaginaVacas(1); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: "#64748b" }}
+                  title="Borrar búsqueda"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
               <button
                 type="button"
-                className={`ghostButton ${filtroEstadoVaca === "todas" ? "active" : ""}`}
-                onClick={() => { setFiltroEstadoVaca("todas"); setPaginaVacas(1); }}
+                className={`ghostButton ${filtroEstadoVaca === "todas" && !hayFiltrosActivos ? "active" : ""}`}
+                onClick={limpiarFiltros}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "todas" ? "#0f172a" : "#ffffff",
-                  color: filtroEstadoVaca === "todas" ? "#ffffff" : "#475569",
+                  background: filtroEstadoVaca === "todas" && !hayFiltrosActivos ? "#0f172a" : "#ffffff",
+                  color: filtroEstadoVaca === "todas" && !hayFiltrosActivos ? "#ffffff" : "#475569",
                   border: "1px solid #cbd5e1",
                   borderRadius: "6px",
                   cursor: "pointer",
@@ -704,13 +811,13 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroEstadoVaca("en_ordenie"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroProdCol("en_ordenie"); setFiltroEstadoVaca("en_ordenie"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "en_ordenie" ? "#15803d" : "#ffffff",
-                  color: filtroEstadoVaca === "en_ordenie" ? "#ffffff" : "#166534",
+                  background: filtroProdCol === "en_ordenie" || filtroEstadoVaca === "en_ordenie" ? "#15803d" : "#ffffff",
+                  color: filtroProdCol === "en_ordenie" || filtroEstadoVaca === "en_ordenie" ? "#ffffff" : "#166534",
                   border: "1px solid #86efac",
                   borderRadius: "6px",
                   cursor: "pointer",
@@ -720,13 +827,13 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroEstadoVaca("secas"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroProdCol("secas"); setFiltroEstadoVaca("secas"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "secas" ? "#92400e" : "#ffffff",
-                  color: filtroEstadoVaca === "secas" ? "#ffffff" : "#92400e",
+                  background: filtroProdCol === "secas" || filtroEstadoVaca === "secas" ? "#92400e" : "#ffffff",
+                  color: filtroProdCol === "secas" || filtroEstadoVaca === "secas" ? "#ffffff" : "#92400e",
                   border: "1px solid #fcd34d",
                   borderRadius: "6px",
                   cursor: "pointer",
@@ -736,13 +843,13 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroEstadoVaca("vaquillonas"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroProdCol("vaquillonas"); setFiltroEstadoVaca("vaquillonas"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "vaquillonas" ? "#1d4ed8" : "#ffffff",
-                  color: filtroEstadoVaca === "vaquillonas" ? "#ffffff" : "#1d4ed8",
+                  background: filtroProdCol === "vaquillonas" || filtroEstadoVaca === "vaquillonas" ? "#1d4ed8" : "#ffffff",
+                  color: filtroProdCol === "vaquillonas" || filtroEstadoVaca === "vaquillonas" ? "#ffffff" : "#1d4ed8",
                   border: "1px solid #93c5fd",
                   borderRadius: "6px",
                   cursor: "pointer",
@@ -752,13 +859,13 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroEstadoVaca("terneras"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroProdCol("terneras"); setFiltroEstadoVaca("terneras"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "terneras" ? "#7e22ce" : "#ffffff",
-                  color: filtroEstadoVaca === "terneras" ? "#ffffff" : "#7e22ce",
+                  background: filtroProdCol === "terneras" || filtroEstadoVaca === "terneras" ? "#7e22ce" : "#ffffff",
+                  color: filtroProdCol === "terneras" || filtroEstadoVaca === "terneras" ? "#ffffff" : "#7e22ce",
                   border: "1px solid #d8b4fe",
                   borderRadius: "6px",
                   cursor: "pointer",
@@ -768,13 +875,13 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroEstadoVaca("preniadas"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroReproCol("preniada"); setFiltroEstadoVaca("preniadas"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "preniadas" ? "#0284c7" : "#ffffff",
-                  color: filtroEstadoVaca === "preniadas" ? "#ffffff" : "#0284c7",
+                  background: filtroReproCol === "preniada" || filtroEstadoVaca === "preniadas" ? "#0284c7" : "#ffffff",
+                  color: filtroReproCol === "preniada" || filtroEstadoVaca === "preniadas" ? "#ffffff" : "#0284c7",
                   border: "1px solid #7dd3fc",
                   borderRadius: "6px",
                   cursor: "pointer",
@@ -784,13 +891,13 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroEstadoVaca("inseminadas"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroReproCol("inseminada"); setFiltroEstadoVaca("inseminadas"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "inseminadas" ? "#d97706" : "#ffffff",
-                  color: filtroEstadoVaca === "inseminadas" ? "#ffffff" : "#d97706",
+                  background: filtroReproCol === "inseminada" || filtroEstadoVaca === "inseminadas" ? "#d97706" : "#ffffff",
+                  color: filtroReproCol === "inseminada" || filtroEstadoVaca === "inseminadas" ? "#ffffff" : "#d97706",
                   border: "1px solid #fcd34d",
                   borderRadius: "6px",
                   cursor: "pointer",
@@ -800,13 +907,13 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroEstadoVaca("vacias"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroReproCol("vacia"); setFiltroEstadoVaca("vacias"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "vacias" ? "#be185d" : "#ffffff",
-                  color: filtroEstadoVaca === "vacias" ? "#ffffff" : "#be185d",
+                  background: filtroReproCol === "vacia" || filtroEstadoVaca === "vacias" ? "#be185d" : "#ffffff",
+                  color: filtroReproCol === "vacia" || filtroEstadoVaca === "vacias" ? "#ffffff" : "#be185d",
                   border: "1px solid #f9a8d4",
                   borderRadius: "6px",
                   cursor: "pointer",
@@ -814,37 +921,25 @@ export default function TamboPage() {
               >
                 Vacías ({countVacias})
               </button>
-
-              {/* Selector de Criterio de Orden */}
-              <div style={{ marginLeft: "8px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-600)" }}>Ordenar:</span>
-                <select
-                  value={ordenCenso}
-                  onChange={(e) => {
-                    setOrdenCenso(e.target.value as any);
-                    setPaginaVacas(1);
-                  }}
+              {hayFiltrosActivos && (
+                <button
+                  type="button"
+                  onClick={limpiarFiltros}
                   style={{
                     padding: "5px 10px",
                     fontSize: "12px",
                     fontWeight: 700,
+                    background: "#fee2e2",
+                    color: "#991b1b",
+                    border: "1px solid #f87171",
                     borderRadius: "6px",
-                    border: "1px solid #cbd5e1",
-                    background: "#ffffff",
-                    color: "#0f172a",
                     cursor: "pointer",
                   }}
+                  title="Restablecer todos los filtros"
                 >
-                  <option value="rp_asc">🏷️ Caravana / RP (Ascendente)</option>
-                  <option value="del_desc">⏱️ Días Lactancia: Mayor a Menor (DEL ↓)</option>
-                  <option value="del_asc">⏱️ Días Lactancia: Menor a Mayor (DEL ↑)</option>
-                  <option value="litros_desc">🥛 Producción Ayer: Mayor a Menor (Litros ↓)</option>
-                  <option value="litros_asc">🥛 Producción Ayer: Menor a Mayor (Litros ↑)</option>
-                  <option value="peso_desc">⚖️ Peso Corporal: Mayor a Menor (Oficial DelPro)</option>
-                  <option value="peso_asc">⚖️ Peso Corporal: Menor a Mayor (Oficial DelPro)</option>
-                  <option value="parto_proximo">🤰 Fecha más próxima a parir</option>
-                </select>
-              </div>
+                  ↺ Limpiar Filtros
+                </button>
+              )}
             </div>
           </div>
 
@@ -852,53 +947,298 @@ export default function TamboPage() {
           <div className="tableWrap" style={{ background: "#ffffff", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
             <table className="dataTable">
               <thead>
-                <tr>
-                  <th
-                    style={{ cursor: "pointer", userSelect: "none" }}
-                    onClick={() => { setOrdenCenso("rp_asc"); setPaginaVacas(1); }}
-                    title="Click para ordenar por Caravana / RP"
-                  >
-                    Caravana / RP {ordenCenso === "rp_asc" && "▲"}
+                <tr style={{ background: "#f8fafc" }}>
+                  <th style={{ minWidth: "130px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
+                        <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
+                          CARAVANA
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOrdenCenso(ordenCenso === "caravana_desc" ? "rp_asc" : "caravana_desc");
+                            setPaginaVacas(1);
+                          }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "0 2px",
+                            fontSize: "11px",
+                            color: ordenCenso === "caravana_desc" || ordenCenso === "rp_asc" ? "#2563eb" : "#64748b",
+                            fontWeight: 800,
+                          }}
+                          title="Click para alternar orden ascendente / descendente"
+                        >
+                          {ordenCenso === "caravana_desc" ? "▼" : "▲"}
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="N° caravana..."
+                        value={filtroCaravana}
+                        onChange={(e) => {
+                          setFiltroCaravana(e.target.value);
+                          setBusquedaVacaRP(e.target.value);
+                          setPaginaVacas(1);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "3px 6px",
+                          fontSize: "11px",
+                          borderRadius: "4px",
+                          border: filtroCaravana ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                          background: filtroCaravana ? "#eff6ff" : "#ffffff",
+                          color: "#0f172a",
+                          fontWeight: 600,
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
                   </th>
-                  <th>Estado Productivo</th>
-                  <th>Estado Reproductivo</th>
-                  <th
-                    style={{ textAlign: "right", cursor: "pointer", userSelect: "none" }}
-                    onClick={() => {
-                      setOrdenCenso(ordenCenso === "del_desc" ? "del_asc" : "del_desc");
-                      setPaginaVacas(1);
-                    }}
-                    title="Click para ordenar por DEL (Mayor/Menor)"
-                  >
-                    Días Lactancia (DEL) {ordenCenso === "del_desc" ? "▼" : ordenCenso === "del_asc" ? "▲" : ""}
+
+                  <th style={{ minWidth: "145px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
+                        ESTADO PRODUCTIVO
+                      </span>
+                      <select
+                        value={filtroProdCol}
+                        onChange={(e) => {
+                          setFiltroProdCol(e.target.value as any);
+                          if (e.target.value !== "todos") setFiltroEstadoVaca(e.target.value as any);
+                          else if (filtroReproCol === "todos") setFiltroEstadoVaca("todas");
+                          setPaginaVacas(1);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "3px 4px",
+                          fontSize: "11px",
+                          fontWeight: filtroProdCol !== "todos" ? 700 : 500,
+                          borderRadius: "4px",
+                          border: filtroProdCol !== "todos" ? "1.5px solid #16a34a" : "1px solid #cbd5e1",
+                          background: filtroProdCol !== "todos" ? "#f0fdf4" : "#ffffff",
+                          color: filtroProdCol !== "todos" ? "#15803d" : "#334155",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="todos">Todos ({vacasDetalle.length})</option>
+                        <option value="en_ordenie">🥛 En Ordeñe ({countOrdenie})</option>
+                        <option value="secas">🍂 Secas ({countSecas})</option>
+                        <option value="vaquillonas">🌱 Vaquillonas ({countVaquillonas})</option>
+                        <option value="terneras">🍼 Terneras Crianza ({countTerneras})</option>
+                      </select>
+                    </div>
                   </th>
-                  <th style={{ textAlign: "right" }}>Días Gestación</th>
-                  <th
-                    style={{ cursor: "pointer", userSelect: "none" }}
-                    onClick={() => { setOrdenCenso("parto_proximo"); setPaginaVacas(1); }}
-                    title="Click para ordenar por fecha más próxima a parir"
-                  >
-                    Fecha Estimada Parto {ordenCenso === "parto_proximo" && "★ Próximas"}
+
+                  <th style={{ minWidth: "145px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
+                        ESTADO REPRODUCTIVO
+                      </span>
+                      <select
+                        value={filtroReproCol}
+                        onChange={(e) => {
+                          setFiltroReproCol(e.target.value as any);
+                          if (e.target.value === "preniada") setFiltroEstadoVaca("preniadas");
+                          else if (e.target.value === "inseminada") setFiltroEstadoVaca("inseminadas");
+                          else if (e.target.value === "vacia") setFiltroEstadoVaca("vacias");
+                          else if (filtroProdCol === "todos") setFiltroEstadoVaca("todas");
+                          setPaginaVacas(1);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "3px 4px",
+                          fontSize: "11px",
+                          fontWeight: filtroReproCol !== "todos" ? 700 : 500,
+                          borderRadius: "4px",
+                          border: filtroReproCol !== "todos" ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                          background: filtroReproCol !== "todos" ? "#eff6ff" : "#ffffff",
+                          color: filtroReproCol !== "todos" ? "#1d4ed8" : "#334155",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="todos">Todos</option>
+                        <option value="preniada">🤰 Preñadas ({countPreniadas})</option>
+                        <option value="inseminada">💉 Inseminadas ({countInseminadas})</option>
+                        <option value="vacia">⭕ Vacías ({countVacias})</option>
+                      </select>
+                    </div>
                   </th>
-                  <th
-                    style={{ textAlign: "right", cursor: "pointer", userSelect: "none" }}
-                    onClick={() => {
-                      setOrdenCenso(ordenCenso === "litros_desc" ? "litros_asc" : "litros_desc");
-                      setPaginaVacas(1);
-                    }}
-                    title="Click para ordenar por Litros (Mayor/Menor)"
-                  >
-                    Producción Ayer {ordenCenso === "litros_desc" ? "▼" : ordenCenso === "litros_asc" ? "▲" : ""}
+
+                  <th style={{ minWidth: "135px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
+                        DÍAS LACTANCIA (DEL)
+                      </span>
+                      <select
+                        value={filtroDELCol}
+                        onChange={(e) => {
+                          setFiltroDELCol(e.target.value as any);
+                          if (e.target.value === "del_desc" || e.target.value === "del_asc") {
+                            setOrdenCenso(e.target.value as any);
+                          }
+                          setPaginaVacas(1);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "3px 4px",
+                          fontSize: "11px",
+                          fontWeight: filtroDELCol !== "todos" ? 700 : 500,
+                          borderRadius: "4px",
+                          border: filtroDELCol !== "todos" ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                          background: filtroDELCol !== "todos" ? "#eff6ff" : "#ffffff",
+                          color: filtroDELCol !== "todos" ? "#1d4ed8" : "#334155",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="todos">Todos</option>
+                        <option value="del_desc">▼ Mayor a menor</option>
+                        <option value="del_asc">▲ Menor a mayor</option>
+                        <option value="alta">&gt; 200 días</option>
+                        <option value="media">100 - 200 días</option>
+                        <option value="baja">&lt; 100 días</option>
+                      </select>
+                    </div>
                   </th>
-                  <th
-                    style={{ textAlign: "right", cursor: "pointer", userSelect: "none" }}
-                    onClick={() => {
-                      setOrdenCenso(ordenCenso === "peso_desc" ? "peso_asc" : "peso_desc");
-                      setPaginaVacas(1);
-                    }}
-                    title="Click para ordenar por Peso Corporal (DelPro / Estimado)"
-                  >
-                    Peso Corporal {ordenCenso === "peso_desc" ? "▼" : ordenCenso === "peso_asc" ? "▲" : ""}
+
+                  <th style={{ minWidth: "125px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
+                        DÍAS GESTACIÓN
+                      </span>
+                      <select
+                        value={filtroGestacionCol}
+                        onChange={(e) => {
+                          setFiltroGestacionCol(e.target.value as any);
+                          if (e.target.value === "gest_desc" || e.target.value === "gest_asc") {
+                            setOrdenCenso(e.target.value as any);
+                          }
+                          setPaginaVacas(1);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "3px 4px",
+                          fontSize: "11px",
+                          fontWeight: filtroGestacionCol !== "todos" ? 700 : 500,
+                          borderRadius: "4px",
+                          border: filtroGestacionCol !== "todos" ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                          background: filtroGestacionCol !== "todos" ? "#eff6ff" : "#ffffff",
+                          color: filtroGestacionCol !== "todos" ? "#1d4ed8" : "#334155",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="todos">Todos</option>
+                        <option value="con_gestacion">En gestación (&gt;0 d)</option>
+                        <option value="gest_desc">▼ Mayor a menor</option>
+                        <option value="gest_asc">▲ Menor a mayor</option>
+                        <option value="sin_gestacion">Sin preñez</option>
+                      </select>
+                    </div>
+                  </th>
+
+                  <th style={{ minWidth: "135px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
+                        FECHA ESTIMADA PARTO
+                      </span>
+                      <select
+                        value={filtroPartoCol}
+                        onChange={(e) => {
+                          setFiltroPartoCol(e.target.value as any);
+                          if (e.target.value === "proximas") {
+                            setOrdenCenso("parto_proximo");
+                          }
+                          setPaginaVacas(1);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "3px 4px",
+                          fontSize: "11px",
+                          fontWeight: filtroPartoCol !== "todos" ? 700 : 500,
+                          borderRadius: "4px",
+                          border: filtroPartoCol !== "todos" ? "1.5px solid #16a34a" : "1px solid #cbd5e1",
+                          background: filtroPartoCol !== "todos" ? "#f0fdf4" : "#ffffff",
+                          color: filtroPartoCol !== "todos" ? "#15803d" : "#334155",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="todos">Todas</option>
+                        <option value="proximas">⭐ Próximas a parir</option>
+                        <option value="con_fecha">Con fecha asignada</option>
+                        <option value="sin_fecha">Sin fecha</option>
+                      </select>
+                    </div>
+                  </th>
+
+                  <th style={{ minWidth: "135px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
+                        PRODUCCIÓN AYER
+                      </span>
+                      <select
+                        value={filtroLitrosCol}
+                        onChange={(e) => {
+                          setFiltroLitrosCol(e.target.value as any);
+                          if (e.target.value === "litros_desc" || e.target.value === "litros_asc") {
+                            setOrdenCenso(e.target.value as any);
+                          }
+                          setPaginaVacas(1);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "3px 4px",
+                          fontSize: "11px",
+                          fontWeight: filtroLitrosCol !== "todos" ? 700 : 500,
+                          borderRadius: "4px",
+                          border: filtroLitrosCol !== "todos" ? "1.5px solid #16a34a" : "1px solid #cbd5e1",
+                          background: filtroLitrosCol !== "todos" ? "#f0fdf4" : "#ffffff",
+                          color: filtroLitrosCol !== "todos" ? "#15803d" : "#334155",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="todos">Todas</option>
+                        <option value="litros_desc">▼ Litros: Mayor a menor</option>
+                        <option value="litros_asc">▲ Litros: Menor a mayor</option>
+                        <option value="alta">Alta (&gt;25 lts)</option>
+                        <option value="baja">Baja (&lt;20 lts)</option>
+                      </select>
+                    </div>
+                  </th>
+
+                  <th style={{ minWidth: "135px", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
+                        PESO CORPORAL
+                      </span>
+                      <select
+                        value={filtroPesoCol}
+                        onChange={(e) => {
+                          setFiltroPesoCol(e.target.value as any);
+                          if (e.target.value === "peso_desc" || e.target.value === "peso_asc") {
+                            setOrdenCenso(e.target.value as any);
+                          }
+                          setPaginaVacas(1);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "3px 4px",
+                          fontSize: "11px",
+                          fontWeight: filtroPesoCol !== "todos" ? 700 : 500,
+                          borderRadius: "4px",
+                          border: filtroPesoCol !== "todos" ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                          background: filtroPesoCol !== "todos" ? "#eff6ff" : "#ffffff",
+                          color: filtroPesoCol !== "todos" ? "#1d4ed8" : "#334155",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="todos">Todos</option>
+                        <option value="peso_desc">▼ Mayor a menor</option>
+                        <option value="peso_asc">▲ Menor a mayor</option>
+                        <option value="oficial">⚖️ Balanza Oficial DelPro</option>
+                      </select>
+                    </div>
                   </th>
                 </tr>
               </thead>
@@ -913,8 +1253,8 @@ export default function TamboPage() {
                   vacasPaginadas.map((v) => (
                     <tr key={v.rp}>
                       <td>
-                        <strong style={{ fontSize: "13.5px", color: "var(--slate-900)" }}>
-                          🏷️ {v.rp}
+                        <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
+                          🏷️ {formatearCaravana(v.rp)}
                         </strong>
                         {v.grupoDelPro && (
                           <div style={{ fontSize: "10.5px", color: "#2563eb", fontWeight: 600 }}>
