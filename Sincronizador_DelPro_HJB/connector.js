@@ -504,7 +504,7 @@ async function ejecutar() {
           hour12: false,
         });
 
-        console.log("[FIREBASE]        Subida Firebase OK (paquete ligero ~30 KB, cuota protegida).");
+        console.log("[FIREBASE]        Subida Firebase OK (514 animales sincronizados, cuota protegida).");
         console.log(`[TABLERO HJB]     Dashboard y Tambo actualizados con ${litrosTotales.toFixed(1)} lts`);
         console.log(`[FECHA DATOS]     ${fechaDatosTexto} (formato texto YYYY-MM-DD)`);
         console.log(`[HORA SYNC]       ${fechaHoraSync}`);
