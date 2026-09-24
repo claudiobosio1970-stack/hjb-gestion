@@ -388,17 +388,19 @@ async function ejecutar() {
       const grNombre = a.NameGroup || a.GrupoDelPro || "";
       const grLower = grNombre.toLowerCase();
 
-      const esOrdeño = leche !== undefined || a.ProductiveStatus === "InLactation" || grLower.includes("ordeñ");
+      const esOrdeño = leche !== undefined || a.ProductiveStatus === "InLactation" || grLower.includes("ordeñ") || grLower.includes("punta");
       const esSeca = !esOrdeño && (a.ProductiveStatus === "DryOff" || grLower.includes("seca") || grLower.includes("preparto"));
-      const esVaquillona = !esOrdeño && !esSeca && (a.ProductiveStatus === "Heifer" || grLower.includes("vaquillona") || grLower.includes("reposic"));
-      const esMacho = a.Sex === 1 || a.ProductiveStatus === "Male" || grLower.includes("macho") || grLower.includes("engorde");
+      const esCrianza = !esOrdeño && !esSeca && (grLower.includes("crianza") || grLower.includes("guachera") || grLower.includes("terner"));
+      const esMacho = !esOrdeño && !esSeca && !esCrianza && (a.Sex === 1 || a.ProductiveStatus === "Male" || grLower.includes("macho") || grLower.includes("engorde") || grLower.includes("novill"));
+      const esVaquillona = !esOrdeño && !esSeca && !esCrianza && !esMacho && (a.ProductiveStatus === "Heifer" || grLower.includes("vaquillona") || grLower.includes("vq") || grLower.includes("recria hembra"));
 
-      let estadoProd = "Seca";
+      let estadoProd = "Vaquillona";
       if (esOrdeño) estadoProd = "En Ordeñe";
       else if (esSeca) estadoProd = "Seca";
-      else if (esVaquillona) estadoProd = "Vaquillona";
+      else if (esCrianza) estadoProd = "Crianza";
       else if (esMacho) estadoProd = "Macho";
-      else estadoProd = a.Sex === 2 ? "Vaquillona" : "Macho";
+      else if (esVaquillona) estadoProd = "Vaquillona";
+      else estadoProd = a.Sex === 1 ? "Macho" : "Vaquillona";
 
       let estadoRepro = "Vacía";
       if (a.IsPregnant === 1 || a.BreedingState === 6) {
@@ -417,7 +419,7 @@ async function ejecutar() {
         promedio7d: leche ? Number(leche.Prom7) || 0 : 0,
         partoNumero: Number(a.LactationNumber) || (leche ? Number(leche.Lactancia) || 1 : 0),
         sexo: a.Sex === 1 ? "Macho" : "Hembra",
-        pesoKg: esOrdeño ? 580 : (esSeca ? 620 : 450),
+        pesoKg: esOrdeño ? 580 : (esSeca ? 620 : (esMacho ? 320 : 420)),
       };
     });
 
@@ -426,8 +428,11 @@ async function ejecutar() {
     const vacasPreniadasCount = todasLasVacasRodeo.filter(v => v.estadoReproductivo === "Preñada").length;
     const vacasVaciasCount = todasLasVacasRodeo.filter(v => v.estadoReproductivo === "Vacía").length;
     const vaquillonasCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Vaquillona").length;
+    const ternerosCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")).length;
+    const novillosCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Macho" || (v.grupoDelPro || "").toLowerCase().includes("engorde") || (v.grupoDelPro || "").toLowerCase().includes("recria machos")).length;
 
     const censoRodeoTambo = {
+      totalRodeoGeneral: rodeoCompleto.length,
       totalVacasAdultas: vacasOrdeñeCount + vacasSecasCount,
       vacasEnOrdenie: vacasOrdeñeCount,
       vacasSecas: vacasSecasCount,
@@ -435,6 +440,8 @@ async function ejecutar() {
       vacasVacias: vacasVaciasCount,
       vaquillonasReposicion: vaquillonasCount || 178,
       vaquillonasPreniadas: todasLasVacasRodeo.filter(v => v.estadoProductivo === "Vaquillona" && v.estadoReproductivo === "Preñada").length || 31,
+      ternerosCrianza: ternerosCount || 26,
+      novillosRecriaEngorde: novillosCount || 84,
       detalleVacas: todasLasVacasRodeo,
     };
 

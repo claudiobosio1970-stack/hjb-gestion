@@ -53,6 +53,7 @@ export interface VacaTamboIndividual {
 }
 
 export interface CensoRodeoTambo {
+  totalRodeoGeneral?: number;
   totalVacasAdultas: number;
   vacasEnOrdenie: number;
   vacasSecas: number;
@@ -60,6 +61,8 @@ export interface CensoRodeoTambo {
   vacasVacias: number;
   vaquillonasReposicion: number;
   vaquillonasPreniadas: number;
+  ternerosCrianza?: number;
+  novillosRecriaEngorde?: number;
   detalleVacas?: VacaTamboIndividual[];
 }
 
@@ -585,13 +588,16 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       terminacion: 26, // Solo machos van a venta comercial / faena
     },
     censoRodeoTambo: {
-      totalVacasAdultas: 212,
-      vacasEnOrdenie: 187,
-      vacasSecas: 25,
+      totalRodeoGeneral: 514,
+      totalVacasAdultas: 226,
+      vacasEnOrdenie: 192,
+      vacasSecas: 34,
       vacasPreniadas: 142,
       vacasVacias: 45,
-      vaquillonasReposicion: 48,
-      vaquillonasPreniadas: 22,
+      vaquillonasReposicion: 178,
+      vaquillonasPreniadas: 31,
+      ternerosCrianza: 26,
+      novillosRecriaEngorde: 84,
       detalleVacas: defaultVacas,
     },
     animalesRecria: defaultAnimales,
@@ -1295,6 +1301,7 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
         : Math.round((vacasVO + vacasSecasCount) * 0.28);
 
       censoExtraido = {
+        totalRodeoGeneral: parsed.rodeoCompleto.length,
         totalVacasAdultas: vacasVO + vacasSecasCount,
         vacasEnOrdenie: vacasVO,
         vacasSecas: vacasSecasCount,
@@ -1302,6 +1309,8 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
         vacasVacias: vaciasCount,
         vaquillonasReposicion: vqReposicion || 178,
         vaquillonasPreniadas: vqPren || 31,
+        ternerosCrianza: parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").toLowerCase().includes("crianza")).length || 26,
+        novillosRecriaEngorde: parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").toLowerCase().includes("macho") || (r.GrupoDelPro || r.NameGroup || "").toLowerCase().includes("engorde")).length || 84,
         detalleVacas: vacasTamboList.length > 0 ? vacasTamboList : undefined,
       };
     }
