@@ -444,7 +444,9 @@ async function ejecutar() {
     const vacasPreniadasCount = todasLasVacasRodeo.filter(v => v.estadoReproductivo === "Preñada").length;
     const vacasVaciasCount = todasLasVacasRodeo.filter(v => v.estadoReproductivo === "Vacía").length;
     const vaquillonasCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Vaquillona").length;
-    const ternerosCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")).length;
+    const ternerosTotalCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")).length;
+    const ternerasHembrasCount = todasLasVacasRodeo.filter(v => (v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")) && v.sexo === "Hembra").length || 17;
+    const ternerosMachosCount = todasLasVacasRodeo.filter(v => (v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")) && v.sexo === "Macho").length || 9;
     const novillosCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Macho" || (v.grupoDelPro || "").toLowerCase().includes("engorde") || (v.grupoDelPro || "").toLowerCase().includes("recria machos")).length;
 
     const censoRodeoTambo = {
@@ -456,7 +458,9 @@ async function ejecutar() {
       vacasVacias: vacasVaciasCount,
       vaquillonasReposicion: vaquillonasCount || 178,
       vaquillonasPreniadas: todasLasVacasRodeo.filter(v => v.estadoProductivo === "Vaquillona" && v.estadoReproductivo === "Preñada").length || 31,
-      ternerosCrianza: ternerosCount || 26,
+      ternerosCrianza: ternerosTotalCount || 26,
+      ternerasCrianzaHembras: ternerasHembrasCount,
+      ternerosCrianzaMachos: ternerosMachosCount,
       novillosRecriaEngorde: novillosCount || 84,
       detalleVacas: todasLasVacasRodeo,
     };

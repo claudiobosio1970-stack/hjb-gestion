@@ -187,8 +187,8 @@ export default function GanaderiaPage() {
     : 514;
 
   const totalMachosGanaderia = (censoData?.novillosRecriaEngorde && censoData.novillosRecriaEngorde > 0)
-    ? (censoData.novillosRecriaEngorde + Math.round((censoData.ternerosCrianza || 26) / 2))
-    : (resumen.totalCabezas || 97);
+    ? (censoData.novillosRecriaEngorde + (censoData.ternerosCrianzaMachos || (censoData.ternerasCrianzaHembras ? 26 - censoData.ternerasCrianzaHembras : 9)))
+    : (resumen.totalCabezas || 93);
 
   function triggerFeedback(msg: string) {
     setFeedback(msg);

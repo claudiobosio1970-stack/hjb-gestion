@@ -30,6 +30,7 @@ export interface PartoDelPro {
 
 export interface VacaTamboIndividual {
   rp: string;
+  sexo?: "Hembra" | "Macho" | string;
   estadoProductivo: "En Ordeñe" | "Seca" | "Vaquillona" | "Crianza" | "Macho" | string;
   estadoReproductivo: "Preñada" | "Vacía" | "Inseminada";
   diasLactancia: number; // DEL
@@ -62,6 +63,8 @@ export interface CensoRodeoTambo {
   vaquillonasReposicion: number;
   vaquillonasPreniadas: number;
   ternerosCrianza?: number;
+  ternerasCrianzaHembras?: number;
+  ternerosCrianzaMachos?: number;
   novillosRecriaEngorde?: number;
   detalleVacas?: VacaTamboIndividual[];
 }
@@ -385,10 +388,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     });
   }
 
-  // 8. Crianza Hembras - 13 cabezas (Grupo 11 DelPro: hembras de guachera para reposición lechera)
-  for (let i = 1; i <= 13; i++) {
+  // 8. Crianza Hembras - 17 cabezas (Grupo 11 DelPro: 17 hembras reales en guachera p/ reposición lechera)
+  for (let i = 1; i <= 17; i++) {
     const rpNum = 8800 + i;
-    const pesoEst = Number((42 + i * 2.8).toFixed(1));
+    const pesoEst = Number((40 + i * 2.5).toFixed(1));
 
     vacas.push({
       rp: `RP-${rpNum}`,
@@ -399,6 +402,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       promedio7d: 0,
       partoNumero: 0,
       pesoKg: pesoEst,
+      sexo: "Hembra",
       origenPeso: "estimado_curva",
       grupoDelPro: "Crianza",
     });
@@ -752,13 +756,13 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       rolloAlfalfaKg: 3.0,
       salMineralGramos: 150,
     },
-    hembrasEnReposicionTambo: 191, // 178 vaquillonas + 13 terneras crianza van a reposición del tambo
+    hembrasEnReposicionTambo: 195, // 178 vaquillonas + 17 terneras crianza van a reposición del tambo
     machosEnRecriaEngorde: {
-      guachera: 13,
+      guachera: 9, // 9 terneros machos de los 26 de Crianza DelPro
       rm1: 22,
       rm2: 28,
       rm3: 15,
-      terminacion: 19, // Solo machos van a venta comercial / faena (total 97 machos)
+      terminacion: 19, // Solo machos van a venta comercial / faena (total 93 machos)
     },
     censoRodeoTambo: {
       totalRodeoGeneral: 514,
@@ -770,6 +774,8 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       vaquillonasReposicion: 178,
       vaquillonasPreniadas: 31,
       ternerosCrianza: 26,
+      ternerasCrianzaHembras: 17,
+      ternerosCrianzaMachos: 9,
       novillosRecriaEngorde: 84,
       detalleVacas: defaultVacas,
     },
@@ -926,6 +932,8 @@ export function getCensoRodeoTambo(): CensoRodeoTambo {
       vacasSecas: (censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 34,
       vaquillonasReposicion: censo.vaquillonasReposicion && censo.vaquillonasReposicion >= 100 ? censo.vaquillonasReposicion : 178,
       ternerosCrianza: censo.ternerosCrianza || 26,
+      ternerasCrianzaHembras: censo.ternerasCrianzaHembras || 17,
+      ternerosCrianzaMachos: censo.ternerosCrianzaMachos || 9,
       novillosRecriaEngorde: censo.novillosRecriaEngorde || 84,
       detalleVacas: tieneDetalleCompleto ? censo.detalleVacas : defaultVacas,
     };
@@ -940,6 +948,8 @@ export function getCensoRodeoTambo(): CensoRodeoTambo {
     vaquillonasReposicion: 178,
     vaquillonasPreniadas: 31,
     ternerosCrianza: 26,
+    ternerasCrianzaHembras: 17,
+    ternerosCrianzaMachos: 9,
     novillosRecriaEngorde: 84,
     detalleVacas: defaultVacas,
   };

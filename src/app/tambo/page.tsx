@@ -169,18 +169,6 @@ export default function TamboPage() {
     ? delproConfig.datosSincronizados.censoRodeoTambo.totalRodeoGeneral
     : 514;
 
-  const vacasEnOrdenieCount = censoRodeo.vacasEnOrdenie || 192;
-  const vacasSecasCount = (censoRodeo.vacasSecas && censoRodeo.vacasSecas >= 25) ? censoRodeo.vacasSecas : 34;
-  const totalVacasAdultas = vacasEnOrdenieCount + vacasSecasCount; // 226
-
-  const vaquillonasReposicionCount = (censoRodeo.vaquillonasReposicion && censoRodeo.vaquillonasReposicion >= 100) 
-    ? censoRodeo.vaquillonasReposicion 
-    : 178;
-
-  const ternerasCrianzaHembrasCount = 13; // 50% de las 26 cabezas de crianza van a reposición lechera
-  const totalAnimalesHembra = totalVacasAdultas + vaquillonasReposicionCount + ternerasCrianzaHembrasCount; // 417
-  const totalAnimalesMacho = totalRodeoGeneral - totalAnimalesHembra; // 97
-
   // EN TAMBO SOLO ESTÁN LAS HEMBRAS (los machos van a Ganadería):
   const vacasDetalle = (censoRodeo.detalleVacas || []).filter((v) => {
     const gr = (v.grupoDelPro || "").toLowerCase();
@@ -211,6 +199,18 @@ export default function TamboPage() {
   const countPreniadas = vacasDetalle.filter((v) => v.estadoReproductivo === "Preñada").length;
   const countInseminadas = vacasDetalle.filter((v) => v.estadoReproductivo === "Inseminada").length;
   const countVacias = vacasDetalle.filter((v) => v.estadoReproductivo === "Vacía").length;
+
+  const vacasEnOrdenieCount = countOrdenie || censoRodeo.vacasEnOrdenie || 192;
+  const vacasSecasCount = countSecas || ((censoRodeo.vacasSecas && censoRodeo.vacasSecas >= 25) ? censoRodeo.vacasSecas : 34);
+  const totalVacasAdultas = vacasEnOrdenieCount + vacasSecasCount; // 226
+
+  const vaquillonasReposicionCount = countVaquillonas || ((censoRodeo.vaquillonasReposicion && censoRodeo.vaquillonasReposicion >= 100) ? censoRodeo.vaquillonasReposicion : 178);
+
+  // Terneras en guachera (en DelPro figuran exactamente 17 hembras de las 26 cabezas de Crianza):
+  const ternerasCrianzaHembrasCount = countTerneras || (censoRodeo.ternerasCrianzaHembras && censoRodeo.ternerasCrianzaHembras > 0 ? censoRodeo.ternerasCrianzaHembras : 17);
+
+  const totalAnimalesHembra = vacasDetalle.length || (totalVacasAdultas + vaquillonasReposicionCount + ternerasCrianzaHembrasCount); // 421
+  const totalAnimalesMacho = totalRodeoGeneral - totalAnimalesHembra; // 93
 
   const vacasFiltradas = vacasDetalle
     .filter((v) => {
@@ -548,8 +548,8 @@ export default function TamboPage() {
             </div>
           </div>
 
-          {/* 5 Tarjetas Principales del Tambo (Solo Hembras + Total General) */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px", marginBottom: "16px" }}>
+          {/* 6 Tarjetas Principales del Tambo (Solo Hembras + Total General) */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px", marginBottom: "16px" }}>
             <div style={{ background: "#f8fafc", border: "1.5px solid #94a3b8", padding: "14px", borderRadius: "10px" }}>
               <div style={{ fontSize: "11px", color: "var(--slate-600)", fontWeight: 800, textTransform: "uppercase" }}>🏷️ TOTAL ANIMALES</div>
               <div style={{ fontSize: "24px", fontWeight: 900, color: "var(--slate-900)", marginTop: "2px" }}>
@@ -570,13 +570,23 @@ export default function TamboPage() {
               </div>
             </div>
 
-            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "14px", borderRadius: "10px" }}>
-              <div style={{ fontSize: "11px", color: "#166534", fontWeight: 800, textTransform: "uppercase" }}>🥛 VACAS LECHERAS (ADULTAS)</div>
+            <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", padding: "14px", borderRadius: "10px" }}>
+              <div style={{ fontSize: "11px", color: "#166534", fontWeight: 800, textTransform: "uppercase" }}>🥛 VACAS EN ORDEÑE (VO)</div>
               <div style={{ fontSize: "24px", fontWeight: 900, color: "#15803d", marginTop: "2px" }}>
-                {totalVacasAdultas} cab.
+                {vacasEnOrdenieCount} cab.
               </div>
               <div style={{ fontSize: "11px", color: "#166534", marginTop: "2px" }}>
-                {vacasEnOrdenieCount} Ordeñe (VO) + {vacasSecasCount} Secas
+                109 Ordeño + 83 Punta (En producción)
+              </div>
+            </div>
+
+            <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", padding: "14px", borderRadius: "10px" }}>
+              <div style={{ fontSize: "11px", color: "#92400e", fontWeight: 800, textTransform: "uppercase" }}>🍂 VACAS SECAS</div>
+              <div style={{ fontSize: "24px", fontWeight: 900, color: "#92400e", marginTop: "2px" }}>
+                {vacasSecasCount} cab.
+              </div>
+              <div style={{ fontSize: "11px", color: "#92400e", marginTop: "2px" }}>
+                21 Preparto + 13 Secas (Descanso)
               </div>
             </div>
 
@@ -586,17 +596,17 @@ export default function TamboPage() {
                 {vaquillonasReposicionCount} cab.
               </div>
               <div style={{ fontSize: "11px", color: "#1e40af", marginTop: "2px" }}>
-                Recría hembras, servicio y preñadas
+                117 Recría + 31 Preñadas + 30 Servicio
               </div>
             </div>
 
             <div style={{ background: "#faf5ff", border: "1px solid #d8b4fe", padding: "14px", borderRadius: "10px" }}>
-              <div style={{ fontSize: "11px", color: "#7e22ce", fontWeight: 800, textTransform: "uppercase" }}>🍼 TERNERAS (CRIANZA)</div>
+              <div style={{ fontSize: "11px", color: "#7e22ce", fontWeight: 800, textTransform: "uppercase" }}>🍼 TERNERAS (GUACHERA)</div>
               <div style={{ fontSize: "24px", fontWeight: 900, color: "#7e22ce", marginTop: "2px" }}>
                 {ternerasCrianzaHembrasCount} cab.
               </div>
               <div style={{ fontSize: "11px", color: "#6b21a8", marginTop: "2px" }}>
-                Hembras en guachera p/ tambo
+                17 Hembras en guachera p/ tambo
               </div>
             </div>
           </div>
