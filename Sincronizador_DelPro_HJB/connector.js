@@ -37,6 +37,11 @@ if (serviceAccount) {
 }
 
 const db = serviceAccount ? getFirestore() : null;
+if (db) {
+  try {
+    db.settings({ ignoreUndefinedProperties: true });
+  } catch (e) {}
+}
 
 // Activar modo HTTPS REST solo si se especifica explícitamente en .env
 if (db && process.env.FIREBASE_USE_REST === "true") {
@@ -409,12 +414,23 @@ async function ejecutar() {
         estadoRepro = "Inseminada";
       }
 
+      const diasGest = esSeca
+        ? (grLower.includes("preparto") ? 268 : 235)
+        : (estadoRepro === "Preñada" ? (esOrdeño ? 140 : 180) : null);
+      const diasParaParto = diasGest ? (282 - diasGest) : null;
+      const fechaParto = diasGest
+        ? new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR")
+        : null;
+
       return {
         rp: String(rpNum).startsWith("RP-") ? String(rpNum) : `RP-${rpNum}`,
         grupoDelPro: grNombre || (esOrdeño ? "Vacas en Ordeñe" : (esSeca ? "Secas" : "Rodeo")),
         estadoProductivo: estadoProd,
         estadoReproductivo: estadoRepro,
         diasLactancia: leche ? Number(leche.DiasEnLeche) || 0 : 0,
+        diasGestacion: diasGest,
+        diasParaParto: diasParaParto,
+        fechaProbableParto: fechaParto,
         litrosAyer: leche ? Number(leche.Ayer) || 0 : 0,
         promedio7d: leche ? Number(leche.Prom7) || 0 : 0,
         partoNumero: Number(a.LactationNumber) || (leche ? Number(leche.Lactancia) || 1 : 0),
@@ -456,8 +472,8 @@ async function ejecutar() {
         return {
           rp: String(rpNum).startsWith("RP-") ? String(rpNum) : `RP-${rpNum}`,
           grupoDelPro: grNombre,
-          Sex: a.Sex,
-          BirthDate: a.BirthDate || a.FechaNacimiento,
+          Sex: a.Sex ?? 1,
+          BirthDate: a.BirthDate ? String(a.BirthDate).slice(0, 10) : (a.FechaNacimiento ? String(a.FechaNacimiento).slice(0, 10) : null),
           ProductiveStatus: a.ProductiveStatus || (a.Sex === 1 ? "Male" : "Heifer"),
         };
       });

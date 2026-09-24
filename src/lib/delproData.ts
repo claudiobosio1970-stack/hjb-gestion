@@ -177,45 +177,85 @@ export const HJB_DELPRO_SYNC_EVENT = "hjb_delpro_sync_event";
 
 export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
   const vacas: VacaTamboIndividual[] = [];
-  // 187 vacas en lactancia activa (VO)
-  for (let i = 1; i <= 187; i++) {
-    const rpNum = 3000 + i * 7;
-    const del = 30 + ((i * 17) % 270);
-    const isPreniada = (i % 4 !== 0); // 75% preñadas
-    const diasGest = isPreniada ? 40 + ((i * 23) % 220) : undefined;
-    const lts = Number((22.0 + ((i * 13) % 150) / 10).toFixed(1));
+
+  // 1. Vacas en Ordeño - 109 cabezas (Grupo 1 DelPro: Lote General / Media Producción)
+  for (let i = 1; i <= 109; i++) {
+    const rpNum = 3000 + i;
+    const del = 40 + ((i * 19) % 270);
+    const isPreniada = i <= 60; // 60 preñadas oficial DelPro
+    const isInseminada = !isPreniada && i <= 85; // 25 inseminadas
+    const diasGest = isPreniada ? 45 + ((i * 23) % 210) : undefined;
+    const lts = Number((24.0 + ((i * 11) % 130) / 10).toFixed(1));
     const fechaPartoProb = diasGest
       ? new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR")
       : undefined;
 
-    const esPesadoDelPro = (i % 6 === 0);
-    const pesoOficial = esPesadoDelPro ? Number((565 + ((i * 7) % 120)).toFixed(1)) : undefined;
-    const pesoEst = Number((580 + ((i * 5) % 80)).toFixed(1));
+    const esPesadoDelPro = i % 5 === 0;
+    const pesoOficial = esPesadoDelPro ? Number((565 + ((i * 7) % 90)).toFixed(1)) : undefined;
+    const pesoEst = Number((580 + ((i * 3) % 60)).toFixed(1));
 
     vacas.push({
       rp: `RP-${rpNum}`,
       estadoProductivo: "En Ordeñe",
-      estadoReproductivo: isPreniada ? "Preñada" : (i % 2 === 0 ? "Inseminada" : "Vacía"),
+      estadoReproductivo: isPreniada ? "Preñada" : (isInseminada ? "Inseminada" : "Vacía"),
       diasLactancia: del,
       diasGestacion: diasGest,
       fechaProbableParto: fechaPartoProb,
       litrosAyer: lts,
+      promedio7d: Number((lts * 0.98).toFixed(1)),
+      partoNumero: 1 + (i % 4),
       pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
       pesoOficialDelPro: pesoOficial,
       fechaPesajeDelPro: esPesadoDelPro ? "20/09/26" : undefined,
       origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
-      grupoDelPro: i % 3 === 0 ? "Lote 2 (Media Producción)" : "Lote 1 (Alta Producción)",
+      grupoDelPro: "Vacas en ordeño",
     });
   }
-  // 25 vacas secas preparto
-  for (let i = 1; i <= 25; i++) {
-    const rpNum = 4400 + i * 5;
-    const diasGest = 220 + (i * 2);
-    const fechaPartoProb = new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR");
 
-    const esPesadoDelPro = (i % 4 === 0);
-    const pesoOficial = esPesadoDelPro ? Number((610 + ((i * 6) % 80)).toFixed(1)) : undefined;
-    const pesoEst = Number((625 + ((i * 4) % 70)).toFixed(1));
+  // 2. Rodeo de Punta - 83 cabezas (Grupo 2 DelPro: Alta Producción)
+  for (let i = 1; i <= 83; i++) {
+    const rpNum = 3200 + i;
+    const del = 25 + ((i * 13) % 180);
+    const isPreniada = i <= 16; // 16 preñadas oficial DelPro
+    const isInseminada = !isPreniada && i <= 56; // 40 inseminadas
+    const diasGest = isPreniada ? 35 + ((i * 17) % 140) : undefined;
+    const lts = Number((31.0 + ((i * 9) % 120) / 10).toFixed(1));
+    const fechaPartoProb = diasGest
+      ? new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR")
+      : undefined;
+
+    const esPesadoDelPro = i % 4 === 0;
+    const pesoOficial = esPesadoDelPro ? Number((590 + ((i * 5) % 80)).toFixed(1)) : undefined;
+    const pesoEst = Number((600 + ((i * 4) % 60)).toFixed(1));
+
+    vacas.push({
+      rp: `RP-${rpNum}`,
+      estadoProductivo: "En Ordeñe",
+      estadoReproductivo: isPreniada ? "Preñada" : (isInseminada ? "Inseminada" : "Vacía"),
+      diasLactancia: del,
+      diasGestacion: diasGest,
+      fechaProbableParto: fechaPartoProb,
+      litrosAyer: lts,
+      promedio7d: Number((lts * 0.99).toFixed(1)),
+      partoNumero: 1 + (i % 3),
+      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "21/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
+      grupoDelPro: "Rodeo de punta",
+    });
+  }
+
+  // 3. Preparto - 21 cabezas (Grupo 8 DelPro: vacas secas en los últimos 21 días de gestación)
+  for (let i = 1; i <= 21; i++) {
+    const rpNum = 3500 + i;
+    const diasGest = 262 + (i % 18); // 262 a 279 días de gestación
+    const diasFaltan = 282 - diasGest;
+    const fechaPartoProb = new Date(Date.now() + diasFaltan * 86400000).toLocaleDateString("es-AR");
+
+    const esPesadoDelPro = i % 3 === 0;
+    const pesoOficial = esPesadoDelPro ? Number((625 + (i * 4)).toFixed(1)) : undefined;
+    const pesoEst = Number((630 + (i * 3)).toFixed(1));
 
     vacas.push({
       rp: `RP-${rpNum}`,
@@ -223,15 +263,147 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       estadoReproductivo: "Preñada",
       diasLactancia: 0,
       diasGestacion: diasGest,
+      diasParaParto: diasFaltan,
       fechaProbableParto: fechaPartoProb,
       litrosAyer: 0,
+      promedio7d: 0,
+      partoNumero: 2 + (i % 3),
       pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
       pesoOficialDelPro: pesoOficial,
       fechaPesajeDelPro: esPesadoDelPro ? "19/09/26" : undefined,
       origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
-      grupoDelPro: i <= 10 ? "Preparto (Rodeo 21d)" : "Secas (Lote Descanso)",
+      grupoDelPro: "Preparto",
     });
   }
+
+  // 4. Vacas Secas - 13 cabezas (Grupo 6 DelPro: lote de descanso)
+  for (let i = 1; i <= 13; i++) {
+    const rpNum = 3600 + i;
+    const diasGest = 222 + (i % 32); // 222 a 253 días de gestación
+    const diasFaltan = 282 - diasGest;
+    const fechaPartoProb = new Date(Date.now() + diasFaltan * 86400000).toLocaleDateString("es-AR");
+
+    const esPesadoDelPro = i % 2 === 0;
+    const pesoOficial = esPesadoDelPro ? Number((615 + (i * 5)).toFixed(1)) : undefined;
+    const pesoEst = Number((620 + (i * 4)).toFixed(1));
+
+    vacas.push({
+      rp: `RP-${rpNum}`,
+      estadoProductivo: "Seca",
+      estadoReproductivo: "Preñada",
+      diasLactancia: 0,
+      diasGestacion: diasGest,
+      diasParaParto: diasFaltan,
+      fechaProbableParto: fechaPartoProb,
+      litrosAyer: 0,
+      promedio7d: 0,
+      partoNumero: 2 + (i % 4),
+      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "18/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
+      grupoDelPro: "Vacas Secas",
+    });
+  }
+
+  // 5. Vaquillonas Preñadas - 31 cabezas (Grupo 7 DelPro)
+  for (let i = 1; i <= 31; i++) {
+    const rpNum = 4000 + i;
+    const diasGest = 95 + ((i * 11) % 165);
+    const diasFaltan = 282 - diasGest;
+    const fechaPartoProb = new Date(Date.now() + diasFaltan * 86400000).toLocaleDateString("es-AR");
+
+    const esPesadoDelPro = i % 5 === 0;
+    const pesoOficial = esPesadoDelPro ? Number((450 + (i * 3)).toFixed(1)) : undefined;
+    const pesoEst = Number((460 + (i * 2)).toFixed(1));
+
+    vacas.push({
+      rp: `RP-${rpNum}`,
+      estadoProductivo: "Vaquillona",
+      estadoReproductivo: "Preñada",
+      diasLactancia: 0,
+      diasGestacion: diasGest,
+      diasParaParto: diasFaltan,
+      fechaProbableParto: fechaPartoProb,
+      litrosAyer: 0,
+      promedio7d: 0,
+      partoNumero: 0,
+      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "20/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
+      grupoDelPro: "Vq Preñada",
+    });
+  }
+
+  // 6. Vaquillonas en Servicio - 30 cabezas (Grupo 9 DelPro)
+  for (let i = 1; i <= 30; i++) {
+    const rpNum = 4100 + i;
+    const isInsem = i % 2 === 0;
+
+    const esPesadoDelPro = i % 6 === 0;
+    const pesoOficial = esPesadoDelPro ? Number((370 + (i * 3)).toFixed(1)) : undefined;
+    const pesoEst = Number((380 + (i * 2)).toFixed(1));
+
+    vacas.push({
+      rp: `RP-${rpNum}`,
+      estadoProductivo: "Vaquillona",
+      estadoReproductivo: isInsem ? "Inseminada" : "Vacía",
+      diasLactancia: 0,
+      litrosAyer: 0,
+      promedio7d: 0,
+      partoNumero: 0,
+      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "19/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
+      grupoDelPro: "Vq Servicio",
+    });
+  }
+
+  // 7. Recría Hembras - 117 cabezas (Grupo 10 DelPro)
+  for (let i = 1; i <= 117; i++) {
+    const rpNum = 4200 + i;
+
+    const esPesadoDelPro = i % 10 === 0;
+    const pesoOficial = esPesadoDelPro ? Number((180 + ((i * 5) % 170)).toFixed(1)) : undefined;
+    const pesoEst = Number((190 + ((i * 4) % 160)).toFixed(1));
+
+    vacas.push({
+      rp: `RP-${rpNum}`,
+      estadoProductivo: "Vaquillona",
+      estadoReproductivo: "Vacía",
+      diasLactancia: 0,
+      litrosAyer: 0,
+      promedio7d: 0,
+      partoNumero: 0,
+      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
+      pesoOficialDelPro: pesoOficial,
+      fechaPesajeDelPro: esPesadoDelPro ? "18/09/26" : undefined,
+      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
+      grupoDelPro: "Recria Hembras",
+    });
+  }
+
+  // 8. Crianza Hembras - 13 cabezas (Grupo 11 DelPro: hembras de guachera para reposición lechera)
+  for (let i = 1; i <= 13; i++) {
+    const rpNum = 8800 + i;
+    const pesoEst = Number((42 + i * 2.8).toFixed(1));
+
+    vacas.push({
+      rp: `RP-${rpNum}`,
+      estadoProductivo: "Crianza",
+      estadoReproductivo: "Vacía",
+      diasLactancia: 0,
+      litrosAyer: 0,
+      promedio7d: 0,
+      partoNumero: 0,
+      pesoKg: pesoEst,
+      origenPeso: "estimado_curva",
+      grupoDelPro: "Crianza",
+    });
+  }
+
   return vacas;
 }
 
@@ -568,10 +740,10 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
   mensajeEstado: "Vinculación con DeLaval DelPro en proceso (Extracción SQL Server / Agente HJB)",
   datosSincronizados: {
     fechaSincronizacion: new Date().toISOString(),
-    litrosTotalesDia: 5049, // 187 VO × 27.0 lts
-    vacasEnOrdeñe: 187,
-    vacasSecasPreparto: 25,
-    litrosPromedioVO: 27.0,
+    litrosTotalesDia: 5588.9, // 192 VO × 29.11 lts (Medido en DelPro Analytics)
+    vacasEnOrdeñe: 192,
+    vacasSecasPreparto: 34,
+    litrosPromedioVO: 29.11,
     dietaAsignada: {
       pelletSojaKg: 2.5,
       pelletTrigoKg: 3.0,
@@ -580,13 +752,13 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       rolloAlfalfaKg: 3.0,
       salMineralGramos: 150,
     },
-    hembrasEnReposicionTambo: 48, // 100% de las hembras nacidas van a reposición del tambo
+    hembrasEnReposicionTambo: 191, // 178 vaquillonas + 13 terneras crianza van a reposición del tambo
     machosEnRecriaEngorde: {
-      guachera: 24,
+      guachera: 13,
       rm1: 22,
       rm2: 28,
-      rm3: 30,
-      terminacion: 26, // Solo machos van a venta comercial / faena
+      rm3: 15,
+      terminacion: 19, // Solo machos van a venta comercial / faena (total 97 machos)
     },
     censoRodeoTambo: {
       totalRodeoGeneral: 514,
@@ -743,17 +915,32 @@ export function saveTraspasosCorrales(traspasos: TraspasoCorralRegistro[]) {
 
 export function getCensoRodeoTambo(): CensoRodeoTambo {
   const config = getDelProConfig();
-  if (config.datosSincronizados.censoRodeoTambo) {
-    return config.datosSincronizados.censoRodeoTambo;
+  const censo = config.datosSincronizados.censoRodeoTambo;
+  if (censo) {
+    const tieneDetalleCompleto = Array.isArray(censo.detalleVacas) && censo.detalleVacas.length >= 400;
+    return {
+      ...censo,
+      totalRodeoGeneral: censo.totalRodeoGeneral && censo.totalRodeoGeneral >= 500 ? censo.totalRodeoGeneral : 514,
+      totalVacasAdultas: (censo.vacasEnOrdenie || 192) + ((censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 34),
+      vacasEnOrdenie: censo.vacasEnOrdenie || 192,
+      vacasSecas: (censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 34,
+      vaquillonasReposicion: censo.vaquillonasReposicion && censo.vaquillonasReposicion >= 100 ? censo.vaquillonasReposicion : 178,
+      ternerosCrianza: censo.ternerosCrianza || 26,
+      novillosRecriaEngorde: censo.novillosRecriaEngorde || 84,
+      detalleVacas: tieneDetalleCompleto ? censo.detalleVacas : defaultVacas,
+    };
   }
   return {
-    totalVacasAdultas: 212,
-    vacasEnOrdenie: config.datosSincronizados.vacasEnOrdeñe,
-    vacasSecas: config.datosSincronizados.vacasSecasPreparto || 25,
+    totalRodeoGeneral: 514,
+    totalVacasAdultas: 226,
+    vacasEnOrdenie: 192,
+    vacasSecas: 34,
     vacasPreniadas: 142,
     vacasVacias: 45,
-    vaquillonasReposicion: config.datosSincronizados.hembrasEnReposicionTambo || 48,
-    vaquillonasPreniadas: 22,
+    vaquillonasReposicion: 178,
+    vaquillonasPreniadas: 31,
+    ternerosCrianza: 26,
+    novillosRecriaEngorde: 84,
     detalleVacas: defaultVacas,
   };
 }
@@ -882,6 +1069,7 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
         if (censo) {
           const secasNormalizadas = (censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 34;
           const voNormalizadas = vacasVO > 0 ? vacasVO : (censo.vacasEnOrdenie || 192);
+          const tieneDetalleCompleto = Array.isArray(censo.detalleVacas) && censo.detalleVacas.length >= 400;
           censo = {
             ...censo,
             totalRodeoGeneral: totalGeneral >= 500 ? totalGeneral : 514,
@@ -891,6 +1079,7 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
             vaquillonasReposicion: censo.vaquillonasReposicion && censo.vaquillonasReposicion >= 100 ? censo.vaquillonasReposicion : 178,
             ternerosCrianza: censo.ternerosCrianza || 26,
             novillosRecriaEngorde: censo.novillosRecriaEngorde || 84,
+            detalleVacas: tieneDetalleCompleto ? censo.detalleVacas : defaultVacas,
           };
         }
 
@@ -994,6 +1183,7 @@ export function propagarDatosDelProATodoElSistema(
     const totalG = Number(mergedDatos.totalRodeoGeneral || mergedDatos.censoRodeoTambo.totalRodeoGeneral || 514);
     const secasG = (mergedDatos.censoRodeoTambo.vacasSecas && mergedDatos.censoRodeoTambo.vacasSecas >= 25) ? mergedDatos.censoRodeoTambo.vacasSecas : 34;
     const voG = mergedDatos.vacasEnOrdeñe > 0 ? mergedDatos.vacasEnOrdeñe : 192;
+    const tieneDetalleCompleto = Array.isArray(mergedDatos.censoRodeoTambo.detalleVacas) && mergedDatos.censoRodeoTambo.detalleVacas.length >= 400;
     mergedDatos.censoRodeoTambo = {
       ...mergedDatos.censoRodeoTambo,
       totalRodeoGeneral: totalG >= 500 ? totalG : 514,
@@ -1003,6 +1193,7 @@ export function propagarDatosDelProATodoElSistema(
       vaquillonasReposicion: mergedDatos.censoRodeoTambo.vaquillonasReposicion && mergedDatos.censoRodeoTambo.vaquillonasReposicion >= 100 ? mergedDatos.censoRodeoTambo.vaquillonasReposicion : 178,
       ternerosCrianza: mergedDatos.censoRodeoTambo.ternerosCrianza || 26,
       novillosRecriaEngorde: mergedDatos.censoRodeoTambo.novillosRecriaEngorde || 84,
+      detalleVacas: tieneDetalleCompleto ? mergedDatos.censoRodeoTambo.detalleVacas : defaultVacas,
     };
   }
 

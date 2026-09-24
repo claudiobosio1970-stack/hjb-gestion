@@ -188,15 +188,48 @@ export default function TamboPage() {
     return !esMacho;
   });
 
+  const countOrdenie = vacasDetalle.filter((v) => {
+    const gr = (v.grupoDelPro || "").toLowerCase();
+    return v.estadoProductivo === "En Ordeñe" || (v.litrosAyer !== undefined && v.litrosAyer > 0) || gr.includes("ordeñ") || gr.includes("punta");
+  }).length;
+
+  const countSecas = vacasDetalle.filter((v) => {
+    const gr = (v.grupoDelPro || "").toLowerCase();
+    return v.estadoProductivo === "Seca" || gr.includes("seca") || gr.includes("preparto");
+  }).length;
+
+  const countVaquillonas = vacasDetalle.filter((v) => {
+    const gr = (v.grupoDelPro || "").toLowerCase();
+    return v.estadoProductivo === "Vaquillona" || gr.includes("vaquillona") || gr.includes("vq") || gr.includes("recria hembra");
+  }).length;
+
+  const countTerneras = vacasDetalle.filter((v) => {
+    const gr = (v.grupoDelPro || "").toLowerCase();
+    return v.estadoProductivo === "Crianza" || gr.includes("crianza") || gr.includes("guachera") || gr.includes("terner");
+  }).length;
+
+  const countPreniadas = vacasDetalle.filter((v) => v.estadoReproductivo === "Preñada").length;
+  const countInseminadas = vacasDetalle.filter((v) => v.estadoReproductivo === "Inseminada").length;
+  const countVacias = vacasDetalle.filter((v) => v.estadoReproductivo === "Vacía").length;
+
   const vacasFiltradas = vacasDetalle
     .filter((v) => {
       if (busquedaVacaRP.trim() && !v.rp.toLowerCase().includes(busquedaVacaRP.toLowerCase().trim())) {
         return false;
       }
-      if (filtroEstadoVaca === "en_ordenie") return v.estadoProductivo === "En Ordeñe";
-      if (filtroEstadoVaca === "secas") return v.estadoProductivo === "Seca";
-      if (filtroEstadoVaca === "vaquillonas") return v.estadoProductivo === "Vaquillona";
-      if (filtroEstadoVaca === "terneras") return v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera");
+      const gr = (v.grupoDelPro || "").toLowerCase();
+      if (filtroEstadoVaca === "en_ordenie") {
+        return v.estadoProductivo === "En Ordeñe" || (v.litrosAyer !== undefined && v.litrosAyer > 0) || gr.includes("ordeñ") || gr.includes("punta");
+      }
+      if (filtroEstadoVaca === "secas") {
+        return v.estadoProductivo === "Seca" || gr.includes("seca") || gr.includes("preparto");
+      }
+      if (filtroEstadoVaca === "vaquillonas") {
+        return v.estadoProductivo === "Vaquillona" || gr.includes("vaquillona") || gr.includes("vq") || gr.includes("recria hembra");
+      }
+      if (filtroEstadoVaca === "terneras") {
+        return v.estadoProductivo === "Crianza" || gr.includes("crianza") || gr.includes("guachera") || gr.includes("terner");
+      }
       if (filtroEstadoVaca === "preniadas") return v.estadoReproductivo === "Preñada";
       if (filtroEstadoVaca === "inseminadas") return v.estadoReproductivo === "Inseminada";
       if (filtroEstadoVaca === "vacias") return v.estadoReproductivo === "Vacía";
@@ -673,7 +706,7 @@ export default function TamboPage() {
                   cursor: "pointer",
                 }}
               >
-                En Ordeñe ({vacasEnOrdenieCount})
+                En Ordeñe ({countOrdenie})
               </button>
               <button
                 type="button"
@@ -689,7 +722,7 @@ export default function TamboPage() {
                   cursor: "pointer",
                 }}
               >
-                Secas ({vacasSecasCount})
+                Secas ({countSecas})
               </button>
               <button
                 type="button"
@@ -705,7 +738,7 @@ export default function TamboPage() {
                   cursor: "pointer",
                 }}
               >
-                Vaquillonas ({vaquillonasReposicionCount})
+                Vaquillonas ({countVaquillonas})
               </button>
               <button
                 type="button"
@@ -721,7 +754,7 @@ export default function TamboPage() {
                   cursor: "pointer",
                 }}
               >
-                Terneras Crianza ({ternerasCrianzaHembrasCount})
+                Terneras Crianza ({countTerneras})
               </button>
               <button
                 type="button"
@@ -737,7 +770,7 @@ export default function TamboPage() {
                   cursor: "pointer",
                 }}
               >
-                Preñadas ({censoRodeo.vacasPreniadas})
+                Preñadas ({countPreniadas})
               </button>
               <button
                 type="button"
@@ -753,7 +786,7 @@ export default function TamboPage() {
                   cursor: "pointer",
                 }}
               >
-                Inseminadas ({censoRodeo.detalleVacas?.filter((v) => v.estadoReproductivo === "Inseminada").length || 0})
+                Inseminadas ({countInseminadas})
               </button>
               <button
                 type="button"
@@ -769,7 +802,7 @@ export default function TamboPage() {
                   cursor: "pointer",
                 }}
               >
-                Vacías ({censoRodeo.vacasVacias})
+                Vacías ({countVacias})
               </button>
 
               {/* Selector de Criterio de Orden */}
