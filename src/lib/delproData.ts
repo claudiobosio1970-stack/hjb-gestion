@@ -30,7 +30,7 @@ export interface PartoDelPro {
 
 export interface VacaTamboIndividual {
   rp: string;
-  estadoProductivo: "En Ordeñe" | "Seca";
+  estadoProductivo: "En Ordeñe" | "Seca" | "Vaquillona" | "Crianza" | "Macho" | string;
   estadoReproductivo: "Preñada" | "Vacía" | "Inseminada";
   diasLactancia: number; // DEL
   diasGestacion?: number;

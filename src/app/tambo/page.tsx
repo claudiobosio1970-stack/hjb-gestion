@@ -36,7 +36,7 @@ export default function TamboPage() {
 
   // Filtros individuales de vacas por RP
   const [busquedaVacaRP, setBusquedaVacaRP] = useState("");
-  const [filtroEstadoVaca, setFiltroEstadoVaca] = useState<"todas" | "en_ordenie" | "secas" | "preniadas" | "inseminadas" | "vacias">("todas");
+  const [filtroEstadoVaca, setFiltroEstadoVaca] = useState<"todas" | "en_ordenie" | "secas" | "vaquillonas" | "preniadas" | "inseminadas" | "vacias">("todas");
   const [ordenCenso, setOrdenCenso] = useState<"rp_asc" | "del_desc" | "del_asc" | "litros_desc" | "litros_asc" | "parto_proximo" | "peso_desc" | "peso_asc">("rp_asc");
   const [elementosPorPagina, setElementosPorPagina] = useState(50);
   const [paginaVacas, setPaginaVacas] = useState(1);
@@ -168,6 +168,7 @@ export default function TamboPage() {
       }
       if (filtroEstadoVaca === "en_ordenie") return v.estadoProductivo === "En Ordeñe";
       if (filtroEstadoVaca === "secas") return v.estadoProductivo === "Seca";
+      if (filtroEstadoVaca === "vaquillonas") return v.estadoProductivo === "Vaquillona";
       if (filtroEstadoVaca === "preniadas") return v.estadoReproductivo === "Preñada";
       if (filtroEstadoVaca === "inseminadas") return v.estadoReproductivo === "Inseminada";
       if (filtroEstadoVaca === "vacias") return v.estadoReproductivo === "Vacía";
@@ -625,6 +626,22 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
+                onClick={() => { setFiltroEstadoVaca("vaquillonas"); setPaginaVacas(1); }}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  background: filtroEstadoVaca === "vaquillonas" ? "#475569" : "#ffffff",
+                  color: filtroEstadoVaca === "vaquillonas" ? "#ffffff" : "#334155",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                Vaquillonas ({censoRodeo.detalleVacas?.filter((v) => v.estadoProductivo === "Vaquillona").length || censoRodeo.vaquillonasReposicion || 0})
+              </button>
+              <button
+                type="button"
                 onClick={() => { setFiltroEstadoVaca("preniadas"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
@@ -781,10 +798,26 @@ export default function TamboPage() {
                       </td>
                       <td>
                         <span
-                          className={`pill ${v.estadoProductivo === "En Ordeñe" ? "badgeGreen" : "badgeSlate"}`}
+                          className={`pill ${
+                            v.estadoProductivo === "En Ordeñe"
+                              ? "badgeGreen"
+                              : v.estadoProductivo === "Seca"
+                              ? "badgeAmber"
+                              : v.estadoProductivo === "Vaquillona"
+                              ? "badgeBlue"
+                              : "badgeSlate"
+                          }`}
                           style={{ fontSize: "11px", fontWeight: 700 }}
                         >
-                          {v.estadoProductivo === "En Ordeñe" ? "🥛 En Ordeñe" : "🍂 Seca"}
+                          {v.estadoProductivo === "En Ordeñe"
+                            ? "🥛 En Ordeñe"
+                            : v.estadoProductivo === "Seca"
+                            ? "🍂 Seca"
+                            : v.estadoProductivo === "Vaquillona"
+                            ? "🌱 Vaquillona"
+                            : v.estadoProductivo === "Macho"
+                            ? "🐂 Macho"
+                            : v.estadoProductivo}
                         </span>
                       </td>
                       <td>

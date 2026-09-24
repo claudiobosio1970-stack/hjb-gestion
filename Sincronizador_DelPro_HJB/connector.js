@@ -373,34 +373,69 @@ async function ejecutar() {
     fs.writeFileSync(rutaJsonLocal, JSON.stringify(copiaLocal, null, 2), "utf8");
     console.log(`[RESPALDO LOCAL]  delpro_sync.json guardado (${rodeoCompleto.length} animales totales)`);
 
-    // 7. Preparar Paquete Consolidado y Ligero para Firestore (< 35 KB - Cero Cuota Excedida)
-    const vacasTamboList = resLeche.recordset.map(v => ({
-      rp: `RP-${v.Vaca}`,
-      estadoProductivo: "En Ordeñe",
-      estadoReproductivo: "Preñada",
-      diasLactancia: Number(v.DiasEnLeche) || 120,
-      litrosAyer: Number(v.Ayer) || 0,
-      promedio7d: Number(v.Prom7) || 0,
-      partoNumero: Number(v.Lactancia) || 1,
-      grupoDelPro: v.Rodeo || "Vacas en Ordeñe",
-      pesoKg: 580,
-    }));
+    // 7. Preparar Paquete Consolidado con el Rodeo Completo de DelPro (513 animales)
+    // Se cruzan los litros de ordeñe de ayer con los 513 animales del censo
+    const lecheMap = new Map();
+    resLeche.recordset.forEach(l => {
+      lecheMap.set(String(l.Vaca).trim(), l);
+    });
 
-    const grupoSecas = resStockGrupos.find(g => 
-      (g.GroupName || "").toLowerCase().includes("seca") || 
-      (g.GroupName || "").toLowerCase().includes("preparto")
-    );
-    const cantVacasSecas = grupoSecas ? (Number(grupoSecas.TotalAnimals) || Number(grupoSecas.DryCow) || 25) : 25;
+    const todasLasVacasRodeo = rodeoCompleto.map(a => {
+      const rpNum = a.AnimalNumber || a.OfficialRegNo || a.Vaca;
+      const numStr = String(rpNum).replace(/^RP-/i, "").trim();
+      const leche = lecheMap.get(numStr);
+
+      const grNombre = a.NameGroup || a.GrupoDelPro || "";
+      const grLower = grNombre.toLowerCase();
+
+      const esOrdeño = leche !== undefined || a.ProductiveStatus === "InLactation" || grLower.includes("ordeñ");
+      const esSeca = !esOrdeño && (a.ProductiveStatus === "DryOff" || grLower.includes("seca") || grLower.includes("preparto"));
+      const esVaquillona = !esOrdeño && !esSeca && (a.ProductiveStatus === "Heifer" || grLower.includes("vaquillona") || grLower.includes("reposic"));
+      const esMacho = a.Sex === 1 || a.ProductiveStatus === "Male" || grLower.includes("macho") || grLower.includes("engorde");
+
+      let estadoProd = "Seca";
+      if (esOrdeño) estadoProd = "En Ordeñe";
+      else if (esSeca) estadoProd = "Seca";
+      else if (esVaquillona) estadoProd = "Vaquillona";
+      else if (esMacho) estadoProd = "Macho";
+      else estadoProd = a.Sex === 2 ? "Vaquillona" : "Macho";
+
+      let estadoRepro = "Vacía";
+      if (a.IsPregnant === 1 || a.BreedingState === 6) {
+        estadoRepro = "Preñada";
+      } else if (a.IsInseminated === 1 || a.BreedingState === 5) {
+        estadoRepro = "Inseminada";
+      }
+
+      return {
+        rp: String(rpNum).startsWith("RP-") ? String(rpNum) : `RP-${rpNum}`,
+        grupoDelPro: grNombre || (esOrdeño ? "Vacas en Ordeñe" : (esSeca ? "Secas" : "Rodeo")),
+        estadoProductivo: estadoProd,
+        estadoReproductivo: estadoRepro,
+        diasLactancia: leche ? Number(leche.DiasEnLeche) || 0 : 0,
+        litrosAyer: leche ? Number(leche.Ayer) || 0 : 0,
+        promedio7d: leche ? Number(leche.Prom7) || 0 : 0,
+        partoNumero: Number(a.LactationNumber) || (leche ? Number(leche.Lactancia) || 1 : 0),
+        sexo: a.Sex === 1 ? "Macho" : "Hembra",
+        pesoKg: esOrdeño ? 580 : (esSeca ? 620 : 450),
+      };
+    });
+
+    const vacasOrdeñeCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "En Ordeñe").length || totalVacasLeche;
+    const vacasSecasCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Seca").length;
+    const vacasPreniadasCount = todasLasVacasRodeo.filter(v => v.estadoReproductivo === "Preñada").length;
+    const vacasVaciasCount = todasLasVacasRodeo.filter(v => v.estadoReproductivo === "Vacía").length;
+    const vaquillonasCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Vaquillona").length;
 
     const censoRodeoTambo = {
-      totalVacasAdultas: totalVacasLeche + cantVacasSecas,
-      vacasEnOrdenie: totalVacasLeche,
-      vacasSecas: cantVacasSecas,
-      vacasPreniadas: Math.round((totalVacasLeche + cantVacasSecas) * 0.72),
-      vacasVacias: Math.round((totalVacasLeche + cantVacasSecas) * 0.28),
-      vaquillonasReposicion: 178,
-      vaquillonasPreniadas: 31,
-      detalleVacas: vacasTamboList,
+      totalVacasAdultas: vacasOrdeñeCount + vacasSecasCount,
+      vacasEnOrdenie: vacasOrdeñeCount,
+      vacasSecas: vacasSecasCount,
+      vacasPreniadas: vacasPreniadasCount,
+      vacasVacias: vacasVaciasCount,
+      vaquillonasReposicion: vaquillonasCount || 178,
+      vaquillonasPreniadas: todasLasVacasRodeo.filter(v => v.estadoProductivo === "Vaquillona" && v.estadoReproductivo === "Preñada").length || 31,
+      detalleVacas: todasLasVacasRodeo,
     };
 
     const animalesRecriaParaNube = rodeoCompleto
