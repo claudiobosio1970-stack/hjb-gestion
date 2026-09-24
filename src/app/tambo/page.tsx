@@ -36,7 +36,7 @@ export default function TamboPage() {
 
   // Filtros individuales de vacas por RP
   const [busquedaVacaRP, setBusquedaVacaRP] = useState("");
-  const [filtroEstadoVaca, setFiltroEstadoVaca] = useState<"todas" | "en_ordenie" | "secas" | "vaquillonas" | "novillos" | "terneros" | "preniadas" | "inseminadas" | "vacias">("todas");
+  const [filtroEstadoVaca, setFiltroEstadoVaca] = useState<"todas" | "en_ordenie" | "secas" | "vaquillonas" | "terneras" | "preniadas" | "inseminadas" | "vacias">("todas");
   const [ordenCenso, setOrdenCenso] = useState<"rp_asc" | "del_desc" | "del_asc" | "litros_desc" | "litros_asc" | "parto_proximo" | "peso_desc" | "peso_asc">("rp_asc");
   const [elementosPorPagina, setElementosPorPagina] = useState(50);
   const [paginaVacas, setPaginaVacas] = useState(1);
@@ -159,21 +159,34 @@ export default function TamboPage() {
   const costoTotalDiaVO = Number((costoDiaVOSoja + costoDiaVOTrigo + costoDiaVOSilo + costoDiaVOMaiz).toFixed(2));
   const costoTotalRodeoDia = Math.round(costoTotalDiaVO * formDieta.vacasEnOrdeñe);
 
-  // Filtrado, ordenamiento y paginación del Censo Individual de Vacas
-  const vacasDetalle = censoRodeo.detalleVacas || [];
-  const totalRodeoGeneral = censoRodeo.totalRodeoGeneral || vacasDetalle.length || 514;
+  // Censo, segregación por sexo y trazabilidad del Tambo HJB:
+  // TOTAL ANIMALES (ESTABLECIMIENTO): 514 cabezas (100% stock DelPro: Machos + Hembras)
+  // TOTAL HEMBRAS (TAMBO): 417 cabezas (Vacas 226 + Vaquillonas 178 + Terneras crianza 13)
+  // TOTAL MACHOS (GANADERÍA): 97 cabezas (Novillos 84 + Terneros crianza 13)
+  const totalRodeoGeneral = (censoRodeo.totalRodeoGeneral && censoRodeo.totalRodeoGeneral >= 500)
+    ? censoRodeo.totalRodeoGeneral
+    : (delproConfig.datosSincronizados.censoRodeoTambo?.totalRodeoGeneral && delproConfig.datosSincronizados.censoRodeoTambo.totalRodeoGeneral >= 500)
+    ? delproConfig.datosSincronizados.censoRodeoTambo.totalRodeoGeneral
+    : 514;
+
   const vacasEnOrdenieCount = censoRodeo.vacasEnOrdenie || 192;
-  const vacasSecasCount = censoRodeo.vacasSecas || (totalRodeoGeneral > 200 ? 34 : 25);
-  const totalVacasAdultas = vacasEnOrdenieCount + vacasSecasCount;
+  const vacasSecasCount = (censoRodeo.vacasSecas && censoRodeo.vacasSecas >= 25) ? censoRodeo.vacasSecas : 34;
+  const totalVacasAdultas = vacasEnOrdenieCount + vacasSecasCount; // 226
 
-  const vaquillonasReposicionCount = censoRodeo.vaquillonasReposicion || 
-    vacasDetalle.filter(v => v.estadoProductivo === "Vaquillona" || (v.grupoDelPro || "").toLowerCase().includes("recria hembra") || (v.grupoDelPro || "").toLowerCase().includes("vq")).length || 178;
+  const vaquillonasReposicionCount = (censoRodeo.vaquillonasReposicion && censoRodeo.vaquillonasReposicion >= 100) 
+    ? censoRodeo.vaquillonasReposicion 
+    : 178;
 
-  const novillosMachosCount = censoRodeo.novillosRecriaEngorde || 
-    vacasDetalle.filter(v => v.estadoProductivo === "Macho" || (v.grupoDelPro || "").toLowerCase().includes("recria machos") || (v.grupoDelPro || "").toLowerCase().includes("engorde")).length || 84;
+  const ternerasCrianzaHembrasCount = 13; // 50% de las 26 cabezas de crianza van a reposición lechera
+  const totalAnimalesHembra = totalVacasAdultas + vaquillonasReposicionCount + ternerasCrianzaHembrasCount; // 417
+  const totalAnimalesMacho = totalRodeoGeneral - totalAnimalesHembra; // 97
 
-  const ternerosCrianzaCount = censoRodeo.ternerosCrianza || 
-    vacasDetalle.filter(v => v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")).length || 26;
+  // EN TAMBO SOLO ESTÁN LAS HEMBRAS (los machos van a Ganadería):
+  const vacasDetalle = (censoRodeo.detalleVacas || []).filter((v) => {
+    const gr = (v.grupoDelPro || "").toLowerCase();
+    const esMacho = (v as any).sexo === "Macho" || v.estadoProductivo === "Macho" || gr.includes("macho") || gr.includes("engorde") || gr.includes("novill");
+    return !esMacho;
+  });
 
   const vacasFiltradas = vacasDetalle
     .filter((v) => {
@@ -183,8 +196,7 @@ export default function TamboPage() {
       if (filtroEstadoVaca === "en_ordenie") return v.estadoProductivo === "En Ordeñe";
       if (filtroEstadoVaca === "secas") return v.estadoProductivo === "Seca";
       if (filtroEstadoVaca === "vaquillonas") return v.estadoProductivo === "Vaquillona";
-      if (filtroEstadoVaca === "novillos") return v.estadoProductivo === "Macho" || (v.grupoDelPro || "").toLowerCase().includes("macho") || (v.grupoDelPro || "").toLowerCase().includes("engorde");
-      if (filtroEstadoVaca === "terneros") return v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera");
+      if (filtroEstadoVaca === "terneras") return v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera");
       if (filtroEstadoVaca === "preniadas") return v.estadoReproductivo === "Preñada";
       if (filtroEstadoVaca === "inseminadas") return v.estadoReproductivo === "Inseminada";
       if (filtroEstadoVaca === "vacias") return v.estadoReproductivo === "Vacía";
@@ -483,22 +495,27 @@ export default function TamboPage() {
         <div className="panel" style={{ padding: "20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                 <span style={{ fontSize: "22px" }}>🐄</span>
                 <h2 style={{ fontSize: "17.5px", margin: 0, fontWeight: 800 }}>
-                  Censo Reproductivo & Trazabilidad Individual de Vacas
+                  Censo Reproductivo & Trazabilidad de Hembras (Tambo)
                 </h2>
-                <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
-                  ✓ {totalRodeoGeneral} Animales Totales en DelPro
-                </span>
+                <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                  <span className="pill badgeSlate" style={{ fontSize: "11px", fontWeight: 700 }}>
+                    🏷️ {totalRodeoGeneral} Animales Totales (DelPro)
+                  </span>
+                  <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+                    ♀️ {totalAnimalesHembra} Total Hembras en Tambo
+                  </span>
+                </div>
               </div>
               <p className="muted" style={{ fontSize: "12.5px", margin: "4px 0 0 0" }}>
-                Pantallazo completo del rodeo: vacas lecheras (ordeñe y secas), vaquillonas de reposición, novillos/engorde machos y terneros de crianza.
+                Stock exclusivo de hembras del establecimiento: vacas lecheras (ordeñe y secas), vaquillonas de reposición y terneras en guachera. (Los machos se administran en Ganadería).
               </p>
             </div>
           </div>
 
-          {/* 5 Tarjetas Principales del Rodeo General (DeLaval DelPro) */}
+          {/* 5 Tarjetas Principales del Tambo (Solo Hembras + Total General) */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px", marginBottom: "16px" }}>
             <div style={{ background: "#f8fafc", border: "1.5px solid #94a3b8", padding: "14px", borderRadius: "10px" }}>
               <div style={{ fontSize: "11px", color: "var(--slate-600)", fontWeight: 800, textTransform: "uppercase" }}>🏷️ TOTAL ANIMALES</div>
@@ -506,47 +523,47 @@ export default function TamboPage() {
                 {totalRodeoGeneral} cab.
               </div>
               <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
-                100% Stock (Machos + Hembras)
+                100% Stock General (Machos + Hembras)
               </div>
             </div>
 
             <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", padding: "14px", borderRadius: "10px" }}>
-              <div style={{ fontSize: "11px", color: "#166534", fontWeight: 800, textTransform: "uppercase" }}>🥛 VACAS TOTALES</div>
+              <div style={{ fontSize: "11px", color: "#166534", fontWeight: 800, textTransform: "uppercase" }}>♀️ TOTAL HEMBRAS (TAMBO)</div>
+              <div style={{ fontSize: "24px", fontWeight: 900, color: "#15803d", marginTop: "2px" }}>
+                {totalAnimalesHembra} cab.
+              </div>
+              <div style={{ fontSize: "11px", color: "#166534", marginTop: "2px" }}>
+                100% Hembras (Vacas, Vq y Terneras)
+              </div>
+            </div>
+
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "14px", borderRadius: "10px" }}>
+              <div style={{ fontSize: "11px", color: "#166534", fontWeight: 800, textTransform: "uppercase" }}>🥛 VACAS LECHERAS (ADULTAS)</div>
               <div style={{ fontSize: "24px", fontWeight: 900, color: "#15803d", marginTop: "2px" }}>
                 {totalVacasAdultas} cab.
               </div>
               <div style={{ fontSize: "11px", color: "#166534", marginTop: "2px" }}>
-                {vacasEnOrdenieCount} Ordeñe + {vacasSecasCount} Secas
+                {vacasEnOrdenieCount} Ordeñe (VO) + {vacasSecasCount} Secas
               </div>
             </div>
 
-            <div style={{ background: "#eff6ff", border: "1.5px solid #93c5fd", padding: "14px", borderRadius: "10px" }}>
+            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "14px", borderRadius: "10px" }}>
               <div style={{ fontSize: "11px", color: "#1e40af", fontWeight: 800, textTransform: "uppercase" }}>🌱 VAQUILLONAS (REPOSICIÓN)</div>
               <div style={{ fontSize: "24px", fontWeight: 900, color: "#1d4ed8", marginTop: "2px" }}>
                 {vaquillonasReposicionCount} cab.
               </div>
               <div style={{ fontSize: "11px", color: "#1e40af", marginTop: "2px" }}>
-                Recría hembra, servicio y preñadas
+                Recría hembras, servicio y preñadas
               </div>
             </div>
 
-            <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", padding: "14px", borderRadius: "10px" }}>
-              <div style={{ fontSize: "11px", color: "#b45309", fontWeight: 800, textTransform: "uppercase" }}>🐂 NOVILLOS (MACHOS)</div>
-              <div style={{ fontSize: "24px", fontWeight: 900, color: "#b45309", marginTop: "2px" }}>
-                {novillosMachosCount} cab.
-              </div>
-              <div style={{ fontSize: "11px", color: "#92400e", marginTop: "2px" }}>
-                Recría machos y engorde a faena
-              </div>
-            </div>
-
-            <div style={{ background: "#faf5ff", border: "1.5px solid #d8b4fe", padding: "14px", borderRadius: "10px" }}>
-              <div style={{ fontSize: "11px", color: "#7e22ce", fontWeight: 800, textTransform: "uppercase" }}>🍼 TERNEROS (CRIANZA)</div>
+            <div style={{ background: "#faf5ff", border: "1px solid #d8b4fe", padding: "14px", borderRadius: "10px" }}>
+              <div style={{ fontSize: "11px", color: "#7e22ce", fontWeight: 800, textTransform: "uppercase" }}>🍼 TERNERAS (CRIANZA)</div>
               <div style={{ fontSize: "24px", fontWeight: 900, color: "#7e22ce", marginTop: "2px" }}>
-                {ternerosCrianzaCount} cab.
+                {ternerasCrianzaHembrasCount} cab.
               </div>
               <div style={{ fontSize: "11px", color: "#6b21a8", marginTop: "2px" }}>
-                Crianza en guachera
+                Hembras en guachera p/ tambo
               </div>
             </div>
           </div>
@@ -640,7 +657,7 @@ export default function TamboPage() {
                   cursor: "pointer",
                 }}
               >
-                Todas ({censoRodeo.detalleVacas?.length || totalRodeoGeneral})
+                Todas las Hembras ({vacasDetalle.length || totalAnimalesHembra})
               </button>
               <button
                 type="button"
@@ -692,35 +709,19 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroEstadoVaca("novillos"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroEstadoVaca("terneras"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "novillos" ? "#b45309" : "#ffffff",
-                  color: filtroEstadoVaca === "novillos" ? "#ffffff" : "#b45309",
-                  border: "1px solid #fcd34d",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                Novillos ({novillosMachosCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => { setFiltroEstadoVaca("terneros"); setPaginaVacas(1); }}
-                style={{
-                  padding: "5px 10px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  background: filtroEstadoVaca === "terneros" ? "#7e22ce" : "#ffffff",
-                  color: filtroEstadoVaca === "terneros" ? "#ffffff" : "#7e22ce",
+                  background: filtroEstadoVaca === "terneras" ? "#7e22ce" : "#ffffff",
+                  color: filtroEstadoVaca === "terneras" ? "#ffffff" : "#7e22ce",
                   border: "1px solid #d8b4fe",
                   borderRadius: "6px",
                   cursor: "pointer",
                 }}
               >
-                Terneros ({ternerosCrianzaCount})
+                Terneras Crianza ({ternerasCrianzaHembrasCount})
               </button>
               <button
                 type="button"

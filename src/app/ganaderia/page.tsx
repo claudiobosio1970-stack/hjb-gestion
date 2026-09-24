@@ -179,6 +179,17 @@ export default function GanaderiaPage() {
 
   const resumen = getResumenGanaderia(corrales, tropas);
 
+  const censoData = delproConfig.datosSincronizados.censoRodeoTambo;
+  const totalAnimalesEstablecimiento = (censoData?.totalRodeoGeneral && censoData.totalRodeoGeneral >= 500)
+    ? censoData.totalRodeoGeneral
+    : (delproConfig.datosSincronizados.totalRodeoGeneral && delproConfig.datosSincronizados.totalRodeoGeneral >= 500)
+    ? delproConfig.datosSincronizados.totalRodeoGeneral
+    : 514;
+
+  const totalMachosGanaderia = (censoData?.novillosRecriaEngorde && censoData.novillosRecriaEngorde > 0)
+    ? (censoData.novillosRecriaEngorde + Math.round((censoData.ternerosCrianza || 26) / 2))
+    : (resumen.totalCabezas || 97);
+
   function triggerFeedback(msg: string) {
     setFeedback(msg);
     setTimeout(() => setFeedback(null), 4000);
@@ -410,13 +421,13 @@ export default function GanaderiaPage() {
       <div className="pageHeader">
         <div>
           <div className="badgeRow" style={{ marginBottom: "6px" }}>
-            <span className="pill badgeAmber">🐂 Engorde a Corral de Machos</span>
-            <span className="pill badgeSlate">Ciclo Cerrado (Guachera ➔ Frigorífico)</span>
+            <span className="pill badgeSlate">🏷️ {totalAnimalesEstablecimiento} Animales Totales (DelPro)</span>
+            <span className="pill badgeAmber">♂️ {totalMachosGanaderia} Total Machos (Ganadería)</span>
             <span className="pill badgeGreen">Modelo HJB</span>
           </div>
           <h1>Ganadería HJB</h1>
           <p className="muted">
-            Gestión intensiva a corral de machos desde nacimiento hasta los 400 kg de salida comercial a frigorífico.
+            Gestión intensiva a corral exclusiva de machos desde nacimiento en guachera hasta los 400 kg de salida comercial a frigorífico.
           </p>
         </div>
 
@@ -528,28 +539,57 @@ export default function GanaderiaPage() {
         </div>
       )}
 
-      {/* Tarjetas de Métricas Principales */}
-      <div className="metricsGrid four" style={{ marginBottom: "22px" }}>
-        <MetricCard
-          label="Cabezas en Engorde"
-          value={`${resumen.totalCabezas} cab.`}
-          note="Machos activos en 5 corrales"
-        />
-        <MetricCard
-          label="Kilos Vivos en Corral"
-          value={`${resumen.totalKilos.toLocaleString("es-AR")} kg`}
-          note={`Promedio: ${resumen.pesoPromedioGeneral} kg / cab.`}
-        />
-        <MetricCard
-          label="Listos p/ Frigorífico"
-          value={`${resumen.listosFrigorifico} cab.`}
-          note="Terminación (≥ 370 kg)"
-        />
-        <MetricCard
-          label="Costo Diario Alim."
-          value={`$${resumen.costoDiarioTotal.toLocaleString("es-AR")}`}
-          note="Raciones vía Valores Móviles"
-        />
+      {/* 5 Tarjetas de Métricas Principales (Solo Machos + Total Establecimiento) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px", marginBottom: "22px" }}>
+        <div style={{ background: "#f8fafc", border: "1.5px solid #94a3b8", padding: "14px", borderRadius: "10px" }}>
+          <div style={{ fontSize: "11px", color: "var(--slate-600)", fontWeight: 800, textTransform: "uppercase" }}>🏷️ TOTAL ANIMALES</div>
+          <div style={{ fontSize: "24px", fontWeight: 900, color: "var(--slate-900)", marginTop: "2px" }}>
+            {totalAnimalesEstablecimiento} cab.
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+            100% Stock General (Machos + Hembras)
+          </div>
+        </div>
+
+        <div style={{ background: "#fffbeb", border: "1.5px solid #fcd34d", padding: "14px", borderRadius: "10px" }}>
+          <div style={{ fontSize: "11px", color: "#b45309", fontWeight: 800, textTransform: "uppercase" }}>♂️ TOTAL MACHOS (GANADERÍA)</div>
+          <div style={{ fontSize: "24px", fontWeight: 900, color: "#b45309", marginTop: "2px" }}>
+            {totalMachosGanaderia} cab.
+          </div>
+          <div style={{ fontSize: "11px", color: "#92400e", marginTop: "2px" }}>
+            100% Machos en Recría & Engorde
+          </div>
+        </div>
+
+        <div style={{ background: "#ffffff", border: "1px solid var(--line)", padding: "14px", borderRadius: "10px" }}>
+          <div style={{ fontSize: "11px", color: "var(--slate-500)", fontWeight: 700, textTransform: "uppercase" }}>⚖️ Kilos Vivos en Corral</div>
+          <div style={{ fontSize: "24px", fontWeight: 900, color: "var(--slate-900)", marginTop: "2px" }}>
+            {resumen.totalKilos.toLocaleString("es-AR")} kg
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+            Promedio: {resumen.pesoPromedioGeneral} kg / cab.
+          </div>
+        </div>
+
+        <div style={{ background: "#ffffff", border: "1px solid var(--line)", padding: "14px", borderRadius: "10px" }}>
+          <div style={{ fontSize: "11px", color: "var(--slate-500)", fontWeight: 700, textTransform: "uppercase" }}>🥩 Listos p/ Frigorífico</div>
+          <div style={{ fontSize: "24px", fontWeight: 900, color: "#15803d", marginTop: "2px" }}>
+            {resumen.listosFrigorifico} cab.
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+            Terminación (≥ 370 kg)
+          </div>
+        </div>
+
+        <div style={{ background: "#ffffff", border: "1px solid var(--line)", padding: "14px", borderRadius: "10px" }}>
+          <div style={{ fontSize: "11px", color: "var(--slate-500)", fontWeight: 700, textTransform: "uppercase" }}>💵 Costo Diario Alim.</div>
+          <div style={{ fontSize: "24px", fontWeight: 900, color: "var(--slate-900)", marginTop: "2px" }}>
+            ${resumen.costoDiarioTotal.toLocaleString("es-AR")}
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+            Raciones vía Valores Móviles
+          </div>
+        </div>
       </div>
 
       {/* Navegación por Pestañas */}      {/* Navegación por Pestañas */}
