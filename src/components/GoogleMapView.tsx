@@ -24,6 +24,7 @@ declare global {
     initHJBGoogleMap?: () => void;
     hjbDeleteLote?: (id: string) => void;
     hjbOpenLabores?: (id: string) => void;
+    hjbOpenCampoLabores?: (campoId: string) => void;
   }
 }
 
@@ -58,6 +59,9 @@ export default function GoogleMapView() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [selectedCampo, setSelectedCampo] = useState<CampoGeo | null>(null);
   const [selectedLote, setSelectedLote] = useState<LoteGeo | null>(null);
+
+  // Acordeón de campos en la barra lateral (por defecto ninguno desplegado para vista compacta y limpia)
+  const [expandedCampoId, setExpandedCampoId] = useState<string | null>(null);
 
   // Nivel de zoom actual (para control dinámico LOD)
   const [currentZoom, setCurrentZoom] = useState<number>(12);
@@ -157,6 +161,14 @@ export default function GoogleMapView() {
       }
     };
 
+    window.hjbOpenCampoLabores = (campoId: string) => {
+      const allCampos = getCamposGeo();
+      const campo = allCampos.find((c) => c.id === campoId);
+      if (campo) {
+        openLaboresForCampo(campo);
+      }
+    };
+
     (window as any).gm_authFailure = () => {
       setLoadError("Google Maps reportó que la clave requiere verificar que la 'Maps JavaScript API' esté habilitada en Google Cloud Console.");
     };
@@ -209,6 +221,7 @@ export default function GoogleMapView() {
       window.removeEventListener(HJB_AGRICULTURE_SYNC_EVENT, reloadLiveMapData);
       delete window.hjbDeleteLote;
       delete window.hjbOpenLabores;
+      delete window.hjbOpenCampoLabores;
     };
   }, []);
 
@@ -379,7 +392,9 @@ export default function GoogleMapView() {
       marker.addListener("click", () => {
         setSelectedCampo(campo);
         setSelectedLote(null);
+        setExpandedCampoId(campo.id);
         focusOnCampo(campo);
+        openCampoInfoWindow(map, marker.getPosition(), campo);
       });
 
       markersRef.current.set(campo.id, marker);
@@ -540,10 +555,21 @@ export default function GoogleMapView() {
 
   // Filtrar labores asociadas a un lote o perímetro de campo
   function getLaboresForLote(lote: LoteGeo): Activity[] {
-    if (lote.tipo === "perimetro_campo") {
-      const cNom = lote.campoNombre.toLowerCase();
+    const cNom = (lote.campoNombre || "").toLowerCase().trim();
+    const lNom = (lote.nombre || "").toLowerCase().trim();
+
+    // Si es perímetro de campo o un campo de lote único (Aguilera de 20 ha, Kitty de 29 ha)
+    if (
+      lote.tipo === "perimetro_campo" ||
+      cNom === "aguilera" ||
+      cNom === "kitty" ||
+      lNom.includes("único") ||
+      lNom.includes("unico") ||
+      lNom === cNom
+    ) {
       return activities.filter((act) => {
-        if (act.campo.toLowerCase() === cNom) return true;
+        const actCampo = (act.campo || "").toLowerCase().trim();
+        if (actCampo === cNom) return true;
         if (act.esGrupal && act.lotesAfectados?.some((la) => la.toLowerCase().includes(cNom))) return true;
         return false;
       });
@@ -890,12 +916,85 @@ export default function GoogleMapView() {
     infoWindowRef.current.open(map);
   }
 
+  function openLaboresForCampo(campo: CampoGeo) {
+    const lotesDelCampo = lotes.filter((l) => l.campoId === campo.id);
+    const perimetro = lotesDelCampo.find((l) => l.tipo === "perimetro_campo");
+    const primerLote = lotesDelCampo[0];
+
+    const targetLote: LoteGeo = perimetro || primerLote || {
+      id: `${campo.id}-perimetro`,
+      campoId: campo.id,
+      campoNombre: campo.nombre,
+      nombre: campo.nombre,
+      tipo: "perimetro_campo",
+      superficieHa: campo.superficieHa,
+      coordenadas: [{ lat: campo.lat, lng: campo.lng }],
+      color: campo.color,
+      cultivo: campo.cultivoPrincipal,
+    };
+    setLaboresModalLote(targetLote);
+  }
+
+  function openCampoInfoWindow(map: any, position: any, campo: CampoGeo) {
+    if (!infoWindowRef.current) return;
+    const lotesDelCampo = lotes.filter((l) => l.campoId === campo.id);
+    const cNom = campo.nombre.toLowerCase();
+    const campoActivities = activities.filter((act) => {
+      const actCampo = (act.campo || "").toLowerCase().trim();
+      if (actCampo === cNom) return true;
+      if (act.esGrupal && act.lotesAfectados?.some((la) => la.toLowerCase().includes(cNom))) return true;
+      return false;
+    });
+
+    const contentString = `
+      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 6px 4px; min-width: 250px; color: #0f172a;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-size: 11px; font-weight: 700; background: ${campo.color}20; color: ${campo.color}; padding: 2px 7px; border-radius: 4px;">
+            Establecimiento HJB
+          </span>
+          <strong style="font-size: 13px; color: #15803d;">
+            ${campo.superficie}
+          </strong>
+        </div>
+
+        <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 800; color: #0f172a;">
+          🌾 Campo ${campo.nombre}
+        </h3>
+
+        <p style="margin: 0 0 6px 0; font-size: 12px; color: #475569;">
+          ${campo.cultivoPrincipal}<br/>
+          <strong>Delimitaciones:</strong> ${lotesDelCampo.length} trazo(s)<br/>
+          <strong>Labores registradas:</strong> ${campoActivities.length} labor(es)
+        </p>
+
+        <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+          <button
+            type="button"
+            onclick="window.hjbOpenCampoLabores('${campo.id}')"
+            style="display: block; width: 100%; text-align: center; background: #166534; color: #ffffff; border: none; padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;"
+          >
+            📋 Ver Labores de ${campo.nombre} (${campoActivities.length}) →
+          </button>
+
+          <a href="/agricultura/${campo.slug}" style="display: block; text-align: center; background: #f1f5f9; color: #334155; text-decoration: none; padding: 5px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600;">
+            Planilla completa de ${campo.nombre}
+          </a>
+        </div>
+      </div>
+    `;
+
+    infoWindowRef.current.setContent(contentString);
+    infoWindowRef.current.setPosition(position);
+    infoWindowRef.current.open(map);
+  }
+
   function focusOnCampo(campo: CampoGeo) {
     if (!mapInstanceRef.current) return;
     mapInstanceRef.current.panTo({ lat: campo.lat, lng: campo.lng });
     mapInstanceRef.current.setZoom(15);
     setSelectedCampo(campo);
     setCurrentZoom(15);
+    setExpandedCampoId(campo.id);
     setStatusNotice(`Enfocando Campo "${campo.nombre}". Se revelaron sus lotes internos.`);
     setTimeout(() => setStatusNotice(null), 3500);
   }
@@ -1093,229 +1192,296 @@ export default function GoogleMapView() {
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {campos.map((campo) => {
               const isSelected = selectedCampo?.id === campo.id;
+              const isExpanded = expandedCampoId === campo.id;
               const lotesDelCampo = lotes.filter((l) => l.campoId === campo.id);
               const perimetroCampo = lotesDelCampo.find((l) => l.tipo === "perimetro_campo");
+
+              const cNom = campo.nombre.toLowerCase();
+              const campoLabores = activities.filter((act) => {
+                const actCampo = (act.campo || "").toLowerCase().trim();
+                if (actCampo === cNom) return true;
+                if (act.esGrupal && act.lotesAfectados?.some((la) => la.toLowerCase().includes(cNom))) return true;
+                return false;
+              });
+              const totalLaboresCampo = campoLabores.length;
 
               return (
                 <div
                   key={campo.id}
-                  onClick={() => focusOnCampo(campo)}
                   style={{
-                    padding: "12px 14px",
                     borderRadius: "10px",
-                    border: `2px solid ${isSelected ? campo.color : "var(--line, #e2e8f0)"}`,
+                    border: `1.5px solid ${isSelected ? campo.color : "var(--line, #e2e8f0)"}`,
                     background: isSelected ? `${campo.color}08` : "#ffffff",
-                    cursor: "pointer",
+                    overflow: "hidden",
                     transition: "all 0.15s ease-in-out",
+                    boxShadow: isExpanded ? "0 2px 6px rgba(0,0,0,0.05)" : "none",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  {/* Fila Principal del Campo (Siempre visible y compacta) */}
+                  <div
+                    onClick={() => {
+                      setExpandedCampoId(isExpanded ? null : campo.id);
+                      setSelectedCampo(campo);
+                      focusOnCampo(campo);
+                    }}
+                    style={{
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      background: isExpanded ? `${campo.color}14` : "transparent",
+                      borderBottom: isExpanded ? `1px solid ${campo.color}30` : "none",
+                      transition: "background 0.15s ease-in-out",
+                    }}
+                  >
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span
                         style={{
-                          width: "12px",
-                          height: "12px",
+                          fontSize: "10px",
+                          color: "var(--muted)",
+                          display: "inline-block",
+                          transform: isExpanded ? "rotate(90deg)" : "none",
+                          transition: "transform 0.15s ease",
+                        }}
+                      >
+                        ▶
+                      </span>
+                      <span
+                        style={{
+                          width: "11px",
+                          height: "11px",
                           borderRadius: "50%",
                           backgroundColor: campo.color,
                           display: "inline-block",
+                          flexShrink: 0,
                         }}
                       />
-                      <strong style={{ fontSize: "14.5px", color: "var(--slate-900, #0f172a)" }}>
-                        {campo.nombre}
-                      </strong>
-                    </div>
-                    <span
-                      className="pill"
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        backgroundColor: isSelected ? campo.color : "var(--slate-100, #f1f5f9)",
-                        color: isSelected ? "#ffffff" : "var(--slate-700, #334155)",
-                        padding: "2px 8px",
-                      }}
-                    >
-                      {campo.superficie}
-                    </span>
-                  </div>
-
-                  <p style={{ margin: "2px 0 6px 0", fontSize: "12px", color: "var(--slate-600, #475569)", lineHeight: 1.3 }}>
-                    {campo.cultivoPrincipal}
-                  </p>
-
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11.5px", marginBottom: "8px" }}>
-                    <span style={{ color: "var(--muted, #64748b)" }}>
-                      Lat: {campo.lat.toFixed(4)}, Lng: {campo.lng.toFixed(4)}
-                    </span>
-                    <Link
-                      href={`/agricultura/${campo.slug}`}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ fontWeight: 700, color: campo.color, textDecoration: "none" }}
-                    >
-                      Ver labores →
-                    </Link>
-                  </div>
-
-                  {/* SECCIÓN INTERNA: Perímetro y Lotes de este Campo */}
-                  <div
-                    style={{
-                      marginTop: "8px",
-                      paddingTop: "8px",
-                      borderTop: "1px dashed var(--line, #e2e8f0)",
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px", flexWrap: "wrap", gap: "4px" }}>
-                      <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--slate-700)" }}>
-                        Delimitaciones ({lotesDelCampo.length})
-                      </span>
-
-                      <div style={{ display: "flex", gap: "4px" }}>
-                        <button
-                          type="button"
-                          onClick={() => startNativeTracing(campo.id, "perimetro_campo")}
-                          style={{
-                            background: perimetroCampo ? "#f1f5f9" : "#e0f2fe",
-                            border: `1px solid ${perimetroCampo ? "#cbd5e1" : "#7dd3fc"}`,
-                            color: perimetroCampo ? "#475569" : "#0369a1",
-                            borderRadius: "4px",
-                            padding: "2px 6px",
-                            fontSize: "10px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                          }}
-                          title={`Trazar perímetro general de ${campo.nombre}`}
-                        >
-                          {perimetroCampo ? "🚩 Perímetro ✓" : "+ Perímetro Campo"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => startNativeTracing(campo.id, "lote_interno")}
-                          style={{
-                            background: "#f0fdf4",
-                            border: "1px solid #86efac",
-                            color: "#166534",
-                            borderRadius: "4px",
-                            padding: "2px 6px",
-                            fontSize: "10px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                          }}
-                          title={`Trazar lote interno para ${campo.nombre}`}
-                        >
-                          + Lote
-                        </button>
+                      <div>
+                        <strong style={{ fontSize: "14px", color: "var(--slate-900)", display: "block", lineHeight: 1.2 }}>
+                          {campo.nombre}
+                        </strong>
+                        <small style={{ fontSize: "10.5px", color: "var(--muted)" }}>
+                          {lotesDelCampo.length === 1 ? "1 lote delimitado" : `${lotesDelCampo.length} lotes delimitados`}
+                        </small>
                       </div>
                     </div>
 
-                    {/* Lista de Trazos del Campo */}
-                    {lotesDelCampo.length === 0 ? (
-                      <small style={{ color: "var(--muted)", fontSize: "11px", display: "block" }}>
-                        Sin trazos. Presioná &quot;+ Perímetro Campo&quot; o &quot;+ Lote&quot;.
-                      </small>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                        {lotesDelCampo.map((lote) => {
-                          const isLoteActive = selectedLote?.id === lote.id;
-                          const isPerim = lote.tipo === "perimetro_campo";
-                          const laboresCount = getLaboresForLote(lote).length;
+                    <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                      {/* Botón directo para ver labores de este campo */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openLaboresForCampo(campo);
+                        }}
+                        style={{
+                          background: totalLaboresCampo > 0 ? "#dcfce7" : "#f1f5f9",
+                          border: `1px solid ${totalLaboresCampo > 0 ? "#86efac" : "#cbd5e1"}`,
+                          color: totalLaboresCampo > 0 ? "#166534" : "#475569",
+                          borderRadius: "5px",
+                          padding: "3px 6px",
+                          fontSize: "10.5px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={`Ver labores de ${campo.nombre}`}
+                      >
+                        📋 {totalLaboresCampo} {totalLaboresCampo === 1 ? "labor" : "labores"}
+                      </button>
 
-                          return (
-                            <div
-                              key={lote.id}
-                              onClick={() => focusOnLote(lote)}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                padding: "5px 8px",
-                                borderRadius: "6px",
-                                background: isLoteActive ? (isPerim ? "#fef3c7" : "#dcfce7") : "#f8fafc",
-                                border: `1px solid ${isLoteActive ? (isPerim ? "#d97706" : "#16a34a") : "#e2e8f0"}`,
-                                cursor: "pointer",
-                              }}
-                            >
-                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    minWidth: "24px",
-                                    padding: "0 4px",
-                                    height: "18px",
-                                    borderRadius: "3px",
-                                    background: "#ffffff",
-                                    border: `1.2px solid ${isPerim ? campo.color : "#16a34a"}`,
-                                    fontWeight: 800,
-                                    fontSize: "11px",
-                                    color: "#0f172a",
-                                  }}
-                                >
-                                  {isPerim ? "🚩" : lote.nombre}
-                                </span>
-                                <div>
-                                  <strong style={{ fontSize: "12px", color: "var(--slate-800)", display: "block" }}>
-                                    {isPerim ? `Perímetro ${lote.nombre}` : `Lote ${lote.nombre}`}
-                                  </strong>
-                                  <small style={{ fontSize: "10.5px", color: "var(--muted)" }}>
-                                    {laboresCount > 0 ? `${laboresCount} labores` : "Sin labores"}
-                                  </small>
+                      <span
+                        className="pill"
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          backgroundColor: isSelected ? campo.color : "var(--slate-100)",
+                          color: isSelected ? "#ffffff" : "var(--slate-700)",
+                          padding: "2px 7px",
+                        }}
+                      >
+                        {campo.superficie}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* SECCIÓN DESPLEGABLE: Perímetro y Lotes de este Campo (Solo si isExpanded) */}
+                  {isExpanded && (
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        background: "#fafafa",
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <p style={{ margin: "0 0 6px 0", fontSize: "11.5px", color: "var(--slate-600)", lineHeight: 1.3 }}>
+                        {campo.cultivoPrincipal} · Lat: {campo.lat.toFixed(4)}, Lng: {campo.lng.toFixed(4)}
+                      </p>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "4px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--slate-700)" }}>
+                          Lotes & Delimitaciones ({lotesDelCampo.length})
+                        </span>
+
+                        <div style={{ display: "flex", gap: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => startNativeTracing(campo.id, "perimetro_campo")}
+                            style={{
+                              background: perimetroCampo ? "#f1f5f9" : "#e0f2fe",
+                              border: `1px solid ${perimetroCampo ? "#cbd5e1" : "#7dd3fc"}`,
+                              color: perimetroCampo ? "#475569" : "#0369a1",
+                              borderRadius: "4px",
+                              padding: "2px 6px",
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                            title={`Trazar perímetro general de ${campo.nombre}`}
+                          >
+                            {perimetroCampo ? "🚩 Perímetro ✓" : "+ Perímetro"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => startNativeTracing(campo.id, "lote_interno")}
+                            style={{
+                              background: "#f0fdf4",
+                              border: "1px solid #86efac",
+                              color: "#166534",
+                              borderRadius: "4px",
+                              padding: "2px 6px",
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                            title={`Trazar lote interno para ${campo.nombre}`}
+                          >
+                            + Lote
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Lista de Trazos del Campo */}
+                      {lotesDelCampo.length === 0 ? (
+                        <small style={{ color: "var(--muted)", fontSize: "11px", display: "block" }}>
+                          Sin trazos. Presioná &quot;+ Perímetro&quot; o &quot;+ Lote&quot;.
+                        </small>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                          {lotesDelCampo.map((lote) => {
+                            const isLoteActive = selectedLote?.id === lote.id;
+                            const isPerim = lote.tipo === "perimetro_campo";
+                            const laboresCount = getLaboresForLote(lote).length;
+
+                            return (
+                              <div
+                                key={lote.id}
+                                onClick={() => focusOnLote(lote)}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  padding: "5px 8px",
+                                  borderRadius: "6px",
+                                  background: isLoteActive ? (isPerim ? "#fef3c7" : "#dcfce7") : "#ffffff",
+                                  border: `1px solid ${isLoteActive ? (isPerim ? "#d97706" : "#16a34a") : "#e2e8f0"}`,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                  <span
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      minWidth: "22px",
+                                      padding: "0 3px",
+                                      height: "18px",
+                                      borderRadius: "3px",
+                                      background: "#ffffff",
+                                      border: `1.2px solid ${isPerim ? campo.color : "#16a34a"}`,
+                                      fontWeight: 800,
+                                      fontSize: "10.5px",
+                                      color: "#0f172a",
+                                    }}
+                                  >
+                                    {isPerim ? "🚩" : lote.nombre}
+                                  </span>
+                                  <div>
+                                    <strong style={{ fontSize: "11.5px", color: "var(--slate-800)", display: "block" }}>
+                                      {isPerim ? `Perímetro ${lote.nombre}` : `Lote ${lote.nombre}`}
+                                    </strong>
+                                    <small style={{ fontSize: "10px", color: "var(--muted)" }}>
+                                      {laboresCount > 0 ? `${laboresCount} labor(es)` : "Sin labores"}
+                                    </small>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setLaboresModalLote(lote);
+                                    }}
+                                    style={{
+                                      background: "#e0f2fe",
+                                      border: "1px solid #bae6fd",
+                                      color: "#0369a1",
+                                      borderRadius: "4px",
+                                      padding: "2px 5px",
+                                      fontSize: "10px",
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                    }}
+                                    title="Ver labores de este lote"
+                                  >
+                                    Labores
+                                  </button>
+
+                                  <span style={{ fontSize: "10.5px", color: isPerim ? "#b45309" : "#166534", fontWeight: 700 }}>
+                                    {lote.superficieHa !== null ? `${lote.superficieHa} ha` : "Manual"}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteLote(lote.id);
+                                    }}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      color: "#ef4444",
+                                      cursor: "pointer",
+                                      padding: "2px 3px",
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                    }}
+                                    title="Eliminar este trazo"
+                                  >
+                                    🗑️
+                                  </button>
                                 </div>
                               </div>
+                            );
+                          })}
+                        </div>
+                      )}
 
-                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setLaboresModalLote(lote);
-                                  }}
-                                  style={{
-                                    background: "#e0f2fe",
-                                    border: "1px solid #bae6fd",
-                                    color: "#0369a1",
-                                    borderRadius: "4px",
-                                    padding: "2px 5px",
-                                    fontSize: "10.5px",
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                  }}
-                                  title="Ver labores de este lote"
-                                >
-                                  Labores
-                                </button>
-
-                                <span style={{ fontSize: "11px", color: isPerim ? "#b45309" : "#166534", fontWeight: 700 }}>
-                                  {lote.superficieHa !== null ? `${lote.superficieHa} ha` : "Manual"}
-                                </span>
-
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteLote(lote.id);
-                                  }}
-                                  style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "#ef4444",
-                                    cursor: "pointer",
-                                    padding: "2px 4px",
-                                    fontSize: "13px",
-                                    fontWeight: 700,
-                                  }}
-                                  title="Eliminar este trazo"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div style={{ marginTop: "8px", textAlign: "right" }}>
+                        <Link
+                          href={`/agricultura/${campo.slug}`}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ fontSize: "11px", fontWeight: 700, color: campo.color, textDecoration: "none" }}
+                        >
+                          Planilla completa de {campo.nombre} →
+                        </Link>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

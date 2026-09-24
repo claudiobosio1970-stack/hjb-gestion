@@ -677,14 +677,21 @@ export function isActivityInLote(act: Activity, campo: string, loteNombre: strin
   const actCampo = (act.campo || "").toLowerCase().trim();
   if (actCampo !== cTarget) return false;
 
+  // Si el campo es de Lote Único (ej: Aguilera de 20 ha, Kitty de 29 ha) o el lote buscado es el perímetro/campo completo
+  const esCampoLoteUnico = cTarget === "aguilera" || cTarget === "kitty";
+  const esPerimetroOBusquedaCampo = lTarget === cTarget || lTarget.includes("único") || lTarget.includes("unico") || lTarget.includes("perímetro") || lTarget.includes("perimetro");
+  if (esCampoLoteUnico || esPerimetroOBusquedaCampo) {
+    return true;
+  }
+
   const actLote = (act.lote || "").toLowerCase().trim();
-  // Excluir labores generales del campo o sin lote definido
+  // Excluir labores generales del campo si se busca un lote subdividido específico (ej: Lote 1 vs Lote 2)
   if (!actLote || actLote === "general" || actLote === "campo" || actLote === "todos") {
     return false;
   }
 
   const actLoteClean = actLote.replace(/lote\s*/g, "").trim();
-  return actLote === lTarget || actLoteClean === lTargetClean;
+  return actLote === lTarget || actLoteClean === lTargetClean || actLote.includes(lTargetClean) || lTarget.includes(actLoteClean);
 }
 
 /**

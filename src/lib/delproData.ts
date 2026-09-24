@@ -883,7 +883,7 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
   }
 }
 
-export function saveDelProConfig(config: Partial<DelProConfig>): DelProConfig {
+export function saveDelProConfig(config: Partial<DelProConfig>, persistToFirestore: boolean = false): DelProConfig {
   if (typeof window === "undefined") return DELPRO_CONFIG_DEFAULT;
   const current = getDelProConfig();
   const updated: DelProConfig = {
@@ -898,8 +898,9 @@ export function saveDelProConfig(config: Partial<DelProConfig>): DelProConfig {
     window.dispatchEvent(new CustomEvent(HJB_DELPRO_SYNC_EVENT, { detail: updated }));
   }
 
-  // Persistir en Firestore en la nube para sincronización multidispositivo
-  if (typeof window !== "undefined" && db) {
+  // SOLO persistir en Firestore si se pide explícitamente (ej: importación manual por archivo en la web)
+  // NUNCA escribir desde el listener reactivo de onSnapshot para evitar que el navegador sobrescriba datos reales
+  if (persistToFirestore && typeof window !== "undefined" && db) {
     try {
       const firestoreData = {
         estadoConexion: updated.estadoConexion,
@@ -1332,6 +1333,9 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
       baseDatosSql: base,
       mensajeEstado: `Datos reales extraídos de DeLaval DelPro SQL (${new Date().toLocaleTimeString("es-AR")})`,
     });
+
+    // Como es importación manual de archivo en la web, persistir explícitamente en Firestore
+    saveDelProConfig(config, true);
 
     const totalRodeo = parsed.rodeoCompleto?.length || payload.vacasEnOrdeñe;
 
