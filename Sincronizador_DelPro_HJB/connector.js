@@ -111,7 +111,7 @@ SET @FechaCorte = DATEADD(day,-1,CAST(GETDATE() AS date));
     WHERE
         a.IsExited = 0
         AND a.IsCulled = 0
-        AND a.GroupOid IN (2,1019)
+        AND (a.GroupOid IN (2, 1019) OR d.TotalYield > 0)
 
     GROUP BY
         a.Number,
