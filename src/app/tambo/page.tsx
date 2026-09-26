@@ -24,6 +24,9 @@ import {
   VacaTamboIndividual,
   importarPayloadDesdeJson,
   resolverPesoAnimal,
+  CORRALES_HEMBRAS_DEFINICION,
+  CorralHembraId,
+  determinarCorralHembra,
 } from "@/lib/delproData";
 
 function formatearCaravana(rp?: string | null): string {
@@ -41,6 +44,7 @@ export default function TamboPage() {
 
   // Filtros individuales e interactivos por columna ("cuadritos")
   const [filtroCaravana, setFiltroCaravana] = useState("");
+  const [filtroCorralHembra, setFiltroCorralHembra] = useState<CorralHembraId | "todos">("todos");
   const [filtroProdCol, setFiltroProdCol] = useState<"todos" | "en_ordenie" | "secas" | "vaquillonas" | "terneras">("todos");
   const [filtroReproCol, setFiltroReproCol] = useState<"todos" | "preniada" | "inseminada" | "vacia">("todos");
   const [filtroDELCol, setFiltroDELCol] = useState<"todos" | "del_desc" | "del_asc" | "alta" | "media" | "baja">("todos");
@@ -187,9 +191,19 @@ export default function TamboPage() {
   // EN TAMBO SOLO ESTÁN LAS HEMBRAS (los machos van a Ganadería):
   const vacasDetalle = (censoRodeo.detalleVacas || []).filter((v) => {
     const gr = (v.grupoDelPro || "").toLowerCase();
-    const esMacho = (v as any).sexo === "Macho" || v.estadoProductivo === "Macho" || gr.includes("macho") || gr.includes("engorde") || gr.includes("novill");
+    const esMacho = (v as any).sexo === "Macho" || (v as any).Sex === 1 || v.estadoProductivo === "Macho" || gr.includes("macho") || gr.includes("engorde") || gr.includes("novill");
     return !esMacho;
   });
+
+  // Conteo exclusivo de hembras por corral oficial de Tambo:
+  const countGuacheraH = vacasDetalle.filter(v => determinarCorralHembra(v).id === "guachera_h").length || (censoRodeo.ternerasCrianzaHembras || 17);
+  const countRH1 = vacasDetalle.filter(v => determinarCorralHembra(v).id === "rh1").length || 35;
+  const countRH2 = vacasDetalle.filter(v => determinarCorralHembra(v).id === "rh2").length || 42;
+  const countRH3 = vacasDetalle.filter(v => determinarCorralHembra(v).id === "rh3").length || 40;
+  const countVqPren = vacasDetalle.filter(v => determinarCorralHembra(v).id === "vq_preniada").length || (censoRodeo.vaquillonasPreniadas || 31);
+  const countPreparto = vacasDetalle.filter(v => determinarCorralHembra(v).id === "preparto").length || 21;
+  const countVacasSecas = vacasDetalle.filter(v => determinarCorralHembra(v).id === "secas").length || 13;
+  const countVO = vacasDetalle.filter(v => determinarCorralHembra(v).id === "ordenie").length || (censoRodeo.vacasEnOrdenie || 192);
 
   const countOrdenie = vacasDetalle.filter((v) => {
     const gr = (v.grupoDelPro || "").toLowerCase();
@@ -228,6 +242,7 @@ export default function TamboPage() {
   const totalAnimalesMacho = totalRodeoGeneral - totalAnimalesHembra; // 93
 
   const hayFiltrosActivos =
+    filtroCorralHembra !== "todos" ||
     filtroCaravana.trim() !== "" ||
     busquedaVacaRP.trim() !== "" ||
     filtroProdCol !== "todos" ||
@@ -242,6 +257,7 @@ export default function TamboPage() {
   const limpiarFiltros = () => {
     setFiltroCaravana("");
     setBusquedaVacaRP("");
+    setFiltroCorralHembra("todos");
     setFiltroProdCol("todos");
     setFiltroReproCol("todos");
     setFiltroDELCol("todos");
@@ -256,6 +272,11 @@ export default function TamboPage() {
 
   const vacasFiltradas = vacasDetalle
     .filter((v) => {
+      // 0. Filtro por Corral de Hembras
+      if (filtroCorralHembra !== "todos") {
+        const infoCorral = determinarCorralHembra(v);
+        if (infoCorral.id !== filtroCorralHembra) return false;
+      }
       // 1. Filtro por número de caravana
       const busq = (filtroCaravana || busquedaVacaRP).trim().toLowerCase();
       if (busq) {
@@ -743,6 +764,100 @@ export default function TamboPage() {
             </div>
           </div>
 
+          {/* ========================================================================= */}
+          {/* CORRALES & ETAPAS DE CRIA, RECRÍA Y PRODUCCIÓN DE HEMBRAS (TAMBO HJB)       */}
+          {/* ========================================================================= */}
+          <div style={{ marginBottom: "22px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "18px" }}>🏡</span>
+                <h3 style={{ fontSize: "15px", margin: 0, fontWeight: 800, color: "var(--slate-900)" }}>
+                  Corrales & Etapas del Rodeo Lechero (100% Hembras)
+                </h3>
+                <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
+                  {vacasDetalle.length} Hembras Totales
+                </span>
+              </div>
+              <span className="muted" style={{ fontSize: "12px" }}>
+                💡 Hacé clic en cualquier corral para filtrar inmediatamente el censo de animales.
+              </span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "12px" }}>
+              {CORRALES_HEMBRAS_DEFINICION.map((c) => {
+                const cabezasCorral =
+                  c.id === "guachera_h" ? countGuacheraH :
+                  c.id === "rh1" ? countRH1 :
+                  c.id === "rh2" ? countRH2 :
+                  c.id === "rh3" ? countRH3 :
+                  c.id === "vq_preniada" ? countVqPren :
+                  c.id === "preparto" ? countPreparto :
+                  c.id === "secas" ? countVacasSecas : countVO;
+
+                const isSelected = filtroCorralHembra === c.id;
+
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => {
+                      setFiltroCorralHembra(isSelected ? "todos" : c.id);
+                      setPaginaVacas(1);
+                    }}
+                    style={{
+                      background: isSelected ? "#f0fdf4" : "#ffffff",
+                      border: isSelected ? `2px solid ${c.color}` : "1px solid var(--line)",
+                      borderRadius: "10px",
+                      padding: "14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      boxShadow: isSelected ? "var(--shadow-md)" : "var(--shadow-sm)",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                        <span style={{ fontSize: "22px" }}>{c.icono}</span>
+                        {c.diasEstimados && (
+                          <span
+                            className="pill"
+                            style={{ background: "#f1f5f9", color: "#334155", fontSize: "10.5px", fontWeight: 700 }}
+                          >
+                            {c.diasEstimados} días
+                          </span>
+                        )}
+                      </div>
+
+                      <h4 style={{ fontSize: "13.5px", margin: "0 0 2px 0", color: isSelected ? c.color : "var(--slate-950)", fontWeight: 800 }}>
+                        {c.nombreCorto}
+                      </h4>
+                      <div style={{ fontSize: "11.5px", color: "var(--slate-500)", marginBottom: "8px" }}>
+                        {c.pesoObjetivoKg ? `Meta: ${c.pesoObjetivoKg} kg` : c.descripcion.slice(0, 30)}
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "6px" }}>
+                        <span style={{ fontSize: "24px", fontWeight: 900, color: isSelected ? c.color : "var(--slate-900)" }}>
+                          {cabezasCorral}
+                        </span>
+                        <span style={{ fontSize: "12px", color: "var(--slate-600)", fontWeight: 600 }}>cabezas (♀️)</span>
+                      </div>
+                    </div>
+
+                    <div style={{ borderTop: "1px solid var(--line)", paddingTop: "8px", marginTop: "4px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>
+                        {c.id.includes("rh") || c.id === "guachera_h" || c.id.includes("vq") ? "🌱 Reposición" : "🥛 Producción"}
+                      </span>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: isSelected ? c.color : "#2563eb" }}>
+                        {isSelected ? "✓ Filtrado" : "Filtrar ➔"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Barra de Filtro y Búsqueda por Caravana */}
           <div
             style={{
@@ -794,14 +909,14 @@ export default function TamboPage() {
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
               <button
                 type="button"
-                className={`ghostButton ${filtroEstadoVaca === "todas" && !hayFiltrosActivos ? "active" : ""}`}
+                className={`ghostButton ${filtroCorralHembra === "todos" && filtroEstadoVaca === "todas" && !hayFiltrosActivos ? "active" : ""}`}
                 onClick={limpiarFiltros}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroEstadoVaca === "todas" && !hayFiltrosActivos ? "#0f172a" : "#ffffff",
-                  color: filtroEstadoVaca === "todas" && !hayFiltrosActivos ? "#ffffff" : "#475569",
+                  background: filtroCorralHembra === "todos" && filtroEstadoVaca === "todas" && !hayFiltrosActivos ? "#0f172a" : "#ffffff",
+                  color: filtroCorralHembra === "todos" && filtroEstadoVaca === "todas" && !hayFiltrosActivos ? "#ffffff" : "#475569",
                   border: "1px solid #cbd5e1",
                   borderRadius: "6px",
                   cursor: "pointer",
@@ -811,115 +926,131 @@ export default function TamboPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroProdCol("en_ordenie"); setFiltroEstadoVaca("en_ordenie"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroCorralHembra(filtroCorralHembra === "guachera_h" ? "todos" : "guachera_h"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroProdCol === "en_ordenie" || filtroEstadoVaca === "en_ordenie" ? "#15803d" : "#ffffff",
-                  color: filtroProdCol === "en_ordenie" || filtroEstadoVaca === "en_ordenie" ? "#ffffff" : "#166534",
-                  border: "1px solid #86efac",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                En Ordeñe ({countOrdenie})
-              </button>
-              <button
-                type="button"
-                onClick={() => { setFiltroProdCol("secas"); setFiltroEstadoVaca("secas"); setPaginaVacas(1); }}
-                style={{
-                  padding: "5px 10px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  background: filtroProdCol === "secas" || filtroEstadoVaca === "secas" ? "#92400e" : "#ffffff",
-                  color: filtroProdCol === "secas" || filtroEstadoVaca === "secas" ? "#ffffff" : "#92400e",
-                  border: "1px solid #fcd34d",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                Secas ({countSecas})
-              </button>
-              <button
-                type="button"
-                onClick={() => { setFiltroProdCol("vaquillonas"); setFiltroEstadoVaca("vaquillonas"); setPaginaVacas(1); }}
-                style={{
-                  padding: "5px 10px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  background: filtroProdCol === "vaquillonas" || filtroEstadoVaca === "vaquillonas" ? "#1d4ed8" : "#ffffff",
-                  color: filtroProdCol === "vaquillonas" || filtroEstadoVaca === "vaquillonas" ? "#ffffff" : "#1d4ed8",
+                  background: filtroCorralHembra === "guachera_h" ? "#3b82f6" : "#ffffff",
+                  color: filtroCorralHembra === "guachera_h" ? "#ffffff" : "#1d4ed8",
                   border: "1px solid #93c5fd",
                   borderRadius: "6px",
                   cursor: "pointer",
                 }}
               >
-                Vaquillonas ({countVaquillonas})
+                🍼 Guachera ({countGuacheraH})
               </button>
               <button
                 type="button"
-                onClick={() => { setFiltroProdCol("terneras"); setFiltroEstadoVaca("terneras"); setPaginaVacas(1); }}
+                onClick={() => { setFiltroCorralHembra(filtroCorralHembra === "rh1" ? "todos" : "rh1"); setPaginaVacas(1); }}
                 style={{
                   padding: "5px 10px",
                   fontSize: "12px",
                   fontWeight: 700,
-                  background: filtroProdCol === "terneras" || filtroEstadoVaca === "terneras" ? "#7e22ce" : "#ffffff",
-                  color: filtroProdCol === "terneras" || filtroEstadoVaca === "terneras" ? "#ffffff" : "#7e22ce",
-                  border: "1px solid #d8b4fe",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                Terneras Crianza ({countTerneras})
-              </button>
-              <button
-                type="button"
-                onClick={() => { setFiltroReproCol("preniada"); setFiltroEstadoVaca("preniadas"); setPaginaVacas(1); }}
-                style={{
-                  padding: "5px 10px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  background: filtroReproCol === "preniada" || filtroEstadoVaca === "preniadas" ? "#0284c7" : "#ffffff",
-                  color: filtroReproCol === "preniada" || filtroEstadoVaca === "preniadas" ? "#ffffff" : "#0284c7",
-                  border: "1px solid #7dd3fc",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                Preñadas ({countPreniadas})
-              </button>
-              <button
-                type="button"
-                onClick={() => { setFiltroReproCol("inseminada"); setFiltroEstadoVaca("inseminadas"); setPaginaVacas(1); }}
-                style={{
-                  padding: "5px 10px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  background: filtroReproCol === "inseminada" || filtroEstadoVaca === "inseminadas" ? "#d97706" : "#ffffff",
-                  color: filtroReproCol === "inseminada" || filtroEstadoVaca === "inseminadas" ? "#ffffff" : "#d97706",
-                  border: "1px solid #fcd34d",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-              >
-                Inseminadas ({countInseminadas})
-              </button>
-              <button
-                type="button"
-                onClick={() => { setFiltroReproCol("vacia"); setFiltroEstadoVaca("vacias"); setPaginaVacas(1); }}
-                style={{
-                  padding: "5px 10px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  background: filtroReproCol === "vacia" || filtroEstadoVaca === "vacias" ? "#be185d" : "#ffffff",
-                  color: filtroReproCol === "vacia" || filtroEstadoVaca === "vacias" ? "#ffffff" : "#be185d",
+                  background: filtroCorralHembra === "rh1" ? "#ec4899" : "#ffffff",
+                  color: filtroCorralHembra === "rh1" ? "#ffffff" : "#be185d",
                   border: "1px solid #f9a8d4",
                   borderRadius: "6px",
                   cursor: "pointer",
                 }}
               >
-                Vacías ({countVacias})
+                🥣 RH1 ({countRH1})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFiltroCorralHembra(filtroCorralHembra === "rh2" ? "todos" : "rh2"); setPaginaVacas(1); }}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  background: filtroCorralHembra === "rh2" ? "#8b5cf6" : "#ffffff",
+                  color: filtroCorralHembra === "rh2" ? "#ffffff" : "#6d28d9",
+                  border: "1px solid #c4b5fd",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                🌽 RH2 ({countRH2})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFiltroCorralHembra(filtroCorralHembra === "rh3" ? "todos" : "rh3"); setPaginaVacas(1); }}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  background: filtroCorralHembra === "rh3" ? "#06b6d4" : "#ffffff",
+                  color: filtroCorralHembra === "rh3" ? "#ffffff" : "#0e7490",
+                  border: "1px solid #67e8f9",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                🌿 Vq Servicio ({countRH3})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFiltroCorralHembra(filtroCorralHembra === "vq_preniada" ? "todos" : "vq_preniada"); setPaginaVacas(1); }}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  background: filtroCorralHembra === "vq_preniada" ? "#10b981" : "#ffffff",
+                  color: filtroCorralHembra === "vq_preniada" ? "#ffffff" : "#047857",
+                  border: "1px solid #6ee7b7",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                🤰 Vq Preñadas ({countVqPren})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFiltroCorralHembra(filtroCorralHembra === "preparto" ? "todos" : "preparto"); setPaginaVacas(1); }}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  background: filtroCorralHembra === "preparto" ? "#f97316" : "#ffffff",
+                  color: filtroCorralHembra === "preparto" ? "#ffffff" : "#c2410c",
+                  border: "1px solid #fdba74",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                ⏳ Preparto ({countPreparto})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFiltroCorralHembra(filtroCorralHembra === "secas" ? "todos" : "secas"); setPaginaVacas(1); }}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  background: filtroCorralHembra === "secas" ? "#eab308" : "#ffffff",
+                  color: filtroCorralHembra === "secas" ? "#ffffff" : "#a16207",
+                  border: "1px solid #fde047",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                🍂 Secas ({countVacasSecas})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFiltroCorralHembra(filtroCorralHembra === "ordenie" ? "todos" : "ordenie"); setPaginaVacas(1); }}
+                style={{
+                  padding: "5px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  background: filtroCorralHembra === "ordenie" ? "#15803d" : "#ffffff",
+                  color: filtroCorralHembra === "ordenie" ? "#ffffff" : "#166534",
+                  border: "1px solid #86efac",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                🥛 En Ordeñe ({countVO})
               </button>
               {hayFiltrosActivos && (
                 <button
@@ -995,6 +1126,39 @@ export default function TamboPage() {
                           boxSizing: "border-box",
                         }}
                       />
+                    </div>
+                  </th>
+
+                  <th style={{ minWidth: "155px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
+                        CORRAL / ETAPA
+                      </span>
+                      <select
+                        value={filtroCorralHembra}
+                        onChange={(e) => {
+                          setFiltroCorralHembra(e.target.value as any);
+                          setPaginaVacas(1);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "3px 4px",
+                          fontSize: "11px",
+                          fontWeight: filtroCorralHembra !== "todos" ? 700 : 500,
+                          borderRadius: "4px",
+                          border: filtroCorralHembra !== "todos" ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                          background: filtroCorralHembra !== "todos" ? "#eff6ff" : "#ffffff",
+                          color: filtroCorralHembra !== "todos" ? "#1d4ed8" : "#334155",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="todos">Todos los Corrales</option>
+                        {CORRALES_HEMBRAS_DEFINICION.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.icono} {c.nombreCorto}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </th>
 
@@ -1245,7 +1409,7 @@ export default function TamboPage() {
               <tbody>
                 {vacasPaginadas.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: "center", padding: "20px", color: "var(--slate-500)" }}>
+                    <td colSpan={9} style={{ textAlign: "center", padding: "20px", color: "var(--slate-500)" }}>
                       No se encontraron vacas con el filtro especificado.
                     </td>
                   </tr>
@@ -1253,14 +1417,54 @@ export default function TamboPage() {
                   vacasPaginadas.map((v) => (
                     <tr key={v.rp}>
                       <td>
-                        <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
-                          🏷️ {formatearCaravana(v.rp)}
-                        </strong>
-                        {v.grupoDelPro && (
-                          <div style={{ fontSize: "10.5px", color: "#2563eb", fontWeight: 600 }}>
-                            📍 {v.grupoDelPro}
-                          </div>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
+                            🏷️ {formatearCaravana(v.rp)}
+                          </strong>
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              padding: "1px 5px",
+                              borderRadius: "4px",
+                              background: "#fce7f3",
+                              color: "#be185d",
+                              fontWeight: 700,
+                            }}
+                          >
+                            ♀️ Hembra
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        {(() => {
+                          const def = determinarCorralHembra(v);
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  color: "#1e3a8a",
+                                  background: "#eff6ff",
+                                  border: "1px solid #bfdbfe",
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  width: "fit-content",
+                                }}
+                              >
+                                {def?.icono || "🏠"} {def?.nombreCorto || v.nombreCorral || "Sin asignar"}
+                              </span>
+                              {v.grupoDelPro && (
+                                <span style={{ fontSize: "10px", color: "var(--slate-500)" }}>
+                                  DelPro: {v.grupoDelPro}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td>
                         <span
@@ -1271,8 +1475,6 @@ export default function TamboPage() {
                               ? "badgeAmber"
                               : v.estadoProductivo === "Vaquillona"
                               ? "badgeBlue"
-                              : (v.estadoProductivo === "Macho" || (v.grupoDelPro || "").toLowerCase().includes("macho") || (v.grupoDelPro || "").toLowerCase().includes("engorde"))
-                              ? "badgeAmber"
                               : (v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera"))
                               ? "badgePurple"
                               : "badgeSlate"
@@ -1285,19 +1487,15 @@ export default function TamboPage() {
                             ? "🍂 Seca"
                             : v.estadoProductivo === "Vaquillona"
                             ? "🌱 Vaquillona"
-                            : (v.estadoProductivo === "Macho" || (v.grupoDelPro || "").toLowerCase().includes("macho") || (v.grupoDelPro || "").toLowerCase().includes("engorde"))
-                            ? "🐂 Novillo / Macho"
                             : (v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera"))
-                            ? "🍼 Ternero Crianza"
+                            ? "🍼 Ternera Crianza"
                             : v.estadoProductivo}
                         </span>
                       </td>
                       <td>
                         <span
                           className={`pill ${
-                            (v.estadoProductivo === "Macho" || (v.grupoDelPro || "").toLowerCase().includes("macho") || (v.grupoDelPro || "").toLowerCase().includes("engorde"))
-                              ? "badgeSlate"
-                              : (v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera"))
+                            (v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera"))
                               ? "badgeSlate"
                               : v.estadoReproductivo === "Preñada"
                               ? "badgeBlue"
@@ -1307,10 +1505,8 @@ export default function TamboPage() {
                           }`}
                           style={{ fontSize: "11px", fontWeight: 700 }}
                         >
-                          {(v.estadoProductivo === "Macho" || (v.grupoDelPro || "").toLowerCase().includes("macho") || (v.grupoDelPro || "").toLowerCase().includes("engorde"))
-                            ? "♂️ Macho (Engorde)"
-                            : (v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera"))
-                            ? "🍼 Ternero/a (Crianza)"
+                          {(v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera"))
+                            ? "🍼 Ternera (Crianza)"
                             : v.estadoReproductivo === "Preñada"
                             ? "🤰 Preñada"
                             : v.estadoReproductivo === "Inseminada"

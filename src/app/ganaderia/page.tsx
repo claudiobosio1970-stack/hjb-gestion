@@ -770,7 +770,12 @@ export default function GanaderiaPage() {
           {/* TABLA DE TRAZABILIDAD INDIVIDUAL Y CENSO DE TERNEROS POR CARAVANA / RP     */}
           {/* ========================================================================= */}
           {(() => {
-            const animalesFiltrados = animalesRecria.filter((a) => {
+            // EN GANADERÍA SOLO ESTÁN LOS MACHOS (100% MACHOS)
+            const soloMachosRecria = animalesRecria.filter(
+              (a) => a.sexo === "Macho" || (a as any).Sex === 1 || !(a.sexo === "Hembra" || (a as any).Sex === 2)
+            );
+
+            const animalesFiltrados = soloMachosRecria.filter((a) => {
               const cumpleCorral =
                 filtroRecriaCorral === "todos"
                   ? true
@@ -786,12 +791,12 @@ export default function GanaderiaPage() {
             const paginaValida = Math.min(paginaRecria, totalPaginas);
             const animalesPaginados = animalesFiltrados.slice((paginaValida - 1) * porPagina, paginaValida * porPagina);
 
-            const countGuachera = animalesRecria.filter((a) => a.corralId === "guachera").length;
-            const countRm1 = animalesRecria.filter((a) => a.corralId === "rm1").length;
-            const countRm2 = animalesRecria.filter((a) => a.corralId === "rm2").length;
-            const countRm3 = animalesRecria.filter((a) => a.corralId === "rm3").length;
-            const countTerminacion = animalesRecria.filter((a) => a.corralId === "terminacion").length;
-            const countFaena = animalesRecria.filter((a) => a.listoFaena).length;
+            const countGuachera = soloMachosRecria.filter((a) => a.corralId === "guachera").length;
+            const countRm1 = soloMachosRecria.filter((a) => a.corralId === "rm1").length;
+            const countRm2 = soloMachosRecria.filter((a) => a.corralId === "rm2").length;
+            const countRm3 = soloMachosRecria.filter((a) => a.corralId === "rm3").length;
+            const countTerminacion = soloMachosRecria.filter((a) => a.corralId === "terminacion").length;
+            const countFaena = soloMachosRecria.filter((a) => a.listoFaena).length;
 
             return (
               <div
@@ -817,10 +822,10 @@ export default function GanaderiaPage() {
                   <div>
                     <h3 style={{ fontSize: "16px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "8px" }}>
                       <span>🏷️</span>
-                      <span>Trazabilidad Individual de Animales por Caravana / RP ({animalesRecria.length} cabezas)</span>
+                      <span>Trazabilidad Individual de Machos por Caravana / RP ({soloMachosRecria.length} cabezas 100% Machos)</span>
                     </h3>
                     <p className="muted" style={{ fontSize: "12px", margin: "2px 0 0 0" }}>
-                      Trazabilidad individual con cálculo de peso estimativo continuo según días de vida acumulados y curva de ganancia biológica (+0.65 kg/d Guachera, +0.85 RM1, +0.95 RM2, +1.10 RM3, +1.45 Terminación).
+                      Circuito exclusivo de terneros y novillos machos en recría y terminación comercial para frigorífico con curva biológica continua.
                     </p>
                   </div>
 
@@ -1002,7 +1007,12 @@ export default function GanaderiaPage() {
                         return (
                           <tr key={a.rp}>
                             <td>
-                              <strong style={{ fontFamily: "monospace", fontSize: "13.5px" }}>{a.rp}</strong>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <strong style={{ fontFamily: "monospace", fontSize: "13.5px" }}>{a.rp}</strong>
+                                <span className="pill badgeBlue" style={{ fontSize: "10px", fontWeight: 700, padding: "1px 6px" }}>
+                                  ♂️ Macho
+                                </span>
+                              </div>
                               <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{a.origen}</div>
                               {a.grupoDelPro && (
                                 <div style={{ fontSize: "10.5px", color: "#2563eb", fontWeight: 600 }}>

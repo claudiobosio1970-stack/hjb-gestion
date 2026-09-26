@@ -31,6 +31,8 @@ export interface PartoDelPro {
 export interface VacaTamboIndividual {
   rp: string;
   sexo?: "Hembra" | "Macho" | string;
+  corralId?: "guachera_h" | "rh1" | "rh2" | "rh3" | "vq_preniada" | "preparto" | "secas" | "ordenie" | string;
+  nombreCorral?: string;
   estadoProductivo: "En Ordeñe" | "Seca" | "Vaquillona" | "Crianza" | "Macho" | string;
   estadoReproductivo: "Preñada" | "Vacía" | "Inseminada";
   diasLactancia: number; // DEL
@@ -71,6 +73,7 @@ export interface CensoRodeoTambo {
 
 export interface AnimalRecriaIndividual {
   rp: string;
+  sexo?: "Macho" | "Hembra" | string;
   corralId: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
   pesoActualKg: number;
   pesoOficialDelPro?: number; // Peso real extraído desde DeLaval DelPro (balanza / pesaje oficial)
@@ -130,6 +133,162 @@ export function parseDelProGrupoToCorralId(grupoNombre: string): "guachera" | "r
     return "terminacion";
   }
   return null;
+}
+
+// =========================================================================
+// DEFINICIÓN OFICIAL DE CORRALES Y ETAPAS DE HEMBRAS (RODEO TAMBO HJB)
+// =========================================================================
+export type CorralHembraId = "guachera_h" | "rh1" | "rh2" | "rh3" | "vq_preniada" | "preparto" | "secas" | "ordenie";
+
+export interface InfoCorralHembra {
+  id: CorralHembraId;
+  numero: number;
+  nombre: string;
+  nombreCorto: string;
+  icono: string;
+  color: string;
+  pesoObjetivoKg?: number;
+  diasEstimados?: number;
+  descripcion: string;
+}
+
+export const CORRALES_HEMBRAS_DEFINICION: InfoCorralHembra[] = [
+  {
+    id: "guachera_h",
+    numero: 1,
+    nombre: "1- Guachera Hembras (hasta 80kg)",
+    nombreCorto: "Guachera Hembras",
+    icono: "🍼",
+    color: "#3b82f6",
+    pesoObjetivoKg: 80,
+    diasEstimados: 60,
+    descripcion: "Crianza láctea individual de terneras para reposición lechera del tambo hasta el desleche.",
+  },
+  {
+    id: "rh1",
+    numero: 2,
+    nombre: "2- Recría Hembras 1 - RH1 (hasta 115kg)",
+    nombreCorto: "Recría Hembras 1",
+    icono: "🥣",
+    color: "#ec4899",
+    pesoObjetivoKg: 115,
+    diasEstimados: 30,
+    descripcion: "Transición post-desleche a ración sólida y desarrollo ruminal temprano de terneras.",
+  },
+  {
+    id: "rh2",
+    numero: 3,
+    nombre: "3- Recría Hembras 2 - RH2 (hasta 170kg)",
+    nombreCorto: "Recría Hembras 2",
+    icono: "🌽",
+    color: "#8b5cf6",
+    pesoObjetivoKg: 170,
+    diasEstimados: 60,
+    descripcion: "Crecimiento óseo y estructural a corral con ración balanceada y heno de alfalfa.",
+  },
+  {
+    id: "rh3",
+    numero: 4,
+    nombre: "4- Recría 3 / Vaquillonas en Servicio (hasta 350kg)",
+    nombreCorto: "Recría 3 / Vq Servicio",
+    icono: "🌿",
+    color: "#06b6d4",
+    pesoObjetivoKg: 350,
+    diasEstimados: 120,
+    descripcion: "Vaquillonas desarrolladas aptas para inseminación artificial y confirmación de preñez.",
+  },
+  {
+    id: "vq_preniada",
+    numero: 5,
+    nombre: "5- Vaquillonas Preñadas (hasta 480kg)",
+    nombreCorto: "Vaquillonas Preñadas",
+    icono: "🤰",
+    color: "#10b981",
+    pesoObjetivoKg: 480,
+    diasEstimados: 180,
+    descripcion: "Vaquillonas con preñez confirmada en desarrollo gestacional previo al ingreso al preparto.",
+  },
+  {
+    id: "preparto",
+    numero: 6,
+    nombre: "6- Lote Preparto",
+    nombreCorto: "Preparto",
+    icono: "⏳",
+    color: "#f97316",
+    pesoObjetivoKg: 620,
+    diasEstimados: 21,
+    descripcion: "Vacas secas y vaquillonas en los últimos 21 días de gestación con sales aniónicas.",
+  },
+  {
+    id: "secas",
+    numero: 7,
+    nombre: "7- Vacas Secas",
+    nombreCorto: "Vacas Secas",
+    icono: "🍂",
+    color: "#eab308",
+    pesoObjetivoKg: 610,
+    diasEstimados: 60,
+    descripcion: "Período de descanso y regeneración mamaria entre lactancias activas.",
+  },
+  {
+    id: "ordenie",
+    numero: 8,
+    nombre: "8- Vacas en Ordeñe (VO)",
+    nombreCorto: "Vacas en Ordeñe",
+    icono: "🥛",
+    color: "#15803d",
+    pesoObjetivoKg: 580,
+    diasEstimados: 305,
+    descripcion: "Rodeo en ordeño lechero activo (Rodeo de Alta / Punta y Lote General).",
+  },
+];
+
+/**
+ * Determina a qué corral o etapa del Tambo pertenece una hembra según su grupo DelPro, peso y estado.
+ */
+export function determinarCorralHembra(v: {
+  rp?: string;
+  grupoDelPro?: string;
+  estadoProductivo?: string;
+  estadoReproductivo?: string;
+  pesoKg?: number;
+  pesoOficialDelPro?: number;
+  litrosAyer?: number;
+}): InfoCorralHembra {
+  const gr = (v.grupoDelPro || "").toLowerCase();
+  const rpNum = parseInt(String(v.rp || "").replace(/\D/g, ""), 10) || 0;
+  const peso = v.pesoKg || v.pesoOficialDelPro || 0;
+
+  // 1. Crianza / Guachera Hembras
+  if (v.estadoProductivo === "Crianza" || gr.includes("crianza") || gr.includes("guachera") || gr.includes("terner")) {
+    return CORRALES_HEMBRAS_DEFINICION[0];
+  }
+  // 2. Preparto
+  if (gr.includes("preparto")) {
+    return CORRALES_HEMBRAS_DEFINICION[5];
+  }
+  // 3. Vacas Secas
+  if (v.estadoProductivo === "Seca" || gr.includes("seca")) {
+    return CORRALES_HEMBRAS_DEFINICION[6];
+  }
+  // 4. Vaquillonas Preñadas
+  if (gr.includes("preñada") || gr.includes("vq preñ") || (v.estadoProductivo === "Vaquillona" && v.estadoReproductivo === "Preñada")) {
+    return CORRALES_HEMBRAS_DEFINICION[4];
+  }
+  // 5. Vaquillonas en Servicio / RH3
+  if (gr.includes("servicio") || gr.includes("rh3") || gr.includes("recria 3") || (gr.includes("recria hembra") && (peso >= 220 || rpNum >= 4280))) {
+    return CORRALES_HEMBRAS_DEFINICION[3];
+  }
+  // 6. Recría Hembras 2 (RH2)
+  if (gr.includes("rh2") || gr.includes("recria 2") || (gr.includes("recria hembra") && ((peso > 125 && peso < 220) || (rpNum >= 4240 && rpNum < 4280)))) {
+    return CORRALES_HEMBRAS_DEFINICION[2];
+  }
+  // 7. Recría Hembras 1 (RH1)
+  if (gr.includes("rh1") || gr.includes("recria 1") || gr.includes("recria hembra") || v.estadoProductivo === "Vaquillona") {
+    return CORRALES_HEMBRAS_DEFINICION[1];
+  }
+  // 8. En Ordeñe (por defecto para vacas en lactancia)
+  return CORRALES_HEMBRAS_DEFINICION[7];
 }
 
 export interface DelProSyncPayload {
@@ -199,6 +358,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
 
     vacas.push({
       rp: `RP-${rpNum}`,
+      sexo: "Hembra",
+      corralId: "ordenie",
+      nombreCorral: "Vacas en Ordeñe",
       estadoProductivo: "En Ordeñe",
       estadoReproductivo: isPreniada ? "Preñada" : (isInseminada ? "Inseminada" : "Vacía"),
       diasLactancia: del,
@@ -233,6 +395,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
 
     vacas.push({
       rp: `RP-${rpNum}`,
+      sexo: "Hembra",
+      corralId: "ordenie",
+      nombreCorral: "Rodeo de Punta",
       estadoProductivo: "En Ordeñe",
       estadoReproductivo: isPreniada ? "Preñada" : (isInseminada ? "Inseminada" : "Vacía"),
       diasLactancia: del,
@@ -262,6 +427,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
 
     vacas.push({
       rp: `RP-${rpNum}`,
+      sexo: "Hembra",
+      corralId: "preparto",
+      nombreCorral: "Preparto",
       estadoProductivo: "Seca",
       estadoReproductivo: "Preñada",
       diasLactancia: 0,
@@ -292,6 +460,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
 
     vacas.push({
       rp: `RP-${rpNum}`,
+      sexo: "Hembra",
+      corralId: "secas",
+      nombreCorral: "Vacas Secas",
       estadoProductivo: "Seca",
       estadoReproductivo: "Preñada",
       diasLactancia: 0,
@@ -322,6 +493,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
 
     vacas.push({
       rp: `RP-${rpNum}`,
+      sexo: "Hembra",
+      corralId: "vq_preniada",
+      nombreCorral: "Vaquillonas Preñadas",
       estadoProductivo: "Vaquillona",
       estadoReproductivo: "Preñada",
       diasLactancia: 0,
@@ -350,6 +524,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
 
     vacas.push({
       rp: `RP-${rpNum}`,
+      sexo: "Hembra",
+      corralId: "rh3",
+      nombreCorral: "Recría 3 / Vq Servicio",
       estadoProductivo: "Vaquillona",
       estadoReproductivo: isInsem ? "Inseminada" : "Vacía",
       diasLactancia: 0,
@@ -364,16 +541,26 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     });
   }
 
-  // 7. Recría Hembras - 117 cabezas (Grupo 10 DelPro)
+  // 7. Recría Hembras - 117 cabezas (Grupo 10 DelPro distribuido en RH1, RH2 y RH3)
   for (let i = 1; i <= 117; i++) {
     const rpNum = 4200 + i;
 
     const esPesadoDelPro = i % 10 === 0;
-    const pesoOficial = esPesadoDelPro ? Number((180 + ((i * 5) % 170)).toFixed(1)) : undefined;
-    const pesoEst = Number((190 + ((i * 4) % 160)).toFixed(1));
+    const esRH1 = i <= 35;
+    const esRH2 = i > 35 && i <= 77;
+    const corralAsignado: CorralHembraId = esRH1 ? "rh1" : (esRH2 ? "rh2" : "rh3");
+    const nombreCorralAsignado = esRH1 ? "Recría Hembras 1" : (esRH2 ? "Recría Hembras 2" : "Recría 3 / Vq Servicio");
+    const grupoDelProStr = esRH1 ? "Recría Hembras 1 (RH1)" : (esRH2 ? "Recría Hembras 2 (RH2)" : "Recría Hembras 3 (RH3)");
+
+    const basePeso = esRH1 ? 85 + (i * 0.8) : (esRH2 ? 120 + ((i - 35) * 1.1) : 175 + ((i - 77) * 2.2));
+    const pesoOficial = esPesadoDelPro ? Number((basePeso + 2.5).toFixed(1)) : undefined;
+    const pesoEst = Number(basePeso.toFixed(1));
 
     vacas.push({
       rp: `RP-${rpNum}`,
+      sexo: "Hembra",
+      corralId: corralAsignado,
+      nombreCorral: nombreCorralAsignado,
       estadoProductivo: "Vaquillona",
       estadoReproductivo: "Vacía",
       diasLactancia: 0,
@@ -384,7 +571,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       pesoOficialDelPro: pesoOficial,
       fechaPesajeDelPro: esPesadoDelPro ? "18/09/26" : undefined,
       origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
-      grupoDelPro: "Recria Hembras",
+      grupoDelPro: grupoDelProStr,
     });
   }
 
@@ -395,6 +582,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
 
     vacas.push({
       rp: `RP-${rpNum}`,
+      sexo: "Hembra",
+      corralId: "guachera_h",
+      nombreCorral: "Guachera Hembras",
       estadoProductivo: "Crianza",
       estadoReproductivo: "Vacía",
       diasLactancia: 0,
@@ -402,9 +592,8 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       promedio7d: 0,
       partoNumero: 0,
       pesoKg: pesoEst,
-      sexo: "Hembra",
       origenPeso: "estimado_curva",
-      grupoDelPro: "Crianza",
+      grupoDelPro: "Guachera Hembras",
     });
   }
 
@@ -525,13 +714,13 @@ export function calcularPesoEstimativoVida(animal: {
  * según la curva de crecimiento biológico de vida.
  */
 export function resolverPesoAnimal(animal: {
-  corralId?: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion";
+  corralId?: "guachera" | "rm1" | "rm2" | "rm3" | "terminacion" | CorralHembraId | string;
   diasEnCorral?: number;
   pesoActualKg?: number;
   pesoKg?: number;
   pesoOficialDelPro?: number;
   fechaPesajeDelPro?: string;
-  origenPeso?: "delpro_oficial" | "estimado_curva";
+  origenPeso?: "delpro_oficial" | "estimado_curva" | string;
   pesoNacimientoKg?: number;
   diasVida?: number;
 }): {
@@ -544,14 +733,21 @@ export function resolverPesoAnimal(animal: {
   gdpvKgDia: number;
   detalleCalculo: string;
 } {
-  const corralId = animal.corralId || "guachera";
-  const diasCorral = animal.diasEnCorral || 15;
-  const calc = calcularPesoEstimativoVida({
-    corralId,
-    diasEnCorral: diasCorral,
-    pesoNacimientoKg: animal.pesoNacimientoKg,
-    diasVida: animal.diasVida,
-  });
+  const isGanaderiaCorral =
+    animal.corralId === "guachera" ||
+    animal.corralId === "rm1" ||
+    animal.corralId === "rm2" ||
+    animal.corralId === "rm3" ||
+    animal.corralId === "terminacion";
+
+  const calc = isGanaderiaCorral
+    ? calcularPesoEstimativoVida({
+        corralId: animal.corralId as any,
+        diasEnCorral: animal.diasEnCorral || 15,
+        pesoNacimientoKg: animal.pesoNacimientoKg,
+        diasVida: animal.diasVida,
+      })
+    : null;
 
   // REGLA OFICIAL DELPRO: Si existe un peso extraído de DelPro, se toma como OFICIAL y prioritario.
   const tieneDelPro =
@@ -566,15 +762,14 @@ export function resolverPesoAnimal(animal: {
       origenEtiqueta: "Oficial DelPro",
       badgeClase: "badgeGreen",
       icono: "⚖️",
-      diasVida: animal.diasVida || calc.diasVida,
-      gdpvKgDia: calc.gdpvEtapaKgDia,
+      diasVida: animal.diasVida || (calc?.diasVida ?? 0),
+      gdpvKgDia: calc?.gdpvEtapaKgDia ?? 0,
       detalleCalculo: `Balanza oficial DelPro${animal.fechaPesajeDelPro ? ` (${animal.fechaPesajeDelPro})` : ""}`,
     };
   }
 
-  // Si no hay pesaje de DelPro:
-  // Si no tiene corral (vaca adulta de tambo), se toma su peso estándar o estimado
-  if (!animal.corralId) {
+  // Si no es corral de recría/engorde machos, se toma su peso estándar o estimado
+  if (!isGanaderiaCorral || !calc) {
     const pesoEst = animal.pesoKg || animal.pesoActualKg || 580;
     return {
       pesoKg: Number(pesoEst.toFixed(1)),
@@ -582,7 +777,7 @@ export function resolverPesoAnimal(animal: {
       origenEtiqueta: "Estimado",
       badgeClase: "badgeBlue",
       icono: "📈",
-      diasVida: 0,
+      diasVida: animal.diasVida || 0,
       gdpvKgDia: 0,
       detalleCalculo: "Estimación estándar por estado y lote",
     };
@@ -604,12 +799,13 @@ export function resolverPesoAnimal(animal: {
 export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   const animales: AnimalRecriaIndividual[] = [];
 
-  // Guachera: 24 animales (edad 10 a 58 días de vida)
-  for (let i = 1; i <= 24; i++) {
-    const dias = 10 + i * 2;
+  // Guachera: 9 animales machos (los otros terneros de crianza son hembras para reposición tambo)
+  for (let i = 1; i <= 9; i++) {
+    const dias = 12 + i * 4;
     const calc = calcularPesoEstimativoVida({ corralId: "guachera", diasEnCorral: dias });
     animales.push({
-      rp: `RP-${8800 + i}`,
+      rp: `RP-${8810 + i}`,
+      sexo: "Macho",
       corralId: "guachera",
       pesoActualKg: calc.pesoEstimadoKg,
       origenPeso: "estimado_curva",
@@ -617,24 +813,25 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       diasEnCorral: dias,
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
-      origen: "Nacimiento Tambo HJB",
-      grupoDelPro: "Guachera (Lácteo)",
+      origen: "Nacimiento Tambo HJB (Macho)",
+      grupoDelPro: "Guachera Machos",
     });
   }
 
-  // RM1: 22 animales (edad 68 a 108 días de vida)
+  // RM1: 22 animales machos (edad 68 a 108 días de vida)
   for (let i = 1; i <= 22; i++) {
     const dias = 8 + Math.round(i * 1.8);
     const rp = `RP-${8750 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "rm1", diasEnCorral: dias });
 
-    // Ejemplo: animales pesados oficialmente en DelPro
+    // Animales pesados oficialmente en DelPro
     const esPesadoDelPro = i === 5 || i === 10;
     const pesoOficial = esPesadoDelPro ? (i === 5 ? 114.5 : 118.0) : undefined;
     const pesoFinal = pesoOficial || calc.pesoEstimadoKg;
 
     animales.push({
       rp,
+      sexo: "Macho",
       corralId: "rm1",
       pesoActualKg: pesoFinal,
       pesoOficialDelPro: pesoOficial,
@@ -645,11 +842,11 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: esPesadoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "Pase desde Guachera",
-      grupoDelPro: "Recría 1 (RM1)",
+      grupoDelPro: "Recría Machos 1 (RM1)",
     });
   }
 
-  // RM2: 28 animales (edad 115 a 159 días de vida)
+  // RM2: 28 animales machos (edad 115 a 159 días de vida)
   for (let i = 1; i <= 28; i++) {
     const dias = 8 + Math.round(i * 1.6);
     const rp = `RP-${8700 + i}`;
@@ -661,6 +858,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
 
     animales.push({
       rp,
+      sexo: "Macho",
       corralId: "rm2",
       pesoActualKg: pesoFinal,
       pesoOficialDelPro: pesoOficial,
@@ -671,12 +869,12 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: esPesadoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "Pase desde RM1",
-      grupoDelPro: "Recría 2 (RM2)",
+      grupoDelPro: "Recría Machos 2 (RM2)",
     });
   }
 
-  // RM3: 30 animales (edad 170 a 248 días de vida)
-  for (let i = 1; i <= 30; i++) {
+  // RM3: 15 animales machos (edad 170 a 248 días de vida)
+  for (let i = 1; i <= 15; i++) {
     const dias = 10 + Math.round(i * 2.6);
     const rp = `RP-${8650 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "rm3", diasEnCorral: dias });
@@ -687,6 +885,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
 
     animales.push({
       rp,
+      sexo: "Macho",
       corralId: "rm3",
       pesoActualKg: pesoFinal,
       pesoOficialDelPro: pesoOficial,
@@ -697,12 +896,12 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: esPesadoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "Pase desde RM2",
-      grupoDelPro: "Recría 3 (RM3)",
+      grupoDelPro: "Recría Machos 3 (RM3)",
     });
   }
 
-  // Terminación: 26 animales (edad 261 a 346 días de vida, peso 280 a 405 kg)
-  for (let i = 1; i <= 26; i++) {
+  // Terminación: 25 animales machos (edad 261 a 346 días de vida, peso 280 a 405 kg)
+  for (let i = 1; i <= 25; i++) {
     const dias = 10 + Math.round(i * 3.3);
     const rp = `RP-${8600 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "terminacion", diasEnCorral: dias });
@@ -713,6 +912,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
 
     animales.push({
       rp,
+      sexo: "Macho",
       corralId: "terminacion",
       pesoActualKg: pesoFinal,
       pesoOficialDelPro: pesoOficial,
@@ -724,7 +924,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: esPesadoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "Pase desde RM3",
       listoFaena: pesoFinal >= 370,
-      grupoDelPro: "Terminación / Engorde",
+      grupoDelPro: "Terminación Gordos (Machos)",
     });
   }
   return animales;
@@ -758,11 +958,11 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
     },
     hembrasEnReposicionTambo: 195, // 178 vaquillonas + 17 terneras crianza van a reposición del tambo
     machosEnRecriaEngorde: {
-      guachera: 9, // 9 terneros machos de los 26 de Crianza DelPro
+      guachera: 9, // 9 terneros machos en guachera
       rm1: 22,
       rm2: 28,
       rm3: 15,
-      terminacion: 19, // Solo machos van a venta comercial / faena (total 93 machos)
+      terminacion: 25, // Solo machos van a venta comercial / faena (total 99 machos)
     },
     censoRodeoTambo: {
       totalRodeoGeneral: 514,
@@ -1391,7 +1591,9 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
     const vacasVO = Number(kpis.vacasEnOrdenie || parsed.vacasEnOrdeñe || parsed.vacasEnOrdenie) || 0;
     const prom = Number(kpis.litrosPromedioVO || parsed.litrosPromedioVO) || (vacasVO > 0 ? Number((litros / vacasVO).toFixed(2)) : 26.24);
 
-    let animalesRecriaExtraidos: AnimalRecriaIndividual[] = parsed.animalesRecria || [];
+    let animalesRecriaExtraidos: AnimalRecriaIndividual[] = (parsed.animalesRecria || [])
+      .filter((a: any) => a.sexo === "Macho" || a.Sex === 1 || (a.Sex !== 2 && (a.ProductiveStatus === "Male" || (a.grupoDelPro || "").toLowerCase().includes("macho") || (a.grupoDelPro || "").toLowerCase().includes("engorde"))))
+      .map((a: any) => ({ ...a, sexo: "Macho" }));
     let censoExtraido: CensoRodeoTambo | undefined = parsed.censoRodeoTambo;
     let vacasSecasCount = Number(parsed.vacasSecasPreparto) || 0;
 
@@ -1405,25 +1607,27 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
         const numId = item.OfficialRegNo || item.AnimalNumber || item.Vaca || item.Number;
         const rp = String(numId).startsWith("RP-") ? String(numId) : `RP-${numId}`;
         const grNombre = item.NameGroup || item.GroupName || item.GrupoDelPro || "";
-        const corralId = parseDelProGrupoToCorralId(grNombre);
+        const grLower = grNombre.toLowerCase();
 
-        // Determinación de categoría: si es macho (Sex=1) o tiene grupo de recría/engorde
-        const esMachoRecria = item.Sex === 1 || item.ProductiveStatus === "Male" || corralId !== null;
+        // REGLA FUNDAMENTAL DE SEGREGACIÓN HJB:
+        // 1. MACHOS (Sex === 1 ó Male ó grupo Machos/Engorde): 100% EXCLUSIVO GANADERÍA (recriaList)
+        // 2. HEMBRAS (Sex === 2 ó Hembra ó grupo Ordeñe/Secas/Recria Hembras/Vaquillonas): 100% EXCLUSIVO TAMBO (vacasTamboList)
+        const esMacho = item.Sex === 1 || item.Sexo === "Macho" || item.ProductiveStatus === "Male" || (item.Sex !== 2 && (grLower.includes("macho") || grLower.includes("engorde")));
 
-        if (corralId || (esMachoRecria && !grNombre.includes("ordeño") && !grNombre.includes("punta"))) {
-          const corralAsignado = corralId || "guachera";
-          // Animales de Ganadería y Recría / Engorde (Crianza, Recría Machos, Engorde Macho)
+        if (esMacho) {
+          const corralId = parseDelProGrupoToCorralId(grNombre) || "guachera";
           const pesoDelPro = Number(item.PesoBalanza || item.Peso || item.PesoKg || item.pesoActualKg || item.pesoDelPro) || 0;
           const fechaPesaje = item.FechaPesaje || item.Fecha || hoyStr;
           const tienePesoDelPro = pesoDelPro > 0;
 
           const diasEnCorral = Number(item.diasEnCorral) || 15;
-          const calcEstimado = calcularPesoEstimativoVida({ corralId: corralAsignado, diasEnCorral });
+          const calcEstimado = calcularPesoEstimativoVida({ corralId, diasEnCorral });
           const pesoFinal = tienePesoDelPro ? pesoDelPro : calcEstimado.pesoEstimadoKg;
 
           recriaList.push({
             rp,
-            corralId: corralAsignado,
+            sexo: "Macho",
+            corralId,
             pesoActualKg: pesoFinal,
             pesoOficialDelPro: tienePesoDelPro ? pesoDelPro : undefined,
             fechaPesajeDelPro: tienePesoDelPro ? fechaPesaje : undefined,
@@ -1433,41 +1637,43 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
             fechaIngresoCorral: item.FechaIngreso || (item.BirthDate ? String(item.BirthDate).slice(0, 10) : hoyStr),
             gdpvKgDia: calcEstimado.gdpvEtapaKgDia,
             origen: tienePesoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "DeLaval DelPro (PC Tambo)",
-            grupoDelPro: grNombre || "Recría / Engorde",
+            grupoDelPro: grNombre || "Recría Machos",
             listoFaena: pesoFinal >= 370,
           });
-        } else if (
-          item.ProductiveStatus === "InLactation" ||
-          item.ProductiveStatus === "DryOff" ||
-          grNombre.includes("ordeño") ||
-          grNombre.includes("punta") ||
-          grNombre.includes("Secas") ||
-          grNombre.includes("Preparto")
-        ) {
-          // Vacas de Tambo (Ordeñe y Secas)
-          const isSeca = item.ProductiveStatus === "DryOff" || grNombre.includes("Secas") || grNombre.includes("Preparto");
-          const isOrdenie = !isSeca;
+        } else {
+          // ES HEMBRA -> Va exclusivamente al Tambo
+          const isSeca = item.ProductiveStatus === "DryOff" || grLower.includes("seca") || grLower.includes("preparto");
+          const isCrianza = item.ProductiveStatus === "Calf" || grLower.includes("crianza") || grLower.includes("guachera") || grLower.includes("terner");
+          const isVaquillona = item.ProductiveStatus === "Heifer" || grLower.includes("recria") || grLower.includes("vaquillona") || grLower.includes("vq");
+          const isOrdenie = !isSeca && !isCrianza && !isVaquillona;
+
           const pesoDelPro = Number(item.PesoBalanza || item.Peso || item.PesoKg || item.pesoActualKg || item.pesoDelPro) || 0;
           const fechaPesaje = item.FechaPesaje || item.Fecha;
           const tienePesoDelPro = pesoDelPro > 0;
 
           // Estado reproductivo oficial DelPro
-          let reproEstado: "Preñada" | "Vacía" | "Inseminada" = "Preñada";
+          let reproEstado: "Preñada" | "Vacía" | "Inseminada" = "Vacía";
           if (item.IsPregnant === 1 || item.IsPregnant === true || item.BreedingState === 6) {
             reproEstado = "Preñada";
           } else if (item.IsInseminated === 1 || item.IsInseminated === true || item.BreedingState === 5) {
             reproEstado = "Inseminada";
           } else if (item.BreedingState === 4 || item.IsPregnant === 0 || item.IsPregnant === false) {
             reproEstado = "Vacía";
+          } else if (isOrdenie) {
+            reproEstado = "Preñada";
           }
 
-          // Días a parto o fecha esperada
+          let estProd: "En Ordeñe" | "Seca" | "Vaquillona" | "Crianza" = "En Ordeñe";
+          if (isCrianza) estProd = "Crianza";
+          else if (isVaquillona) estProd = "Vaquillona";
+          else if (isSeca) estProd = "Seca";
+          else estProd = "En Ordeñe";
+
           const daysToCalving = item.DaysToCalving !== undefined && item.DaysToCalving !== null ? Number(item.DaysToCalving) : undefined;
           const expectedCalvingStr = item.ExpectedCalving
             ? (item.ExpectedCalving instanceof Date ? item.ExpectedCalving.toLocaleDateString("es-AR") : String(item.ExpectedCalving).slice(0, 10))
             : undefined;
 
-          // Días a secado o fecha esperada
           const daysToDryOff = item.DaysToDryOff !== undefined && item.DaysToDryOff !== null ? Number(item.DaysToDryOff) : undefined;
           const expectedDryOffStr = item.DateExpectedDryOff
             ? (item.DateExpectedDryOff instanceof Date ? item.DateExpectedDryOff.toLocaleDateString("es-AR") : String(item.DateExpectedDryOff).slice(0, 10))
@@ -1475,9 +1681,10 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
 
           const diasGestacion = daysToCalving !== undefined ? Math.max(0, 282 - daysToCalving) : (item.diasGestacion || undefined);
 
-          vacasTamboList.push({
+          const vacaObj: VacaTamboIndividual = {
             rp,
-            estadoProductivo: isOrdenie ? "En Ordeñe" : "Seca",
+            sexo: "Hembra",
+            estadoProductivo: estProd,
             estadoReproductivo: reproEstado,
             diasLactancia: Number(item.DIM || item.DiasEnLeche) || (isOrdenie ? 120 : 0),
             diasGestacion,
@@ -1491,13 +1698,19 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
             scc: item.SCC ? Number(item.SCC) : undefined,
             grasaPct: item.Fat ? Number(item.Fat) : undefined,
             proteinaPct: item.Protein ? Number(item.Protein) : undefined,
-            partoNumero: item.LactationNumber ? Number(item.LactationNumber) : undefined,
-            pesoKg: tienePesoDelPro ? pesoDelPro : (isOrdenie ? 580 : 610),
+            partoNumero: item.LactationNumber ? Number(item.LactationNumber) : (isOrdenie ? 2 : 0),
+            pesoKg: tienePesoDelPro ? pesoDelPro : (isOrdenie ? 580 : isSeca ? 610 : isCrianza ? 55 : 320),
             pesoOficialDelPro: tienePesoDelPro ? pesoDelPro : undefined,
             fechaPesajeDelPro: tienePesoDelPro ? fechaPesaje : undefined,
             origenPeso: tienePesoDelPro ? "delpro_oficial" : "estimado_curva",
-            grupoDelPro: grNombre || (isOrdenie ? "Vacas en ordeño" : "Vacas Secas"),
-          });
+            grupoDelPro: grNombre || (isOrdenie ? "Vacas en ordeño" : isSeca ? "Vacas Secas" : isCrianza ? "Guachera Hembras" : "Recría Hembras"),
+          };
+
+          const infoCorral = determinarCorralHembra(vacaObj);
+          vacaObj.corralId = infoCorral.id;
+          vacaObj.nombreCorral = infoCorral.nombreCorto;
+
+          vacasTamboList.push(vacaObj);
         }
       }
 
@@ -1505,19 +1718,17 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
         animalesRecriaExtraidos = recriaList;
       }
 
-      const secasCalc = vacasTamboList.filter(v => v.estadoProductivo === "Seca").length ||
-        parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").includes("Secas") || (r.GrupoDelPro || r.NameGroup || "").includes("Preparto")).length;
+      const secasCalc = vacasTamboList.filter(v => v.estadoProductivo === "Seca").length;
       if (secasCalc > 0) vacasSecasCount = secasCalc;
 
-      const vqReposicion = parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").includes("Recria Hembras") || (r.GrupoDelPro || r.NameGroup || "").includes("Vq") || r.ProductiveStatus === "Heifer").length;
-      const vqPren = parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").includes("Vq Preñada")).length;
+      const vqReposicion = vacasTamboList.filter(v => v.estadoProductivo === "Vaquillona").length;
+      const vqPren = vacasTamboList.filter(v => v.estadoProductivo === "Vaquillona" && v.estadoReproductivo === "Preñada").length;
+      const ternerasH = vacasTamboList.filter(v => v.estadoProductivo === "Crianza").length;
+      const novillosMachos = recriaList.filter(a => a.corralId !== "guachera").length;
+      const ternerosGuacheraMachos = recriaList.filter(a => a.corralId === "guachera").length;
 
-      const preñadasCount = vacasTamboList.length > 0
-        ? vacasTamboList.filter(v => v.estadoReproductivo === "Preñada").length
-        : Math.round((vacasVO + vacasSecasCount) * 0.72);
-      const vaciasCount = vacasTamboList.length > 0
-        ? vacasTamboList.filter(v => v.estadoReproductivo === "Vacía").length
-        : Math.round((vacasVO + vacasSecasCount) * 0.28);
+      const preñadasCount = vacasTamboList.filter(v => v.estadoReproductivo === "Preñada").length;
+      const vaciasCount = vacasTamboList.filter(v => v.estadoReproductivo === "Vacía").length;
 
       censoExtraido = {
         totalRodeoGeneral: parsed.rodeoCompleto.length,
@@ -1528,8 +1739,10 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
         vacasVacias: vaciasCount,
         vaquillonasReposicion: vqReposicion || 178,
         vaquillonasPreniadas: vqPren || 31,
-        ternerosCrianza: parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").toLowerCase().includes("crianza")).length || 26,
-        novillosRecriaEngorde: parsed.rodeoCompleto.filter((r: any) => (r.GrupoDelPro || r.NameGroup || "").toLowerCase().includes("macho") || (r.GrupoDelPro || r.NameGroup || "").toLowerCase().includes("engorde")).length || 84,
+        ternerosCrianza: (ternerasH + ternerosGuacheraMachos) || 26,
+        ternerasCrianzaHembras: ternerasH || 17,
+        ternerosCrianzaMachos: ternerosGuacheraMachos || 9,
+        novillosRecriaEngorde: novillosMachos || 84,
         detalleVacas: vacasTamboList.length > 0 ? vacasTamboList : undefined,
       };
     }

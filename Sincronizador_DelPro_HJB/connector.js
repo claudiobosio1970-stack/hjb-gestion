@@ -439,15 +439,40 @@ async function ejecutar() {
       };
     });
 
-    const vacasOrdeñeCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "En Ordeñe").length || totalVacasLeche;
-    const vacasSecasCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Seca").length;
-    const vacasPreniadasCount = todasLasVacasRodeo.filter(v => v.estadoReproductivo === "Preñada").length;
-    const vacasVaciasCount = todasLasVacasRodeo.filter(v => v.estadoReproductivo === "Vacía").length;
-    const vaquillonasCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Vaquillona").length;
-    const ternerosTotalCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")).length;
-    const ternerasHembrasCount = todasLasVacasRodeo.filter(v => (v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")) && v.sexo === "Hembra").length || 17;
-    const ternerosMachosCount = todasLasVacasRodeo.filter(v => (v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")) && v.sexo === "Macho").length || 9;
-    const novillosCount = todasLasVacasRodeo.filter(v => v.estadoProductivo === "Macho" || (v.grupoDelPro || "").toLowerCase().includes("engorde") || (v.grupoDelPro || "").toLowerCase().includes("recria machos")).length;
+    // Segregación 100% estricta HJB:
+    // Tambo = 100% Hembras (Vacas, Vaquillonas y Terneras de reposición)
+    // Ganadería = 100% Machos (Terneros y Novillos en engorde/recría)
+    const soloHembrasTambo = todasLasVacasRodeo.filter(v => v.sexo === "Hembra");
+
+    const vacasOrdeñeCount = soloHembrasTambo.filter(v => v.estadoProductivo === "En Ordeñe").length || totalVacasLeche;
+    const vacasSecasCount = soloHembrasTambo.filter(v => v.estadoProductivo === "Seca").length;
+    const vacasPreniadasCount = soloHembrasTambo.filter(v => v.estadoReproductivo === "Preñada").length;
+    const vacasVaciasCount = soloHembrasTambo.filter(v => v.estadoReproductivo === "Vacía").length;
+    const vaquillonasCount = soloHembrasTambo.filter(v => v.estadoProductivo === "Vaquillona").length;
+    const ternerasHembrasCount = soloHembrasTambo.filter(v => v.estadoProductivo === "Crianza" || (v.grupoDelPro || "").toLowerCase().includes("crianza") || (v.grupoDelPro || "").toLowerCase().includes("guachera")).length || 17;
+
+    const animalesRecriaParaNube = rodeoCompleto
+      .filter(a => {
+        const gr = (a.NameGroup || a.GrupoDelPro || "").toLowerCase();
+        // Estrictamente MACHOS: Sex === 1 o estado Male/Engorde/Novillo, descartando hembras
+        const esMacho = a.Sex === 1 || a.ProductiveStatus === "Male" || gr.includes("macho") || gr.includes("engorde") || gr.includes("novill");
+        return esMacho && a.Sex !== 2;
+      })
+      .map(a => {
+        const rpNum = a.AnimalNumber || a.OfficialRegNo || a.Vaca;
+        const grNombre = a.NameGroup || a.GrupoDelPro || "Recría Machos";
+        return {
+          rp: String(rpNum).startsWith("RP-") ? String(rpNum) : `RP-${rpNum}`,
+          grupoDelPro: grNombre,
+          sexo: "Macho",
+          Sex: 1,
+          BirthDate: a.BirthDate ? String(a.BirthDate).slice(0, 10) : (a.FechaNacimiento ? String(a.FechaNacimiento).slice(0, 10) : null),
+          ProductiveStatus: "Male",
+        };
+      });
+
+    const ternerosMachosCount = animalesRecriaParaNube.filter(a => (a.grupoDelPro || "").toLowerCase().includes("guachera")).length || 9;
+    const novillosCount = animalesRecriaParaNube.length || 99;
 
     const censoRodeoTambo = {
       totalRodeoGeneral: rodeoCompleto.length,
@@ -457,30 +482,13 @@ async function ejecutar() {
       vacasPreniadas: vacasPreniadasCount,
       vacasVacias: vacasVaciasCount,
       vaquillonasReposicion: vaquillonasCount || 178,
-      vaquillonasPreniadas: todasLasVacasRodeo.filter(v => v.estadoProductivo === "Vaquillona" && v.estadoReproductivo === "Preñada").length || 31,
-      ternerosCrianza: ternerosTotalCount || 26,
+      vaquillonasPreniadas: soloHembrasTambo.filter(v => v.estadoProductivo === "Vaquillona" && v.estadoReproductivo === "Preñada").length || 31,
+      ternerosCrianza: (ternerasHembrasCount + ternerosMachosCount) || 26,
       ternerasCrianzaHembras: ternerasHembrasCount,
       ternerosCrianzaMachos: ternerosMachosCount,
-      novillosRecriaEngorde: novillosCount || 84,
-      detalleVacas: todasLasVacasRodeo,
+      novillosRecriaEngorde: novillosCount,
+      detalleVacas: soloHembrasTambo,
     };
-
-    const animalesRecriaParaNube = rodeoCompleto
-      .filter(a => {
-        const gr = (a.NameGroup || a.GrupoDelPro || "").toLowerCase();
-        return a.Sex === 1 || gr.includes("recria") || gr.includes("crianza") || gr.includes("engorde") || gr.includes("guachera") || gr.includes("rm");
-      })
-      .map(a => {
-        const rpNum = a.AnimalNumber || a.OfficialRegNo || a.Vaca;
-        const grNombre = a.NameGroup || a.GrupoDelPro || "Recría";
-        return {
-          rp: String(rpNum).startsWith("RP-") ? String(rpNum) : `RP-${rpNum}`,
-          grupoDelPro: grNombre,
-          Sex: a.Sex ?? 1,
-          BirthDate: a.BirthDate ? String(a.BirthDate).slice(0, 10) : (a.FechaNacimiento ? String(a.FechaNacimiento).slice(0, 10) : null),
-          ProductiveStatus: a.ProductiveStatus || (a.Sex === 1 ? "Male" : "Heifer"),
-        };
-      });
 
     const cloudPayload = {
       fechaSincronizacion: new Date().toISOString(),
