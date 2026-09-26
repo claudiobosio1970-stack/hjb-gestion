@@ -38,6 +38,8 @@ import {
   calcularPesoEstimativoVida,
   resolverPesoAnimal,
 } from "@/lib/delproData";
+import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
+import { ResultadoVentaHacienda, getVentasHacienda } from "@/lib/ventasHaciendaData";
 
 export default function GanaderiaPage() {
   const [activeTab, setActiveTab] = useState<"corrales" | "dietas" | "pesajes" | "ventas" | "partos_delpro">("corrales");
@@ -55,6 +57,9 @@ export default function GanaderiaPage() {
   const [busquedaAnimalModal, setBusquedaAnimalModal] = useState<string>("");
   const [mostrarHistorialTraspasos, setMostrarHistorialTraspasos] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // Modal de Venta con Foto de Remito
+  const [modalVentaRemitoOpen, setModalVentaRemitoOpen] = useState(false);
 
   // Ficha Técnica Dedicada del Corral (Modal Enfocado)
   const [modalFichaCorralId, setModalFichaCorralId] = useState<EtapaCorralId | null>(null);
@@ -361,6 +366,19 @@ export default function GanaderiaPage() {
     triggerFeedback(`¡Venta registrada con éxito! Despachadas ${cabezas} cabezas.`);
   }
 
+  // Handler Venta con Foto de Remito (Inteligente / Multisección)
+  function handleVentaRemitoCompletada(resultado: ResultadoVentaHacienda) {
+    setTropas(getTropas());
+    setVentas(getVentas());
+    setAnimalesRecria(getAnimalesRecria());
+    setDelproConfig(getDelProConfig());
+    triggerFeedback(resultado.mensaje);
+    if (resultado.venta) {
+      const ficha = getVentas().find((v) => v.remitoDte === resultado.venta.remitoDte) || getVentas()[0];
+      if (ficha) setModalFichaVenta(ficha);
+    }
+  }
+
   // Handler Nueva Camada Guachera
   function handleNuevaGuachera() {
     const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -461,6 +479,20 @@ export default function GanaderiaPage() {
           <button
             type="button"
             className="primaryButton"
+            onClick={() => setModalVentaRemitoOpen(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              background: "#166534",
+              borderColor: "#166534",
+            }}
+          >
+            📸 Registrar Venta (Foto Remito)
+          </button>
+          <button
+            type="button"
+            className="secondaryBtn"
             onClick={() => {
               const tropaGordos = tropas.find((t) => t.corralId === "terminacion") || tropas[0];
               if (tropaGordos) {
@@ -478,7 +510,7 @@ export default function GanaderiaPage() {
             }}
             style={{ display: "flex", alignItems: "center", gap: "6px" }}
           >
-            🚛 + Registrar Venta
+            🚛 + Venta Manual
           </button>
         </div>
       </div>
@@ -1412,27 +1444,43 @@ export default function GanaderiaPage() {
                 Registro comercial con aplicación de desbaste (7%), liquidación de kilos netos y cálculo de ganancia neta.
               </p>
             </div>
-            <button
-              type="button"
-              className="primaryButton"
-              onClick={() => {
-                const tropaGordos = tropas.find((t) => t.corralId === "terminacion") || tropas[0];
-                if (tropaGordos) {
-                  setFormVenta({
-                    tropaId: tropaGordos.id,
-                    frigorifico: "Frigorífico Logros S.A.",
-                    remitoDte: "",
-                    cabezas: tropaGordos.cabezas,
-                    pesoBrutoTotal: Math.round(tropaGordos.cabezas * tropaGordos.pesoActualKg),
-                    precioKg: 4200,
-                    otrosGastos: 950000,
-                  });
-                }
-                setModalNuevaVentaOpen(true);
-              }}
-            >
-              ➕ Registrar Venta a Frigorífico
-            </button>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="primaryButton"
+                onClick={() => setModalVentaRemitoOpen(true)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: "#166534",
+                  borderColor: "#166534",
+                }}
+              >
+                📸 Registrar Venta con Foto Remito / IA
+              </button>
+              <button
+                type="button"
+                className="secondaryBtn"
+                onClick={() => {
+                  const tropaGordos = tropas.find((t) => t.corralId === "terminacion") || tropas[0];
+                  if (tropaGordos) {
+                    setFormVenta({
+                      tropaId: tropaGordos.id,
+                      frigorifico: "Frigorífico Logros S.A.",
+                      remitoDte: "",
+                      cabezas: tropaGordos.cabezas,
+                      pesoBrutoTotal: Math.round(tropaGordos.cabezas * tropaGordos.pesoActualKg),
+                      precioKg: 4200,
+                      otrosGastos: 950000,
+                    });
+                  }
+                  setModalNuevaVentaOpen(true);
+                }}
+              >
+                ➕ Venta Manual
+              </button>
+            </div>
           </div>
 
           <div className="tableWrap">
@@ -2415,6 +2463,25 @@ export default function GanaderiaPage() {
               </div>
             </div>
 
+            {/* Foto del Remito Escaneado si existe */}
+            {(() => {
+              const ventaRemito = getVentasHacienda().find((vr) => vr.remitoDte === modalFichaVenta.remitoDte);
+              if (!ventaRemito?.remitoFotoUrl) return null;
+              return (
+                <div style={{ marginBottom: "20px", padding: "12px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#1e293b", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>📸</span> Foto del Remito / DTe Oficial:
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={ventaRemito.remitoFotoUrl}
+                    alt="Foto del remito"
+                    style={{ maxWidth: "100%", maxHeight: "240px", objectFit: "contain", borderRadius: "6px", border: "1px solid #94a3b8", display: "block" }}
+                  />
+                </div>
+              );
+            })()}
+
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
               <button
                 type="button"
@@ -2464,7 +2531,28 @@ export default function GanaderiaPage() {
               boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)",
             }}
           >
-            <h2 style={{ fontSize: "18px", margin: "0 0 14px 0" }}>🚛 Registrar Venta a Frigorífico</h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <h2 style={{ fontSize: "18px", margin: 0 }}>🚛 Registrar Venta a Frigorífico</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalNuevaVentaOpen(false);
+                  setModalVentaRemitoOpen(true);
+                }}
+                style={{
+                  fontSize: "11.5px",
+                  fontWeight: 700,
+                  color: "#166534",
+                  background: "#dcfce7",
+                  border: "1px solid #86efac",
+                  padding: "4px 8px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                📸 Cargar con Foto Remito
+              </button>
+            </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
               <div>
@@ -2874,6 +2962,14 @@ export default function GanaderiaPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Inteligente de Venta con Foto de Remito */}
+      <ModalRegistrarVentaRemito
+        isOpen={modalVentaRemitoOpen}
+        onClose={() => setModalVentaRemitoOpen(false)}
+        onVentaCompletada={handleVentaRemitoCompletada}
+        seccionInicial="ganaderia"
+      />
     </AppShell>
   );
 }

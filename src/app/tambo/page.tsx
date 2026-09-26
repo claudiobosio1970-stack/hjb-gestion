@@ -28,6 +28,8 @@ import {
   CorralHembraId,
   determinarCorralHembra,
 } from "@/lib/delproData";
+import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
+import { ResultadoVentaHacienda } from "@/lib/ventasHaciendaData";
 
 function formatearCaravana(rp?: string | null): string {
   if (!rp) return "";
@@ -41,6 +43,15 @@ export default function TamboPage() {
   const [stockData, setStockData] = useState(() => getStockActualInsumos());
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [modalVentaRemitoOpen, setModalVentaRemitoOpen] = useState(false);
+
+  function handleVentaRemitoCompletada(res: ResultadoVentaHacienda) {
+    const nuevoConfig = getDelProConfig();
+    setDelproConfig(nuevoConfig);
+    setCensoRodeo(getCensoRodeoTambo());
+    setFeedback(res.mensaje);
+    setTimeout(() => setFeedback(null), 8000);
+  }
 
   // Filtros individuales e interactivos por columna ("cuadritos")
   const [filtroCaravana, setFiltroCaravana] = useState("");
@@ -404,7 +415,21 @@ export default function TamboPage() {
           <p className="muted">Control lechero, rodeo en ordeñe, formulación de raciones y balance forrajero.</p>
         </div>
 
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="primaryButton"
+            onClick={() => setModalVentaRemitoOpen(true)}
+            style={{
+              background: "#166534",
+              borderColor: "#166534",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            📸 Registrar Venta (Foto Remito)
+          </button>
           <Link
             href="/insumos"
             className="secondaryBtn"
@@ -414,16 +439,18 @@ export default function TamboPage() {
           </Link>
           <button
             type="button"
-            className="primaryButton"
+            className="secondaryBtn"
             onClick={() => handleGuardarDieta()}
             disabled={!hasChanges}
             style={{
-              background: hasChanges ? "#15803d" : "var(--slate-400)",
-              borderColor: hasChanges ? "#15803d" : "var(--slate-400)",
+              background: hasChanges ? "#f0fdf4" : undefined,
+              borderColor: hasChanges ? "#16a34a" : undefined,
+              color: hasChanges ? "#15803d" : undefined,
               opacity: hasChanges ? 1 : 0.7,
               display: "inline-flex",
               alignItems: "center",
               gap: "6px",
+              fontWeight: hasChanges ? 800 : 500,
             }}
           >
             💾 Guardar Dieta {hasChanges && "⚠️"}
@@ -660,6 +687,25 @@ export default function TamboPage() {
               <p className="muted" style={{ fontSize: "12.5px", margin: "4px 0 0 0" }}>
                 Stock exclusivo de hembras del establecimiento: vacas lecheras (ordeñe y secas), vaquillonas de reposición y terneras en guachera. (Los machos se administran en Ganadería).
               </p>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                className="primaryButton"
+                onClick={() => setModalVentaRemitoOpen(true)}
+                style={{
+                  background: "#166534",
+                  borderColor: "#166534",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "12.5px",
+                  padding: "7px 12px",
+                }}
+              >
+                📸 Venta de Vacas / Novillos (Foto Remito)
+              </button>
             </div>
           </div>
 
@@ -2173,6 +2219,14 @@ export default function TamboPage() {
           </div>
         </div>
       </section>
+
+      {/* Modal de Venta de Hacienda con Foto de Remito */}
+      <ModalRegistrarVentaRemito
+        isOpen={modalVentaRemitoOpen}
+        onClose={() => setModalVentaRemitoOpen(false)}
+        onVentaCompletada={handleVentaRemitoCompletada}
+        seccionInicial="tambo"
+      />
     </AppShell>
   );
 }
