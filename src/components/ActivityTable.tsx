@@ -552,7 +552,7 @@ export default function ActivityTable({
 
                               if (isLiq) {
                                 const matchT = obsLower.match(/(\d+(?:\.\d+)?)\s*tanque/i) || (activity.observaciones || "").match(/(\d+(?:\.\d+)?)\s*tanque/i);
-                                const m3T = getLiquidManureAnalysis().m3PorTanque || 11;
+                                const m3T = getLiquidManureAnalysis().m3PorTanque || 12;
                                 let tanques = matchT ? parseFloat(matchT[1]) : 0;
                                 if (!tanques && input.cantidadTotal) {
                                   const prevCapM = obsLower.match(/(?:tanques? de\s*)(\d+(?:\.\d+)?)\s*(?:m³|kl|l)/i);

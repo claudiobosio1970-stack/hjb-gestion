@@ -267,7 +267,7 @@ export default function NewActivityModal({
           } else if (!isL && matchC) {
             setBioCantidadUnidades(Number(matchC[1]));
           } else if (ins.cantidadTotal) {
-            const cap = isL ? (getLiquidManureAnalysis().m3PorTanque || 11) : (getManureAnalysis().toneladasPorCarro || 5);
+            const cap = isL ? (getLiquidManureAnalysis().m3PorTanque || 12) : (getManureAnalysis().toneladasPorCarro || 5);
             setBioCantidadUnidades(Math.round((ins.cantidadTotal / cap) * 10) / 10);
           }
         }
@@ -294,7 +294,7 @@ export default function NewActivityModal({
   const isReal = form.estado === "Realizada";
   const curLiquid = getLiquidManureAnalysis();
   const curSolid = getManureAnalysis();
-  const curM3Tanque = curLiquid.m3PorTanque || 11;
+  const curM3Tanque = curLiquid.m3PorTanque || 12;
   const curTnCarro = curSolid.toneladasPorCarro || 5;
 
   function set<K extends keyof Activity>(key: K, value: Activity[K]) {

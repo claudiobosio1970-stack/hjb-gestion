@@ -167,11 +167,11 @@ export default function SuelosPage() {
   }, [solidoNeto, bioConfig]);
 
   const liquidoNeto = useMemo(() => ({
-    n: Number((m3Tanque * (liquidManure.nitrogenoKgM3 || 1.8)).toFixed(1)),
-    p: Number((m3Tanque * (liquidManure.fosforoKgM3 || 0.6)).toFixed(1)),
-    k: Number((m3Tanque * (liquidManure.potasioKgM3 || 2.2)).toFixed(1)),
-    s: Number((m3Tanque * (liquidManure.azufreKgM3 || 0.2)).toFixed(1)),
-    mo: Math.round(m3Tanque * (liquidManure.materiaOrganicaKgM3 || 15)),
+    n: Number((m3Tanque * (liquidManure.nitrogenoKgM3 || 2.317)).toFixed(1)),
+    p: Number((m3Tanque * (liquidManure.fosforoKgM3 || 1.417)).toFixed(1)),
+    k: Number((m3Tanque * (liquidManure.potasioKgM3 || 1.582)).toFixed(1)),
+    s: Number((m3Tanque * (liquidManure.azufreKgM3 || 1.016)).toFixed(1)),
+    mo: Math.round(m3Tanque * (liquidManure.materiaOrganicaKgM3 || 9.7)),
   }), [m3Tanque, liquidManure]);
 
   const liquidoAno1 = useMemo(() => {
@@ -756,22 +756,49 @@ export default function SuelosPage() {
                 </div>
 
                 <h4 style={{ margin: "0 0 10px", fontSize: "13.5px", color: "var(--slate-700)" }}>Concentración Nutricional por m³ (kL):</h4>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", marginBottom: "16px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", marginBottom: "12px" }}>
                   <div style={{ padding: "8px 10px", background: "#f0fdf4", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
-                    <span style={{ fontSize: "11px", color: "#166534", display: "block" }}>Nitrógeno (N)</span>
+                    <span style={{ fontSize: "11px", color: "#166534", display: "block" }}>Nitrógeno Total (N)</span>
                     <strong style={{ fontSize: "14px", color: "#166534" }}>{liquidManure.nitrogenoKgM3} kg / m³</strong>
+                    <span style={{ fontSize: "10px", color: "#15803d", display: "block" }}>
+                      N-NH₄: {liquidManure.nitrogenoAmoniacalKgM3 ?? 0.85} kg/m³ (36.5% asimilable)
+                    </span>
                   </div>
                   <div style={{ padding: "8px 10px", background: "#eff6ff", borderRadius: "6px", border: "1px solid #bfdbfe" }}>
-                    <span style={{ fontSize: "11px", color: "#1d4ed8", display: "block" }}>Fósforo (P)</span>
+                    <span style={{ fontSize: "11px", color: "#1d4ed8", display: "block" }}>Fósforo Total (P)</span>
                     <strong style={{ fontSize: "14px", color: "#1d4ed8" }}>{liquidManure.fosforoKgM3} kg / m³</strong>
+                    <span style={{ fontSize: "10px", color: "#2563eb", display: "block" }}>
+                      {(liquidManure.fosforoKgM3 * 2.291).toFixed(2)} kg P₂O₅ / m³
+                    </span>
                   </div>
                   <div style={{ padding: "8px 10px", background: "#fef3c7", borderRadius: "6px", border: "1px solid #fde68a" }}>
-                    <span style={{ fontSize: "11px", color: "#92400e", display: "block" }}>Potasio (K)</span>
+                    <span style={{ fontSize: "11px", color: "#92400e", display: "block" }}>Potasio Total (K)</span>
                     <strong style={{ fontSize: "14px", color: "#92400e" }}>{liquidManure.potasioKgM3} kg / m³</strong>
+                    <span style={{ fontSize: "10px", color: "#d97706", display: "block" }}>
+                      {(liquidManure.potasioKgM3 * 1.2046).toFixed(2)} kg K₂O / m³
+                    </span>
                   </div>
-                  <div style={{ padding: "8px 10px", background: "#f8fafc", borderRadius: "6px", border: "1px solid var(--line)" }}>
-                    <span style={{ fontSize: "11px", color: "var(--slate-600)", display: "block" }}>Materia Orgánica (MO)</span>
-                    <strong style={{ fontSize: "14px", color: "var(--slate-800)" }}>{liquidManure.materiaOrganicaKgM3} kg / m³</strong>
+                  <div style={{ padding: "8px 10px", background: "#faf5ff", borderRadius: "6px", border: "1px solid #e9d5ff" }}>
+                    <span style={{ fontSize: "11px", color: "#6b21a8", display: "block" }}>Azufre Total (S)</span>
+                    <strong style={{ fontSize: "14px", color: "#6b21a8" }}>{liquidManure.azufreKgM3} kg / m³</strong>
+                    <span style={{ fontSize: "10px", color: "#7e22ce", display: "block" }}>
+                      Sulfatos (SO₄²⁻): 3.04 kg/m³
+                    </span>
+                  </div>
+                </div>
+
+                {/* Parámetros Físico-Químicos y Secundarios */}
+                <div style={{ padding: "8px 12px", background: "#f8fafc", borderRadius: "8px", border: "1px solid var(--line)", marginBottom: "12px", fontSize: "11px", color: "var(--slate-600)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
+                    <span><strong>Materia Orgánica:</strong> {liquidManure.materiaOrganicaKgM3} kg/m³ (C/N: {liquidManure.relacionCN ?? 2.43})</span>
+                    <span><strong>pH:</strong> {liquidManure.ph} · <strong>CE:</strong> {liquidManure.ceUsCm} µS/cm</span>
+                    <span><strong>Densidad:</strong> {liquidManure.densidadGcm3 ?? 1.06} g/cm³ · <strong>ST:</strong> {liquidManure.solidosTotalesPct ?? 4.5}%</span>
+                  </div>
+                  <div style={{ marginTop: "4px", paddingTop: "4px", borderTop: "1px dashed var(--line)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
+                    <span><strong>Calcio:</strong> {liquidManure.calcioKgM3 ?? 1.06} kg/m³</span>
+                    <span><strong>Magnesio:</strong> {liquidManure.magnesioKgM3 ?? 0.48} kg/m³</span>
+                    <span><strong>Micro:</strong> Fe 578 g, Zn 10.9 g, Mn 25.5 g/m³</span>
+                    <span style={{ color: "#166534" }}><strong>Microbio:</strong> Salmonella Negativa · E. coli 150 NMP/g</span>
                   </div>
                 </div>
 
@@ -791,12 +818,12 @@ export default function SuelosPage() {
                       <strong style={{ fontSize: "13px", color: "#166534" }}>{liquidoAno1.n} kg N</strong>
                     </div>
                     <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
-                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>P (70%)</span>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>P (75%)</span>
                       <strong style={{ fontSize: "13px", color: "#1d4ed8" }}>{liquidoAno1.p} kg P</strong>
                       <span style={{ fontSize: "9.5px", color: "#2563eb", display: "block" }}>{(liquidoAno1.p * 2.291).toFixed(1)} P₂O₅</span>
                     </div>
                     <div style={{ background: "#ffffff", padding: "6px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
-                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>K (80%)</span>
+                      <span style={{ fontSize: "10px", color: "var(--muted)", display: "block" }}>K (95%)</span>
                       <strong style={{ fontSize: "13px", color: "#b45309" }}>{liquidoAno1.k} kg K</strong>
                       <span style={{ fontSize: "9.5px", color: "#d97706", display: "block" }}>{(liquidoAno1.k * 1.2046).toFixed(1)} K₂O</span>
                     </div>
@@ -826,8 +853,8 @@ export default function SuelosPage() {
 
                 {/* Dinámica Líquido Tambo */}
                 <div style={{ background: "var(--slate-50)", border: "1px solid var(--line)", padding: "8px 12px", borderRadius: "6px", fontSize: "11px", color: "var(--slate-600)" }}>
-                  <strong style={{ color: "var(--slate-800)" }}>Curva Efluente Líquido (kg/tanque): </strong>
-                  <span>N: Año 1 (10.9 kg), Año 2 (3 kg), Año 3 (1 kg), &gt;3a (0.4 kg) · P: Año 1 (4.6 kg), Año 2 (1.3 kg), Año 3 (0.7 kg), &gt;3a (0.3 kg).</span>
+                  <strong style={{ color: "var(--slate-800)" }}>Curva Clover E328 Líquido (kg/tanque): </strong>
+                  <span>N: Año 1 ({(liquidoNeto.n * (bioConfig.liquido.n.ano1Pct || 0.55)).toFixed(1)} kg), Año 2 ({(liquidoNeto.n * (bioConfig.liquido.n.ano2Pct || 0.15)).toFixed(1)} kg), Año 3 ({(liquidoNeto.n * (bioConfig.liquido.n.ano3Pct || 0.05)).toFixed(1)} kg) · P: Año 1 ({(liquidoNeto.p * (bioConfig.liquido.p.ano1Pct || 0.75)).toFixed(1)} kg / {((liquidoNeto.p * (bioConfig.liquido.p.ano1Pct || 0.75)) * 2.291).toFixed(1)} P₂O₅), Año 2 ({(liquidoNeto.p * (bioConfig.liquido.p.ano2Pct || 0.15)).toFixed(1)} kg).</span>
                 </div>
               </div>
             </div>
@@ -1159,13 +1186,13 @@ function AnalisisModal({
   const [tnPorCarro, setTnPorCarro] = useState<number | "">(initialData?.toneladasPorCarro ?? 5);
 
   // Estados específicos de Efluente Líquido
-  const [protocoloLiquido, setProtocoloLiquido] = useState<string>(initialData?.protocolo || "LIQ-TAMBO-26");
-  const [nLiquidoKgM3, setNLiquidoKgM3] = useState<number | "">(initialData?.nitrogenoKgM3 ?? 1.8);
-  const [pLiquidoKgM3, setPLiquidoKgM3] = useState<number | "">(initialData?.fosforoKgM3 ?? 0.6);
-  const [kLiquidoKgM3, setKLiquidoKgM3] = useState<number | "">(initialData?.potasioKgM3 ?? 2.2);
-  const [sLiquidoKgM3, setSLiquidoKgM3] = useState<number | "">(initialData?.azufreKgM3 ?? 0.2);
-  const [moLiquidoKgM3, setMoLiquidoKgM3] = useState<number | "">(initialData?.materiaOrganicaKgM3 ?? 15.0);
-  const [m3PorTanque, setM3PorTanque] = useState<number | "">(initialData?.m3PorTanque ?? 11);
+  const [protocoloLiquido, setProtocoloLiquido] = useState<string>(initialData?.protocolo || "E328");
+  const [nLiquidoKgM3, setNLiquidoKgM3] = useState<number | "">(initialData?.nitrogenoKgM3 ?? 2.317);
+  const [pLiquidoKgM3, setPLiquidoKgM3] = useState<number | "">(initialData?.fosforoKgM3 ?? 1.417);
+  const [kLiquidoKgM3, setKLiquidoKgM3] = useState<number | "">(initialData?.potasioKgM3 ?? 1.582);
+  const [sLiquidoKgM3, setSLiquidoKgM3] = useState<number | "">(initialData?.azufreKgM3 ?? 1.016);
+  const [moLiquidoKgM3, setMoLiquidoKgM3] = useState<number | "">(initialData?.materiaOrganicaKgM3 ?? 9.7);
+  const [m3PorTanque, setM3PorTanque] = useState<number | "">(initialData?.m3PorTanque ?? 12);
 
   // Estados específicos de Perfil Hídrico
   const [totalAguaUtilMm, setTotalAguaUtilMm] = useState<number | "">(initialData?.totalAguaUtilMm ?? 280);
@@ -1253,20 +1280,36 @@ function AnalisisModal({
       alert("✓ Protocolo de estiércol sólido actualizado con éxito.");
     } else if (currentType === "manure_liquido") {
       const record: LiquidManureAnalysis = {
-        id: initialData?.id || "liquid-manure-tambo-01",
+        id: initialData?.id || "liquid-manure-clover-e328",
         protocolo: protocoloLiquido,
-        matriz: "Efluente Tambo Líquido (Fosa / Laguna de decantación)",
-        laboratorio: laboratorio || "Clover Laboratorio",
+        matriz: "Efluente Tambo (Líquido) - Abono",
+        laboratorio: laboratorio || "Clover Laboratorio (El Trébol)",
         fecha,
-        nitrogenoKgM3: Number(nLiquidoKgM3) || 1.8,
-        fosforoKgM3: Number(pLiquidoKgM3) || 0.6,
-        potasioKgM3: Number(kLiquidoKgM3) || 2.2,
-        azufreKgM3: Number(sLiquidoKgM3) || 0.2,
-        materiaOrganicaKgM3: Number(moLiquidoKgM3) || 15.0,
-        ph: initialData?.ph || 7.8,
-        ceUsCm: initialData?.ceUsCm || 4500,
-        m3PorTanque: Number(m3PorTanque) || 11,
-        observaciones: observaciones || undefined,
+        nitrogenoKgM3: Number(nLiquidoKgM3) || 2.317,
+        nitrogenoAmoniacalKgM3: initialData?.nitrogenoAmoniacalKgM3 || 0.846,
+        fosforoKgM3: Number(pLiquidoKgM3) || 1.417,
+        potasioKgM3: Number(kLiquidoKgM3) || 1.582,
+        azufreKgM3: Number(sLiquidoKgM3) || 1.016,
+        materiaOrganicaKgM3: Number(moLiquidoKgM3) || 9.7,
+        carbonoOrganicoKgM3: initialData?.carbonoOrganicoKgM3 || 5.624,
+        relacionCN: initialData?.relacionCN || 2.43,
+        ph: initialData?.ph || 7.3,
+        ceUsCm: initialData?.ceUsCm || 9400,
+        nitratosMgL: initialData?.nitratosMgL || 845,
+        sulfatosMgL: initialData?.sulfatosMgL || 3044,
+        calcioKgM3: initialData?.calcioKgM3 || 1.061,
+        magnesioKgM3: initialData?.magnesioKgM3 || 0.478,
+        sodioKgM3: initialData?.sodioKgM3 || 0.662,
+        hierroKgM3: initialData?.hierroKgM3 || 0.578,
+        zincMgL: initialData?.zincMgL || 10.93,
+        boroMgL: initialData?.boroMgL || 5.92,
+        cobreMgL: initialData?.cobreMgL || 2.28,
+        manganesoMgL: initialData?.manganesoMgL || 25.54,
+        eColiNmpG: initialData?.eColiNmpG || 150,
+        coliformesTotalesNmpG: initialData?.coliformesTotalesNmpG || 150,
+        salmonella: initialData?.salmonella || "<1/NMP 4 g (Negativo)",
+        m3PorTanque: Number(m3PorTanque) || 12,
+        observaciones: observaciones || "Protocolo oficial Clover E328 (Dra. Laura Lucía Monti).",
       };
       saveLiquidManureAnalysis(record);
       alert("✓ Protocolo de efluente líquido actualizado con éxito.");

@@ -346,7 +346,7 @@ export default function LotesPanel({
       if (isBio) {
         const curLiquid = getLiquidManureAnalysis();
         const curSolid = getManureAnalysis();
-        const m3Tanque = curLiquid.m3PorTanque || 11;
+        const m3Tanque = curLiquid.m3PorTanque || 12;
         const tnCarro = curSolid.toneladasPorCarro || 5;
 
         act.insumos?.forEach((ins) => {

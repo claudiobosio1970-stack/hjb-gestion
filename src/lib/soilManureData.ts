@@ -85,18 +85,37 @@ export interface ManureAnalysis {
 
 export interface LiquidManureAnalysis {
   id: string;
-  protocolo: string; // "LIQ-01"
-  matriz: string; // "Efluente Tambo - Líquido de laguna/fosa"
-  laboratorio: string;
-  fecha: string;
-  nitrogenoKgM3: number; // 1.8 kg N / m³
-  fosforoKgM3: number;   // 0.6 kg P / m³
-  potasioKgM3: number;   // 2.2 kg K / m³
-  azufreKgM3: number;    // 0.2 kg S / m³
-  materiaOrganicaKgM3: number; // 15 kg MO / m³
-  ph: number;            // 7.8
-  ceUsCm: number;        // 4500 uS/cm
-  m3PorTanque: number;   // 12 m³
+  protocolo: string; // "E328"
+  matriz: string; // "Efluente Tambo (Líquido) - Abono"
+  laboratorio: string; // "Clover Laboratorio (El Trébol)"
+  fecha: string; // "2026-08-31"
+  humedadPct?: number; // 95.50%
+  solidosTotalesPct?: number; // 4.50%
+  densidadGcm3?: number; // 1.06 g/cm³ (1060 kg/m³)
+  nitrogenoKgM3: number; // 2.317 kg N / m³ (2317 mg/L)
+  nitrogenoAmoniacalKgM3?: number; // 0.846 kg / m³ (846 mg/L, 36.5% N asimilable inmediato)
+  fosforoKgM3: number;   // 1.417 kg P / m³ (1417 mg/L = 3.246 kg P2O5 / m³)
+  potasioKgM3: number;   // 1.582 kg K / m³ (1582.4 mg/L = 1.906 kg K2O / m³)
+  azufreKgM3: number;    // 1.016 kg S / m³ (1016 mg/L)
+  materiaOrganicaKgM3: number; // 9.697 kg MO / m³ (9697 mg/L)
+  carbonoOrganicoKgM3?: number; // 5.624 kg C / m³ (5624 mg/L)
+  relacionCN?: number; // 2.43
+  ph: number;            // 7.3
+  ceUsCm: number;        // 9400 uS/cm
+  nitratosMgL?: number;  // 845 mg/L
+  sulfatosMgL?: number;  // 3044 mg/L
+  calcioKgM3?: number;   // 1.061 kg Ca / m³ (1061.40 mg/L)
+  magnesioKgM3?: number; // 0.478 kg Mg / m³ (477.85 mg/L)
+  sodioKgM3?: number;    // 0.662 kg Na / m³ (661.80 mg/L)
+  hierroKgM3?: number;   // 0.578 kg Fe / m³ (577.70 mg/L)
+  zincMgL?: number;      // 10.93 mg/L
+  boroMgL?: number;      // 5.92 mg/L
+  cobreMgL?: number;     // 2.28 mg/L
+  manganesoMgL?: number; // 25.54 mg/L
+  eColiNmpG?: number;    // 150 NMP/g
+  coliformesTotalesNmpG?: number; // 150 NMP/g
+  salmonella?: string;   // "<1/NMP 4 g (Negativo)"
+  m3PorTanque: number;   // 12 m³ (Tanque Estercolero Gergolet Agri 12.000 L)
   observaciones?: string;
 }
 
@@ -150,20 +169,39 @@ export const DEFAULT_MANURE_ANALYSIS: ManureAnalysis = {
 };
 
 export const DEFAULT_LIQUID_MANURE_ANALYSIS: LiquidManureAnalysis = {
-  id: "liquid-manure-tambo-01",
-  protocolo: "LIQ-TAMBO-26",
-  matriz: "Efluente Tambo Líquido (Fosa / Laguna de decantación)",
+  id: "liquid-manure-clover-e328",
+  protocolo: "E328",
+  matriz: "Efluente Tambo (Líquido) - Abono",
   laboratorio: "Clover Laboratorio (El Trébol)",
-  fecha: "2026-08-23",
-  nitrogenoKgM3: 1.8,
-  fosforoKgM3: 0.6,
-  potasioKgM3: 2.2,
-  azufreKgM3: 0.2,
-  materiaOrganicaKgM3: 15.0,
-  ph: 7.8,
-  ceUsCm: 4500,
-  m3PorTanque: 11,
-  observaciones: "Muestreo representativo de fosa de efluentes líquidos previa homogenización. Calibración operativa de tanque a 11.000 L (11 m³).",
+  fecha: "2026-08-31",
+  humedadPct: 95.50,
+  solidosTotalesPct: 4.50,
+  densidadGcm3: 1.06,
+  nitrogenoKgM3: 2.317,
+  nitrogenoAmoniacalKgM3: 0.846,
+  fosforoKgM3: 1.417,
+  potasioKgM3: 1.582,
+  azufreKgM3: 1.016,
+  materiaOrganicaKgM3: 9.7,
+  carbonoOrganicoKgM3: 5.624,
+  relacionCN: 2.43,
+  ph: 7.3,
+  ceUsCm: 9400,
+  nitratosMgL: 845,
+  sulfatosMgL: 3044,
+  calcioKgM3: 1.061,
+  magnesioKgM3: 0.478,
+  sodioKgM3: 0.662,
+  hierroKgM3: 0.578,
+  zincMgL: 10.93,
+  boroMgL: 5.92,
+  cobreMgL: 2.28,
+  manganesoMgL: 25.54,
+  eColiNmpG: 150,
+  coliformesTotalesNmpG: 150,
+  salmonella: "<1/NMP 4 g (Negativo)",
+  m3PorTanque: 12,
+  observaciones: "Informe oficial Protocolo E328 de Clover Laboratorio (Dra. Laura Lucía Monti). Efluente para biofertilización con Tanque Estercolero 12.000 L Gergolet Agri.",
 };
 
 export interface NutrientReleaseCurve {
@@ -183,7 +221,7 @@ export interface ManureBioavailabilityConfig {
     s: NutrientReleaseCurve;
   };
   liquido: {
-    protocolo: string; // "Purín Tambo"
+    protocolo: string; // "Clover E328"
     n: NutrientReleaseCurve;
     p: NutrientReleaseCurve;
     k: NutrientReleaseCurve;
@@ -224,34 +262,34 @@ export const DEFAULT_BIOAVAILABILITY_CONFIG: ManureBioavailabilityConfig = {
     },
   },
   liquido: {
-    protocolo: "Purín Laguna HJB",
+    protocolo: "Clover E328 (Líquido)",
     n: {
       ano1Pct: 0.55,
       ano2Pct: 0.15,
       ano3Pct: 0.05,
       mas3AnosPct: 0.02,
-      descripcion: "N: rápida disponibilidad amoniacal en solución",
+      descripcion: "N: 36.5% amoniacal soluble inmediato + rápida mineralización (C/N 2.43)",
     },
     p: {
       ano1Pct: 0.75,
       ano2Pct: 0.15,
       ano3Pct: 0.05,
       mas3AnosPct: 0.02,
-      descripcion: "P: alta disponibilidad soluble",
+      descripcion: "P: alta disponibilidad en solución (3.25 kg P₂O₅/m³)",
     },
     k: {
       ano1Pct: 0.95,
       ano2Pct: 0.05,
       ano3Pct: 0.00,
       mas3AnosPct: 0.00,
-      descripcion: "K: disponibilidad inmediata total (ion K⁺ disuelto)",
+      descripcion: "K: disponibilidad inmediata total (1.91 kg K₂O/m³)",
     },
     s: {
       ano1Pct: 0.50,
       ano2Pct: 0.25,
       ano3Pct: 0.10,
       mas3AnosPct: 0.05,
-      descripcion: "S: disponibilidad intermedia en solución",
+      descripcion: "S: alta concentración de sulfatos solubles (1.02 kg S/m³)",
     },
   },
 };
@@ -751,7 +789,18 @@ export function getLiquidManureAnalysis(): LiquidManureAnalysis {
   try {
     const raw = localStorage.getItem(LIQUID_MANURE_STORAGE_KEY);
     if (!raw) return DEFAULT_LIQUID_MANURE_ANALYSIS;
-    return JSON.parse(raw) || DEFAULT_LIQUID_MANURE_ANALYSIS;
+    const parsed = JSON.parse(raw);
+    if (
+      !parsed ||
+      parsed.protocolo === "LIQ-TAMBO-26" ||
+      parsed.protocolo === "LIQ-01" ||
+      !parsed.nitrogenoKgM3 ||
+      parsed.nitrogenoKgM3 === 1.8
+    ) {
+      saveLiquidManureAnalysis(DEFAULT_LIQUID_MANURE_ANALYSIS);
+      return DEFAULT_LIQUID_MANURE_ANALYSIS;
+    }
+    return parsed;
   } catch {
     return DEFAULT_LIQUID_MANURE_ANALYSIS;
   }
@@ -827,7 +876,7 @@ export function recalculateBiofertilizationActivities(
   try {
     const liquid = getLiquidManureAnalysis();
     const solid = getManureAnalysis();
-    const m3Tanque = overrideM3Tanque || liquid.m3PorTanque || 11;
+    const m3Tanque = overrideM3Tanque || liquid.m3PorTanque || 12;
     const tnCarro = overrideTnCarro || solid.toneladasPorCarro || 5;
 
     const activities = agricultureData.listActivities();
@@ -1005,11 +1054,23 @@ export function initSoilFirestoreSync() {
           if (data.manure_analysis && typeof data.manure_analysis === "object") {
             localStorage.setItem(MANURE_STORAGE_KEY, JSON.stringify(data.manure_analysis));
           }
-          if (data.liquid_manure_analysis && typeof data.liquid_manure_analysis === "object") {
+          if (
+            data.liquid_manure_analysis &&
+            typeof data.liquid_manure_analysis === "object" &&
+            data.liquid_manure_analysis.protocolo !== "LIQ-TAMBO-26" &&
+            data.liquid_manure_analysis.protocolo !== "LIQ-01" &&
+            data.liquid_manure_analysis.nitrogenoKgM3 !== 1.8
+          ) {
             localStorage.setItem(LIQUID_MANURE_STORAGE_KEY, JSON.stringify(data.liquid_manure_analysis));
+          } else {
+            localStorage.setItem(LIQUID_MANURE_STORAGE_KEY, JSON.stringify(DEFAULT_LIQUID_MANURE_ANALYSIS));
+            setDoc(docRef, { liquid_manure_analysis: DEFAULT_LIQUID_MANURE_ANALYSIS, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
           }
           if (data.bioavailability_config && typeof data.bioavailability_config === "object") {
             localStorage.setItem(BIOAVAILABILITY_STORAGE_KEY, JSON.stringify(data.bioavailability_config));
+          } else {
+            localStorage.setItem(BIOAVAILABILITY_STORAGE_KEY, JSON.stringify(DEFAULT_BIOAVAILABILITY_CONFIG));
+            setDoc(docRef, { bioavailability_config: DEFAULT_BIOAVAILABILITY_CONFIG, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
           }
           if (Array.isArray(data.other_analyses)) {
             localStorage.setItem(OTHER_ANALYSES_STORAGE_KEY, JSON.stringify(data.other_analyses));
@@ -1218,7 +1279,7 @@ export function computeLoteNutrientSummary(
 
   // 2. Extraer labores de biofertilización (o usar simulación en vivo)
   const tnCarro = Math.max(0.1, manure.toneladasPorCarro || 5);
-  const m3Tanque = Math.max(0.1, liquidManure.m3PorTanque || 11);
+  const m3Tanque = Math.max(0.1, liquidManure.m3PorTanque || 12);
 
   let totalTnSolido = 0;
   let totalM3Liquido = 0;
@@ -1275,10 +1336,10 @@ export function computeLoteNutrientSummary(
   const kBrutoCarro = tnCarro * (manure.potasioTotalPct * 10);
   const sBrutoCarro = tnCarro * (manure.azufreTotalPct * 10);
 
-  const nBrutoTanque = m3Tanque * (liquidManure.nitrogenoKgM3 || 1.8);
-  const pBrutoTanque = m3Tanque * (liquidManure.fosforoKgM3 || 0.6);
-  const kBrutoTanque = m3Tanque * (liquidManure.potasioKgM3 || 2.2);
-  const sBrutoTanque = m3Tanque * (liquidManure.azufreKgM3 || 0.2);
+  const nBrutoTanque = m3Tanque * (liquidManure.nitrogenoKgM3 || 2.317);
+  const pBrutoTanque = m3Tanque * (liquidManure.fosforoKgM3 || 1.417);
+  const kBrutoTanque = m3Tanque * (liquidManure.potasioKgM3 || 1.582);
+  const sBrutoTanque = m3Tanque * (liquidManure.azufreKgM3 || 1.016);
 
   // Esquema unitario de liberación para Carro Sólido
   const aportePorCarroSolido: UnitReleaseSchedule = {
@@ -1380,10 +1441,10 @@ export function computeLoteNutrientSummary(
 
   // Curva de mineralización plurianual acumulada en el lote
   const calcTimeframeValues = (key: "ano1Pct" | "ano2Pct" | "ano3Pct" | "mas3AnosPct"): NutrientTimeframeValues => {
-    const n = ((totalTnSolido * (manure.nitrogenoTotalPct * 10) * bioCfg.solido.n[key]) + (totalM3Liquido * (liquidManure.nitrogenoKgM3 || 1.8) * bioCfg.liquido.n[key])) / sup;
-    const p = ((totalTnSolido * (manure.fosforoTotalPct * 10) * bioCfg.solido.p[key]) + (totalM3Liquido * (liquidManure.fosforoKgM3 || 0.6) * bioCfg.liquido.p[key])) / sup;
-    const k = ((totalTnSolido * (manure.potasioTotalPct * 10) * bioCfg.solido.k[key]) + (totalM3Liquido * (liquidManure.potasioKgM3 || 2.2) * bioCfg.liquido.k[key])) / sup;
-    const s = ((totalTnSolido * (manure.azufreTotalPct * 10) * bioCfg.solido.s[key]) + (totalM3Liquido * (liquidManure.azufreKgM3 || 0.2) * bioCfg.liquido.s[key])) / sup;
+    const n = ((totalTnSolido * (manure.nitrogenoTotalPct * 10) * bioCfg.solido.n[key]) + (totalM3Liquido * (liquidManure.nitrogenoKgM3 || 2.317) * bioCfg.liquido.n[key])) / sup;
+    const p = ((totalTnSolido * (manure.fosforoTotalPct * 10) * bioCfg.solido.p[key]) + (totalM3Liquido * (liquidManure.fosforoKgM3 || 1.417) * bioCfg.liquido.p[key])) / sup;
+    const k = ((totalTnSolido * (manure.potasioTotalPct * 10) * bioCfg.solido.k[key]) + (totalM3Liquido * (liquidManure.potasioKgM3 || 1.582) * bioCfg.liquido.k[key])) / sup;
+    const s = ((totalTnSolido * (manure.azufreTotalPct * 10) * bioCfg.solido.s[key]) + (totalM3Liquido * (liquidManure.azufreKgM3 || 1.016) * bioCfg.liquido.s[key])) / sup;
     return {
       nKgHa: Number(n.toFixed(1)),
       pKgHa: Number(p.toFixed(1)),
@@ -1400,16 +1461,16 @@ export function computeLoteNutrientSummary(
     ano3: calcTimeframeValues("ano3Pct"),
     mas3Anos: calcTimeframeValues("mas3AnosPct"),
     totalBruto: {
-      nKgHa: Number((((totalTnSolido * (manure.nitrogenoTotalPct * 10)) + (totalM3Liquido * (liquidManure.nitrogenoKgM3 || 1.8))) / sup).toFixed(1)),
-      pKgHa: Number((((totalTnSolido * (manure.fosforoTotalPct * 10)) + (totalM3Liquido * (liquidManure.fosforoKgM3 || 0.6))) / sup).toFixed(1)),
-      kKgHa: Number((((totalTnSolido * (manure.potasioTotalPct * 10)) + (totalM3Liquido * (liquidManure.potasioKgM3 || 2.2))) / sup).toFixed(1)),
-      sKgHa: Number((((totalTnSolido * (manure.azufreTotalPct * 10)) + (totalM3Liquido * (liquidManure.azufreKgM3 || 0.2))) / sup).toFixed(1)),
-      p2o5KgHa: Number(((((totalTnSolido * (manure.fosforoTotalPct * 10)) + (totalM3Liquido * (liquidManure.fosforoKgM3 || 0.6))) / sup) * P2O5_FACTOR).toFixed(1)),
-      k2oKgHa: Number(((((totalTnSolido * (manure.potasioTotalPct * 10)) + (totalM3Liquido * (liquidManure.potasioKgM3 || 2.2))) / sup) * K2O_FACTOR).toFixed(1)),
+      nKgHa: Number((((totalTnSolido * (manure.nitrogenoTotalPct * 10)) + (totalM3Liquido * (liquidManure.nitrogenoKgM3 || 2.317))) / sup).toFixed(1)),
+      pKgHa: Number((((totalTnSolido * (manure.fosforoTotalPct * 10)) + (totalM3Liquido * (liquidManure.fosforoKgM3 || 1.417))) / sup).toFixed(1)),
+      kKgHa: Number((((totalTnSolido * (manure.potasioTotalPct * 10)) + (totalM3Liquido * (liquidManure.potasioKgM3 || 1.582))) / sup).toFixed(1)),
+      sKgHa: Number((((totalTnSolido * (manure.azufreTotalPct * 10)) + (totalM3Liquido * (liquidManure.azufreKgM3 || 1.016))) / sup).toFixed(1)),
+      p2o5KgHa: Number(((((totalTnSolido * (manure.fosforoTotalPct * 10)) + (totalM3Liquido * (liquidManure.fosforoKgM3 || 1.417))) / sup) * P2O5_FACTOR).toFixed(1)),
+      k2oKgHa: Number(((((totalTnSolido * (manure.potasioTotalPct * 10)) + (totalM3Liquido * (liquidManure.potasioKgM3 || 1.582))) / sup) * K2O_FACTOR).toFixed(1)),
     },
   };
 
-  const moBruta = (totalTnSolido * (manure.materiaOrganicaPct * 10)) + (totalM3Liquido * (liquidManure.materiaOrganicaKgM3 || 15));
+  const moBruta = (totalTnSolido * (manure.materiaOrganicaPct * 10)) + (totalM3Liquido * (liquidManure.materiaOrganicaKgM3 || 9.7));
   const moTnPorHa = Number((moBruta / 1000 / sup).toFixed(2));
 
   const aportesBrutosPorHa = {

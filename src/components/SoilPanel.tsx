@@ -216,9 +216,9 @@ export default function SoilPanel({
 
   // Parámetros de capacidad y equivalencia agronómica dinámica
   const tnCarro = manure.toneladasPorCarro || 5;
-  const m3Tanque = liquidManure.m3PorTanque || 11;
-  const ratioN = (tnCarro * manure.nitrogenoTotalPct * 10) / Math.max(0.1, m3Tanque * (liquidManure.nitrogenoKgM3 || 1.8));
-  const ratioP = (tnCarro * manure.fosforoTotalPct * 10) / Math.max(0.1, m3Tanque * (liquidManure.fosforoKgM3 || 0.6));
+  const m3Tanque = liquidManure.m3PorTanque || 12;
+  const ratioN = (tnCarro * manure.nitrogenoTotalPct * 10) / Math.max(0.1, m3Tanque * (liquidManure.nitrogenoKgM3 || 2.317));
+  const ratioP = (tnCarro * manure.fosforoTotalPct * 10) / Math.max(0.1, m3Tanque * (liquidManure.fosforoKgM3 || 1.417));
   const equivTanques = ((ratioN + ratioP) / 2).toFixed(1);
 
   // Totales acumulados en todo el campo
