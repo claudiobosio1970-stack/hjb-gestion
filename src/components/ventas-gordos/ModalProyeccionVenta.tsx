@@ -7,6 +7,10 @@ import {
   crearProyeccionVenta,
   pasarVentaATemporal,
   buscarOperacionSimilar,
+  getClientesCompradores,
+  agregarClienteComprador,
+  getFrigorificosDestino,
+  agregarFrigorificoDestino,
   MetodoVentaGordo,
   VentaGordoExpediente,
 } from "@/lib/ventasGordosData";
@@ -26,24 +30,36 @@ export default function ModalProyeccionVenta({
 }: Props) {
   // Lote y Parámetros Generales
   const [fechaEstimada, setFechaEstimada] = useState(() => new Date().toISOString().slice(0, 10));
-  const [clienteNombre, setClienteNombre] = useState("");
-  const [frigorificoDestino, setFrigorificoDestino] = useState("Frigorífico Logros S.A.");
-  const [cantidadCabezas, setCantidadCabezas] = useState<number>(25);
-  const [pesoPromedioCampoKg, setPesoPromedioCampoKg] = useState<number>(405);
+
+  // Clientes con Desplegable + Opción de Agregar Nuevo
+  const [listaClientes, setListaClientes] = useState<string[]>(() => getClientesCompradores());
+  const [clienteNombre, setClienteNombre] = useState<string>(() => listaClientes[0] || "La Tercera S.R.L.");
+  const [modoNuevoCliente, setModoNuevoCliente] = useState(false);
+  const [nuevoClienteNombre, setNuevoClienteNombre] = useState("");
+
+  // Frigoríficos con Desplegable + Opción de Agregar Nuevo
+  const [listaFrigorificos, setListaFrigorificos] = useState<string[]>(() => getFrigorificosDestino());
+  const [frigorificoDestino, setFrigorificoDestino] = useState<string>(() => listaFrigorificos[0] || "Frigorífico Logros S.A.");
+  const [modoNuevoFrigorifico, setModoNuevoFrigorifico] = useState(false);
+  const [nuevoFrigorificoNombre, setNuevoFrigorificoNombre] = useState("");
+
+  // Inputs Numéricos (Estados como string para permitir borrar completamente y tipear libremente ej: 255)
+  const [cantidadCabezasStr, setCantidadCabezasStr] = useState<string>("25");
+  const [pesoPromedioCampoKgStr, setPesoPromedioCampoKgStr] = useState<string>("405");
   const [periodoCosto, setPeriodoCosto] = useState<string>("Sep-2026");
-  const [costoDirectoUnitario, setCostoDirectoUnitario] = useState<number>(794021.98);
-  const [porcentajeCostoIndirecto, setPorcentajeCostoIndirecto] = useState<number>(5.0);
-  const [gastosVentaArs, setGastosVentaArs] = useState<number>(35000); // DT-e, guías, etc.
+  const [costoDirectoUnitarioStr, setCostoDirectoUnitarioStr] = useState<string>("794021.98");
+  const [porcentajeCostoIndirectoStr, setPorcentajeCostoIndirectoStr] = useState<string>("5");
+  const [gastosVentaArsStr, setGastosVentaArsStr] = useState<string>("35000");
   const [observaciones, setObservaciones] = useState("");
 
   // Alternativa A: Kilo Vivo
-  const [precioKgVivoArs, setPrecioKgVivoArs] = useState<number>(4250);
-  const [desbasteKiloVivoPct, setDesbasteKiloVivoPct] = useState<number>(8.0);
+  const [precioKgVivoArsStr, setPrecioKgVivoArsStr] = useState<string>("4250");
+  const [desbasteKiloVivoPctStr, setDesbasteKiloVivoPctStr] = useState<string>("8");
 
   // Alternativa B: A Rendimiento
-  const [precioKgResArs, setPrecioKgResArs] = useState<number>(7600);
-  const [desbasteTrasladoPct, setDesbasteTrasladoPct] = useState<number>(4.0);
-  const [rendimientoEstimadoPct, setRendimientoEstimadoPct] = useState<number>(55.82);
+  const [precioKgResArsStr, setPrecioKgResArsStr] = useState<string>("7600");
+  const [desbasteTrasladoPctStr, setDesbasteTrasladoPctStr] = useState<string>("4");
+  const [rendimientoEstimadoPctStr, setRendimientoEstimadoPctStr] = useState<string>("55.82");
 
   // Decisión Comercial
   const [metodoElegidoManual, setMetodoElegidoManual] = useState<MetodoVentaGordo | null>(null);
@@ -51,6 +67,57 @@ export default function ModalProyeccionVenta({
   // Advertencia de Duplicado
   const [advertenciaDuplicado, setAdvertenciaDuplicado] = useState<VentaGordoExpediente | null>(null);
   const [accionPendienteTrasAdvertencia, setAccionPendienteTrasAdvertencia] = useState<"PROYECCION" | "TEMPORAL" | null>(null);
+
+  // Conversión reactiva a números para cálculos sin trabar el tipeo
+  const cantidadCabezas = useMemo(() => {
+    const val = Number(cantidadCabezasStr);
+    return isNaN(val) ? 0 : val;
+  }, [cantidadCabezasStr]);
+
+  const pesoPromedioCampoKg = useMemo(() => {
+    const val = Number(pesoPromedioCampoKgStr);
+    return isNaN(val) ? 0 : val;
+  }, [pesoPromedioCampoKgStr]);
+
+  const costoDirectoUnitario = useMemo(() => {
+    const val = Number(costoDirectoUnitarioStr);
+    return isNaN(val) ? 0 : val;
+  }, [costoDirectoUnitarioStr]);
+
+  const porcentajeCostoIndirecto = useMemo(() => {
+    const val = Number(porcentajeCostoIndirectoStr);
+    return isNaN(val) ? 0 : val;
+  }, [porcentajeCostoIndirectoStr]);
+
+  const gastosVentaArs = useMemo(() => {
+    const val = Number(gastosVentaArsStr);
+    return isNaN(val) ? 0 : val;
+  }, [gastosVentaArsStr]);
+
+  const precioKgVivoArs = useMemo(() => {
+    const val = Number(precioKgVivoArsStr);
+    return isNaN(val) ? 0 : val;
+  }, [precioKgVivoArsStr]);
+
+  const desbasteKiloVivoPct = useMemo(() => {
+    const val = Number(desbasteKiloVivoPctStr);
+    return isNaN(val) ? 0 : val;
+  }, [desbasteKiloVivoPctStr]);
+
+  const precioKgResArs = useMemo(() => {
+    const val = Number(precioKgResArsStr);
+    return isNaN(val) ? 0 : val;
+  }, [precioKgResArsStr]);
+
+  const desbasteTrasladoPct = useMemo(() => {
+    const val = Number(desbasteTrasladoPctStr);
+    return isNaN(val) ? 0 : val;
+  }, [desbasteTrasladoPctStr]);
+
+  const rendimientoEstimadoPct = useMemo(() => {
+    const val = Number(rendimientoEstimadoPctStr);
+    return isNaN(val) ? 0 : val;
+  }, [rendimientoEstimadoPctStr]);
 
   // Cálculos en tiempo real
   const pesoCampoTotalKg = useMemo(() => {
@@ -91,18 +158,40 @@ export default function ModalProyeccionVenta({
     setPeriodoCosto(periodo);
     const encontrado = COSTOS_HISTORICOS_DEFAULT.find((c) => c.periodo === periodo);
     if (encontrado) {
-      setCostoDirectoUnitario(encontrado.costoDirectoUnitario);
+      setCostoDirectoUnitarioStr(String(encontrado.costoDirectoUnitario));
     }
   }
 
-  // Guardado
+  // Funciones para guardar nuevo Cliente / Comprador
+  function handleGuardarNuevoCliente() {
+    const clean = nuevoClienteNombre.trim();
+    if (!clean) return;
+    const updated = agregarClienteComprador(clean);
+    setListaClientes(updated);
+    setClienteNombre(clean);
+    setNuevoClienteNombre("");
+    setModoNuevoCliente(false);
+  }
+
+  // Funciones para guardar nuevo Frigorífico Destino
+  function handleGuardarNuevoFrigorifico() {
+    const clean = nuevoFrigorificoNombre.trim();
+    if (!clean) return;
+    const updated = agregarFrigorificoDestino(clean);
+    setListaFrigorificos(updated);
+    setFrigorificoDestino(clean);
+    setNuevoFrigorificoNombre("");
+    setModoNuevoFrigorifico(false);
+  }
+
+  // Guardado de la Venta
   function ejecutarGuardado(estadoDestino: "PROYECCION" | "TEMPORAL") {
     if (!clienteNombre.trim()) {
-      alert("Por favor ingrese el nombre del cliente o comprador.");
+      alert("Por favor seleccione o ingrese el cliente o comprador.");
       return;
     }
     if (cantidadCabezas <= 0 || pesoPromedioCampoKg <= 0) {
-      alert("La cantidad de cabezas y peso deben ser mayores a 0.");
+      alert("La cantidad de cabezas y peso promedio deben ser mayores a 0.");
       return;
     }
 
@@ -334,52 +423,233 @@ export default function ModalProyeccionVenta({
               />
             </div>
 
+            {/* Selector Desplegable Cliente / Comprador con opción de Agregar Nuevo */}
             <div>
-              <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Cliente / Comprador *</label>
-              <input
-                type="text"
-                placeholder="ej: La Tercera S.R.L. / Cabaña..."
-                value={clienteNombre}
-                onChange={(e) => setClienteNombre(e.target.value)}
-                style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-              />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Cliente / Comprador *</label>
+                <button
+                  type="button"
+                  onClick={() => setModoNuevoCliente(!modoNuevoCliente)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#2563eb",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  {modoNuevoCliente ? "✕ Elegir de la lista" : "➕ + Agregar nuevo"}
+                </button>
+              </div>
+
+              {!modoNuevoCliente ? (
+                <select
+                  value={clienteNombre}
+                  onChange={(e) => {
+                    if (e.target.value === "__nuevo__") {
+                      setModoNuevoCliente(true);
+                    } else {
+                      setClienteNombre(e.target.value);
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "7px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13px",
+                    backgroundColor: "#ffffff",
+                    fontWeight: 600,
+                    color: "#0f172a",
+                  }}
+                >
+                  <option value="">-- Seleccionar Comprador --</option>
+                  {listaClientes.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  <option value="__nuevo__">➕ + Agregar nuevo comprador...</option>
+                </select>
+              ) : (
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <input
+                    type="text"
+                    placeholder="Nombre del nuevo comprador..."
+                    value={nuevoClienteNombre}
+                    onChange={(e) => setNuevoClienteNombre(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleGuardarNuevoCliente();
+                      }
+                    }}
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      padding: "7px 10px",
+                      borderRadius: "6px",
+                      border: "1.5px solid #2563eb",
+                      fontSize: "13px",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGuardarNuevoCliente}
+                    style={{
+                      backgroundColor: "#2563eb",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: "0 12px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Guardar
+                  </button>
+                </div>
+              )}
             </div>
 
+            {/* Selector Desplegable Frigorífico Destino con opción de Agregar Nuevo */}
             <div>
-              <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Frigorífico Destino</label>
-              <input
-                type="text"
-                placeholder="ej: Frigorífico Logros S.A."
-                value={frigorificoDestino}
-                onChange={(e) => setFrigorificoDestino(e.target.value)}
-                style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-              />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Frigorífico Destino</label>
+                <button
+                  type="button"
+                  onClick={() => setModoNuevoFrigorifico(!modoNuevoFrigorifico)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#2563eb",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  {modoNuevoFrigorifico ? "✕ Elegir de la lista" : "➕ + Agregar nuevo"}
+                </button>
+              </div>
+
+              {!modoNuevoFrigorifico ? (
+                <select
+                  value={frigorificoDestino}
+                  onChange={(e) => {
+                    if (e.target.value === "__nuevo__") {
+                      setModoNuevoFrigorifico(true);
+                    } else {
+                      setFrigorificoDestino(e.target.value);
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "7px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13px",
+                    backgroundColor: "#ffffff",
+                    fontWeight: 600,
+                    color: "#0f172a",
+                  }}
+                >
+                  <option value="">-- Seleccionar Frigorífico --</option>
+                  {listaFrigorificos.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                  <option value="__nuevo__">➕ + Agregar nuevo frigorífico...</option>
+                </select>
+              ) : (
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <input
+                    type="text"
+                    placeholder="Nombre del nuevo frigorífico..."
+                    value={nuevoFrigorificoNombre}
+                    onChange={(e) => setNuevoFrigorificoNombre(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleGuardarNuevoFrigorifico();
+                      }
+                    }}
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      padding: "7px 10px",
+                      borderRadius: "6px",
+                      border: "1.5px solid #2563eb",
+                      fontSize: "13px",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGuardarNuevoFrigorifico}
+                    style={{
+                      backgroundColor: "#2563eb",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: "0 12px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Guardar
+                  </button>
+                </div>
+              )}
             </div>
 
+            {/* Inputs de Cabezas Estimadas y Peso Promedio (Editables libremente) */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Cabezas Estimadas</label>
                 <input
-                  type="number"
-                  min="1"
-                  value={cantidadCabezas}
-                  onChange={(e) => setCantidadCabezas(Math.max(1, Number(e.target.value) || 1))}
-                  style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", fontWeight: 700 }}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="ej: 25 o 255"
+                  value={cantidadCabezasStr}
+                  onChange={(e) => setCantidadCabezasStr(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "7px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                  }}
                 />
               </div>
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Peso Promedio (kg/cab)</label>
                 <input
-                  type="number"
-                  min="200"
-                  step="0.5"
-                  value={pesoPromedioCampoKg}
-                  onChange={(e) => setPesoPromedioCampoKg(Number(e.target.value) || 0)}
-                  style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", fontWeight: 700 }}
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="ej: 405"
+                  value={pesoPromedioCampoKgStr}
+                  onChange={(e) => setPesoPromedioCampoKgStr(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "7px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                  }}
                 />
               </div>
             </div>
 
+            {/* Peso Total Calculado en vivo */}
             <div
               style={{
                 backgroundColor: "#f1f5f9",
@@ -391,9 +661,12 @@ export default function ModalProyeccionVenta({
               }}
             >
               <span style={{ fontSize: "12px", color: "#475569" }}>Peso Total Lote en Campo:</span>
-              <strong style={{ fontSize: "14px", color: "#0f172a" }}>{pesoCampoTotalKg.toLocaleString("es-AR")} kg</strong>
+              <strong style={{ fontSize: "14px", color: "#0f172a" }}>
+                {pesoCampoTotalKg.toLocaleString("es-AR")} kg
+              </strong>
             </div>
 
+            {/* Período de Costo */}
             <div style={{ borderTop: "1px dashed #e2e8f0", paddingTop: "10px" }}>
               <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Período de Costo Productivo</label>
               <select
@@ -413,19 +686,20 @@ export default function ModalProyeccionVenta({
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Costo Directo ($/cab)</label>
                 <input
-                  type="number"
-                  value={costoDirectoUnitario}
-                  onChange={(e) => setCostoDirectoUnitario(Number(e.target.value) || 0)}
+                  type="text"
+                  inputMode="decimal"
+                  value={costoDirectoUnitarioStr}
+                  onChange={(e) => setCostoDirectoUnitarioStr(e.target.value)}
                   style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
                 />
               </div>
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Indirecto (%)</label>
                 <input
-                  type="number"
-                  step="0.5"
-                  value={porcentajeCostoIndirecto}
-                  onChange={(e) => setPorcentajeCostoIndirecto(Number(e.target.value) || 0)}
+                  type="text"
+                  inputMode="decimal"
+                  value={porcentajeCostoIndirectoStr}
+                  onChange={(e) => setPorcentajeCostoIndirectoStr(e.target.value)}
                   style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
                 />
               </div>
@@ -434,9 +708,10 @@ export default function ModalProyeccionVenta({
             <div>
               <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Gastos Directos Venta (DT-e, flete $)</label>
               <input
-                type="number"
-                value={gastosVentaArs}
-                onChange={(e) => setGastosVentaArs(Number(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                value={gastosVentaArsStr}
+                onChange={(e) => setGastosVentaArsStr(e.target.value)}
                 style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
               />
             </div>
@@ -504,11 +779,19 @@ export default function ModalProyeccionVenta({
                     <div>
                       <label style={{ fontSize: "11px", fontWeight: 600, color: "#64748b" }}>Precio $/kg Vivo</label>
                       <input
-                        type="number"
-                        step="10"
-                        value={precioKgVivoArs}
-                        onChange={(e) => setPrecioKgVivoArs(Number(e.target.value) || 0)}
-                        style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700, color: "#1e3a8a" }}
+                        type="text"
+                        inputMode="decimal"
+                        value={precioKgVivoArsStr}
+                        onChange={(e) => setPrecioKgVivoArsStr(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "7px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #cbd5e1",
+                          fontSize: "14px",
+                          fontWeight: 700,
+                          color: "#1e3a8a",
+                        }}
                       />
                     </div>
 
@@ -516,11 +799,18 @@ export default function ModalProyeccionVenta({
                       <label style={{ fontSize: "11px", fontWeight: 600, color: "#64748b" }}>% Desbaste Estimado</label>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <input
-                          type="number"
-                          step="0.5"
-                          value={desbasteKiloVivoPct}
-                          onChange={(e) => setDesbasteKiloVivoPct(Number(e.target.value) || 0)}
-                          style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                          type="text"
+                          inputMode="decimal"
+                          value={desbasteKiloVivoPctStr}
+                          onChange={(e) => setDesbasteKiloVivoPctStr(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            border: "1px solid #cbd5e1",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                          }}
                         />
                         <span style={{ fontSize: "12px", color: "#64748b" }}>%</span>
                       </div>
@@ -627,11 +917,19 @@ export default function ModalProyeccionVenta({
                     <div>
                       <label style={{ fontSize: "11px", fontWeight: 600, color: "#64748b" }}>Precio $/kg de Res</label>
                       <input
-                        type="number"
-                        step="10"
-                        value={precioKgResArs}
-                        onChange={(e) => setPrecioKgResArs(Number(e.target.value) || 0)}
-                        style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700, color: "#14532d" }}
+                        type="text"
+                        inputMode="decimal"
+                        value={precioKgResArsStr}
+                        onChange={(e) => setPrecioKgResArsStr(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "7px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #cbd5e1",
+                          fontSize: "14px",
+                          fontWeight: 700,
+                          color: "#14532d",
+                        }}
                       />
                     </div>
 
@@ -639,22 +937,36 @@ export default function ModalProyeccionVenta({
                       <div>
                         <label style={{ fontSize: "11px", fontWeight: 600, color: "#64748b" }}>% Traslado</label>
                         <input
-                          type="number"
-                          step="0.1"
-                          value={desbasteTrasladoPct}
-                          onChange={(e) => setDesbasteTrasladoPct(Number(e.target.value) || 0)}
-                          style={{ width: "100%", padding: "6px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px" }}
+                          type="text"
+                          inputMode="decimal"
+                          value={desbasteTrasladoPctStr}
+                          onChange={(e) => setDesbasteTrasladoPctStr(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: "6px",
+                            border: "1px solid #cbd5e1",
+                            fontSize: "12.5px",
+                            fontWeight: 600,
+                          }}
                         />
                         <span style={{ fontSize: "10px", color: "#94a3b8" }}>Ref: 4%</span>
                       </div>
                       <div>
                         <label style={{ fontSize: "11px", fontWeight: 600, color: "#64748b" }}>% Rendimiento</label>
                         <input
-                          type="number"
-                          step="0.05"
-                          value={rendimientoEstimadoPct}
-                          onChange={(e) => setRendimientoEstimadoPct(Number(e.target.value) || 0)}
-                          style={{ width: "100%", padding: "6px 8px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12.5px", fontWeight: 700 }}
+                          type="text"
+                          inputMode="decimal"
+                          value={rendimientoEstimadoPctStr}
+                          onChange={(e) => setRendimientoEstimadoPctStr(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: "6px",
+                            border: "1px solid #cbd5e1",
+                            fontSize: "12.5px",
+                            fontWeight: 700,
+                          }}
                         />
                         <span style={{ fontSize: "10px", color: "#94a3b8" }}>Ref: 55,82%</span>
                       </div>

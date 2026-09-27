@@ -5,6 +5,8 @@ import {
   VentaGordoExpediente,
   cerrarVentaADefinitivo,
   calcularLiquidacionRealConDesvios,
+  getFrigorificosDestino,
+  agregarFrigorificoDestino,
 } from "@/lib/ventasGordosData";
 
 interface Props {
@@ -25,42 +27,112 @@ export default function ModalCierreVentaDefinitivo({
   // Datos Reales
   const [fechaReal, setFechaReal] = useState(() => venta.fechaReal || new Date().toISOString().slice(0, 10));
   const [fechaFaena, setFechaFaena] = useState(() => venta.liquidacionReal?.fechaFaena || new Date().toISOString().slice(0, 10));
-  const [cantidadReal, setCantidadReal] = useState<number>(venta.cantidadReal || venta.cantidadEstimada);
-  const [pesoCampoRealKg, setPesoCampoRealKg] = useState<number>(venta.pesoCampoRealKg || venta.pesoCampoEstimadoKg);
-  const [pesoFrigorificoRealKg, setPesoFrigorificoRealKg] = useState<number>(
-    venta.liquidacionReal?.pesoFrigorificoRealKg || Number((venta.pesoCampoEstimadoKg * 0.96).toFixed(1))
+
+  // Estados como String para permitir tipeo libre sin trabas de backspace / 0s
+  const [cantidadRealStr, setCantidadRealStr] = useState<string>(
+    String(venta.cantidadReal || venta.cantidadEstimada || 25)
   );
-  const [kgResReales, setKgResReales] = useState<number>(
-    venta.liquidacionReal?.kgResReales || Number(((venta.pesoCampoEstimadoKg * 0.96) * 0.5582).toFixed(1))
+  const [pesoCampoRealKgStr, setPesoCampoRealKgStr] = useState<string>(
+    String(venta.pesoCampoRealKg || venta.pesoCampoEstimadoKg || 10000)
+  );
+  const [pesoFrigorificoRealKgStr, setPesoFrigorificoRealKgStr] = useState<string>(
+    String(venta.liquidacionReal?.pesoFrigorificoRealKg || Number((venta.pesoCampoEstimadoKg * 0.96).toFixed(1)))
+  );
+  const [kgResRealesStr, setKgResRealesStr] = useState<string>(
+    String(
+      venta.liquidacionReal?.kgResReales || Number((venta.pesoCampoEstimadoKg * 0.96 * 0.5582).toFixed(1))
+    )
   );
 
   const metodoRef = venta.metodoElegido || "RENDIMIENTO";
-  const [precioRealKgResArs, setPrecioRealKgResArs] = useState<number>(
-    venta.liquidacionReal?.precioRealKgResArs || venta.proyeccion.altRendimiento.precioKgResArs
+  const [precioRealKgResArsStr, setPrecioRealKgResArsStr] = useState<string>(
+    String(venta.liquidacionReal?.precioRealKgResArs || venta.proyeccion.altRendimiento.precioKgResArs || 7600)
   );
-  const [precioRealKgVivoArs, setPrecioRealKgVivoArs] = useState<number>(
-    venta.liquidacionReal?.precioRealKgVivoArs || venta.proyeccion.altKiloVivo.precioKgVivoArs
+  const [precioRealKgVivoArsStr, setPrecioRealKgVivoArsStr] = useState<string>(
+    String(venta.liquidacionReal?.precioRealKgVivoArs || venta.proyeccion.altKiloVivo.precioKgVivoArs || 4250)
   );
 
   // Ingreso Bruto Real Liquidado
-  const [ingresoBrutoRealArs, setIngresoBrutoRealArs] = useState<number>(() => {
-    if (venta.liquidacionReal?.ingresoBrutoRealArs) return venta.liquidacionReal.ingresoBrutoRealArs;
-    if (metodoRef === "RENDIMIENTO") {
-      return Number((kgResReales * precioRealKgResArs).toFixed(2));
+  const [ingresoBrutoRealArsStr, setIngresoBrutoRealArsStr] = useState<string>(() => {
+    if (venta.liquidacionReal?.ingresoBrutoRealArs) {
+      return String(venta.liquidacionReal.ingresoBrutoRealArs);
     }
-    return Number((pesoFrigorificoRealKg * precioRealKgVivoArs).toFixed(2));
+    const kgRes = Number(venta.pesoCampoEstimadoKg * 0.96 * 0.5582);
+    const precioRes = Number(venta.proyeccion.altRendimiento.precioKgResArs || 7600);
+    return String(Math.round(kgRes * precioRes));
   });
 
-  const [gastosDirectosRealesArs, setGastosDirectosRealesArs] = useState<number>(
-    venta.liquidacionReal?.gastosDirectosRealesArs || venta.proyeccion.altRendimiento.gastosVentaEstimadosArs || 25000
+  const [gastosDirectosRealesArsStr, setGastosDirectosRealesArsStr] = useState<string>(
+    String(
+      venta.liquidacionReal?.gastosDirectosRealesArs ||
+        venta.proyeccion.altRendimiento.gastosVentaEstimadosArs ||
+        25000
+    )
   );
-  const [frigorificoReal, setFrigorificoReal] = useState(venta.frigorificoDestino || "Frigorífico Logros S.A.");
+
+  // Frigorífico con selector
+  const [listaFrigorificos, setListaFrigorificos] = useState<string[]>(() => getFrigorificosDestino());
+  const [frigorificoReal, setFrigorificoReal] = useState(venta.frigorificoDestino || listaFrigorificos[0] || "Frigorífico Logros S.A.");
+  const [modoNuevoFrigorifico, setModoNuevoFrigorifico] = useState(false);
+  const [nuevoFrigorificoNombre, setNuevoFrigorificoNombre] = useState("");
+
   const [observaciones, setObservaciones] = useState(venta.observaciones || "");
 
-  // Auto-cálculo de ingreso bruto si cambia kg de res o precio
+  // Conversión numérica segura
+  const cantidadReal = useMemo(() => {
+    const v = Number(cantidadRealStr);
+    return isNaN(v) ? 0 : v;
+  }, [cantidadRealStr]);
+
+  const pesoCampoRealKg = useMemo(() => {
+    const v = Number(pesoCampoRealKgStr);
+    return isNaN(v) ? 0 : v;
+  }, [pesoCampoRealKgStr]);
+
+  const pesoFrigorificoRealKg = useMemo(() => {
+    const v = Number(pesoFrigorificoRealKgStr);
+    return isNaN(v) ? 0 : v;
+  }, [pesoFrigorificoRealKgStr]);
+
+  const kgResReales = useMemo(() => {
+    const v = Number(kgResRealesStr);
+    return isNaN(v) ? 0 : v;
+  }, [kgResRealesStr]);
+
+  const precioRealKgResArs = useMemo(() => {
+    const v = Number(precioRealKgResArsStr);
+    return isNaN(v) ? 0 : v;
+  }, [precioRealKgResArsStr]);
+
+  const precioRealKgVivoArs = useMemo(() => {
+    const v = Number(precioRealKgVivoArsStr);
+    return isNaN(v) ? 0 : v;
+  }, [precioRealKgVivoArsStr]);
+
+  const ingresoBrutoRealArs = useMemo(() => {
+    const v = Number(ingresoBrutoRealArsStr);
+    return isNaN(v) ? 0 : v;
+  }, [ingresoBrutoRealArsStr]);
+
+  const gastosDirectosRealesArs = useMemo(() => {
+    const v = Number(gastosDirectosRealesArsStr);
+    return isNaN(v) ? 0 : v;
+  }, [gastosDirectosRealesArsStr]);
+
+  // Auto-cálculo de ingreso bruto según res × precio
   function recalcularIngresoEstimadoSegunRes() {
     const calc = Number((kgResReales * precioRealKgResArs).toFixed(2));
-    setIngresoBrutoRealArs(calc);
+    setIngresoBrutoRealArsStr(String(calc));
+  }
+
+  function handleGuardarNuevoFrigorifico() {
+    const clean = nuevoFrigorificoNombre.trim();
+    if (!clean) return;
+    const updated = agregarFrigorificoDestino(clean);
+    setListaFrigorificos(updated);
+    setFrigorificoReal(clean);
+    setNuevoFrigorificoNombre("");
+    setModoNuevoFrigorifico(false);
   }
 
   // Desvío y liquidación en tiempo real
@@ -258,21 +330,66 @@ export default function ModalCierreVentaDefinitivo({
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Cabezas Reales Faenadas</label>
                 <input
-                  type="number"
-                  min="1"
-                  value={cantidadReal}
-                  onChange={(e) => setCantidadReal(Number(e.target.value) || 1)}
-                  style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", fontWeight: 700 }}
+                  type="text"
+                  inputMode="numeric"
+                  value={cantidadRealStr}
+                  onChange={(e) => setCantidadRealStr(e.target.value)}
+                  style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700 }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Frigorífico Definitivo</label>
-                <input
-                  type="text"
-                  value={frigorificoReal}
-                  onChange={(e) => setFrigorificoReal(e.target.value)}
-                  style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Frigorífico Definitivo</label>
+                  <button
+                    type="button"
+                    onClick={() => setModoNuevoFrigorifico(!modoNuevoFrigorifico)}
+                    style={{ background: "none", border: "none", color: "#2563eb", fontSize: "11px", fontWeight: 700, cursor: "pointer", padding: 0 }}
+                  >
+                    {modoNuevoFrigorifico ? "✕ Lista" : "➕ + Nuevo"}
+                  </button>
+                </div>
+                {!modoNuevoFrigorifico ? (
+                  <select
+                    value={frigorificoReal}
+                    onChange={(e) => {
+                      if (e.target.value === "__nuevo__") {
+                        setModoNuevoFrigorifico(true);
+                      } else {
+                        setFrigorificoReal(e.target.value);
+                      }
+                    }}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", fontWeight: 600 }}
+                  >
+                    {listaFrigorificos.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                    <option value="__nuevo__">➕ + Agregar nuevo frigorífico...</option>
+                  </select>
+                ) : (
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <input
+                      type="text"
+                      placeholder="Nuevo frigorífico..."
+                      value={nuevoFrigorificoNombre}
+                      onChange={(e) => setNuevoFrigorificoNombre(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleGuardarNuevoFrigorifico();
+                        }
+                      }}
+                      autoFocus
+                      style={{ flex: 1, padding: "7px 10px", borderRadius: "6px", border: "1.5px solid #2563eb", fontSize: "13px" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGuardarNuevoFrigorifico}
+                      style={{ backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: "6px", padding: "0 10px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -280,21 +397,21 @@ export default function ModalCierreVentaDefinitivo({
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Peso Campo Real (kg)</label>
                 <input
-                  type="number"
-                  step="1"
-                  value={pesoCampoRealKg}
-                  onChange={(e) => setPesoCampoRealKg(Number(e.target.value) || 0)}
-                  style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                  type="text"
+                  inputMode="decimal"
+                  value={pesoCampoRealKgStr}
+                  onChange={(e) => setPesoCampoRealKgStr(e.target.value)}
+                  style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 600 }}
                 />
               </div>
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Peso Vivo Frigorífico (kg)</label>
                 <input
-                  type="number"
-                  step="1"
-                  value={pesoFrigorificoRealKg}
-                  onChange={(e) => setPesoFrigorificoRealKg(Number(e.target.value) || 0)}
-                  style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                  type="text"
+                  inputMode="decimal"
+                  value={pesoFrigorificoRealKgStr}
+                  onChange={(e) => setPesoFrigorificoRealKgStr(e.target.value)}
+                  style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 600 }}
                 />
               </div>
             </div>
@@ -303,20 +420,20 @@ export default function ModalCierreVentaDefinitivo({
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Kg Res Reales (al Gancho)</label>
                 <input
-                  type="number"
-                  step="0.5"
-                  value={kgResReales}
-                  onChange={(e) => setKgResReales(Number(e.target.value) || 0)}
+                  type="text"
+                  inputMode="decimal"
+                  value={kgResRealesStr}
+                  onChange={(e) => setKgResRealesStr(e.target.value)}
                   style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700, color: "#14532d" }}
                 />
               </div>
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Precio Real $/kg Res</label>
                 <input
-                  type="number"
-                  step="10"
-                  value={precioRealKgResArs}
-                  onChange={(e) => setPrecioRealKgResArs(Number(e.target.value) || 0)}
+                  type="text"
+                  inputMode="decimal"
+                  value={precioRealKgResArsStr}
+                  onChange={(e) => setPrecioRealKgResArsStr(e.target.value)}
                   style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "14px", fontWeight: 700 }}
                 />
               </div>
@@ -336,9 +453,10 @@ export default function ModalCierreVentaDefinitivo({
                 </button>
               </div>
               <input
-                type="number"
-                value={ingresoBrutoRealArs}
-                onChange={(e) => setIngresoBrutoRealArs(Number(e.target.value) || 0)}
+                type="text"
+                inputMode="decimal"
+                value={ingresoBrutoRealArsStr}
+                onChange={(e) => setIngresoBrutoRealArsStr(e.target.value)}
                 style={{ width: "100%", padding: "9px 12px", borderRadius: "6px", border: "2px solid #16a34a", fontSize: "16px", fontWeight: 800, color: "#14532d" }}
               />
             </div>
@@ -347,19 +465,20 @@ export default function ModalCierreVentaDefinitivo({
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Gastos Directos Reales (DT-e, fletes $)</label>
                 <input
-                  type="number"
-                  value={gastosDirectosRealesArs}
-                  onChange={(e) => setGastosDirectosRealesArs(Number(e.target.value) || 0)}
+                  type="text"
+                  inputMode="decimal"
+                  value={gastosDirectosRealesArsStr}
+                  onChange={(e) => setGastosDirectosRealesArsStr(e.target.value)}
                   style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
                 />
               </div>
               <div>
                 <label style={{ fontSize: "11.5px", fontWeight: 600, color: "#64748b" }}>Precio Equiv. $/kg Vivo</label>
                 <input
-                  type="number"
-                  step="10"
-                  value={precioRealKgVivoArs}
-                  onChange={(e) => setPrecioRealKgVivoArs(Number(e.target.value) || 0)}
+                  type="text"
+                  inputMode="decimal"
+                  value={precioRealKgVivoArsStr}
+                  onChange={(e) => setPrecioRealKgVivoArsStr(e.target.value)}
                   style={{ width: "100%", padding: "7px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
                 />
               </div>

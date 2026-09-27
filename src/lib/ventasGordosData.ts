@@ -1099,3 +1099,77 @@ export function getEstadoDocumentacion(documentos: DocumentoAdjuntoVenta[]): {
   }
   return { estado: "incompleta", label: "Incompleta (0/3)", color: "#dc2626", tieneDte, tieneRomaneo, tieneFactura };
 }
+
+// ==========================================
+// CLIENTES COMPRADORES Y FRIGORÍFICOS DESTINO
+// ==========================================
+export const STORAGE_CLIENTES_GORDOS = "hjb_clientes_gordos_list";
+export const STORAGE_FRIGORIFICOS_GORDOS = "hjb_frigorificos_gordos_list";
+
+export const CLIENTES_COMPRADORES_DEFAULT: string[] = [
+  "La Tercera S.R.L.",
+  "Cabaña La Rosalía",
+  "Haciendas del Sur",
+  "Consignaciones Córdoba",
+  "Cooperativa Agropecuaria",
+];
+
+export const FRIGORIFICOS_DESTINO_DEFAULT: string[] = [
+  "Frigorífico Logros S.A.",
+  "Frigorífico Swift Argentina",
+  "Frigorífico La Tercera S.R.L.",
+  "Frigorífico Mattievich",
+  "Frigorífico Rioplatense",
+];
+
+export function getClientesCompradores(): string[] {
+  if (typeof window === "undefined") return CLIENTES_COMPRADORES_DEFAULT;
+  try {
+    const raw = localStorage.getItem(STORAGE_CLIENTES_GORDOS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return CLIENTES_COMPRADORES_DEFAULT;
+}
+
+export function agregarClienteComprador(nombre: string): string[] {
+  const clean = nombre.trim();
+  if (!clean) return getClientesCompradores();
+  const current = getClientesCompradores();
+  if (!current.some((c) => c.toLowerCase() === clean.toLowerCase())) {
+    const updated = [clean, ...current];
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_CLIENTES_GORDOS, JSON.stringify(updated));
+    }
+    return updated;
+  }
+  return current;
+}
+
+export function getFrigorificosDestino(): string[] {
+  if (typeof window === "undefined") return FRIGORIFICOS_DESTINO_DEFAULT;
+  try {
+    const raw = localStorage.getItem(STORAGE_FRIGORIFICOS_GORDOS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return FRIGORIFICOS_DESTINO_DEFAULT;
+}
+
+export function agregarFrigorificoDestino(nombre: string): string[] {
+  const clean = nombre.trim();
+  if (!clean) return getFrigorificosDestino();
+  const current = getFrigorificosDestino();
+  if (!current.some((f) => f.toLowerCase() === clean.toLowerCase())) {
+    const updated = [clean, ...current];
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_FRIGORIFICOS_GORDOS, JSON.stringify(updated));
+    }
+    return updated;
+  }
+  return current;
+}
