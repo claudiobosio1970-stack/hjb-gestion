@@ -136,7 +136,7 @@ export function procesarTextoOCRRemito(rawText: string, nombreArchivo?: string):
   let fecha = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
   // 1. Detección de Nº de DTe / Remito
-  const matchDte = text.match(/(?:DTe|D\.T\.e|Remito|Gu[íi]a|Comprobante|N[°ºo\.]*)\s*[:#\-\s]*([0-9]{3,5}[\-\s]?[0-9]{5,8})/i);
+  const matchDte = text.match(/(?:DTe|D\.T\.E|D\.T\.e|Tr[áa]nsito\s*Electr[óo]nico|Remito|Gu[íi]a|Comprobante|N[°ºo\.]*)\s*[:#\-\s]*([0-9]{3,5}[\-\s]?[0-9]{5,8})/i);
   if (matchDte) {
     remitoDte = `DTe ${matchDte[1].replace(/\s+/g, "-")}`;
   } else {
@@ -157,6 +157,7 @@ export function procesarTextoOCRRemito(rawText: string, nombreArchivo?: string):
     { pattern: /santa\s*fe/i, nombre: "Frigorífico Santa Fe" },
     { pattern: /caba[ñn]a\s*don\s*felipe/i, nombre: "Cabaña Don Felipe" },
     { pattern: /consignataria/i, nombre: "Consignataria de Hacienda" },
+    { pattern: /logros/i, nombre: "Frigorífico Logros S.A." },
   ];
 
   for (const c of conocidos) {
@@ -167,7 +168,7 @@ export function procesarTextoOCRRemito(rawText: string, nombreArchivo?: string):
   }
 
   if (!frigorifico) {
-    const matchDest = text.match(/(?:Destino|Comprador|Frigor[íi]fico|Se[ñn]or(?:es)?|Cliente)[:\s]+([A-Za-z0-9\s\.\,]{4,35})/i);
+    const matchDest = text.match(/(?:Destino|Comprador|Frigor[íi]fico|Se[ñn]or(?:es)?|Cliente|Raz[óo]n\s*Social)[:\s]+([A-Za-z0-9\s\.\,]{4,35})/i);
     if (matchDest) {
       frigorifico = matchDest[1].trim();
     }
@@ -185,7 +186,9 @@ export function procesarTextoOCRRemito(rawText: string, nombreArchivo?: string):
 
     // Novillos / Novillitos / Toritos / Gordos
     if (lLower.includes("novillo") || lLower.includes("novillito") || lLower.includes("macho") || lLower.includes("gordo") || lLower.includes("torito")) {
-      const matchNum = line.match(/\b([0-9]{1,3})\s*(?:cab(?:ezas)?|un(?:idades)?|anim(?:ales)?|\b)/i);
+      const matchNum1 = line.match(/\b([0-9]{1,3})\s*(?:cab(?:ezas)?|un(?:idades)?|anim(?:ales)?|\b)/i);
+      const matchNum2 = line.match(/(?:novillo[s]?|novillito[s]?|macho[s]?|gordo[s]?|torito[s]?)\s*[:=\s]*([0-9]{1,3})\b/i);
+      const matchNum = matchNum2 || matchNum1;
       if (matchNum) {
         const val = parseInt(matchNum[1], 10);
         if (val > 0 && val < 500) {
@@ -196,7 +199,9 @@ export function procesarTextoOCRRemito(rawText: string, nombreArchivo?: string):
 
     // Vacas / Vaquillonas / Conserva / Manufactura / Descarte
     if (lLower.includes("vaca") || lLower.includes("vaquillona") || lLower.includes("conserva") || lLower.includes("manufactura") || lLower.includes("descarte")) {
-      const matchNum = line.match(/\b([0-9]{1,3})\s*(?:cab(?:ezas)?|un(?:idades)?|anim(?:ales)?|\b)/i);
+      const matchNum1 = line.match(/\b([0-9]{1,3})\s*(?:cab(?:ezas)?|un(?:idades)?|anim(?:ales)?|\b)/i);
+      const matchNum2 = line.match(/(?:vaca[s]?|vaquillona[s]?|conserva[s]?|manufactura[s]?|descarte[s]?)\s*[:=\s]*([0-9]{1,3})\b/i);
+      const matchNum = matchNum2 || matchNum1;
       if (matchNum) {
         const val = parseInt(matchNum[1], 10);
         if (val > 0 && val < 500) {
@@ -322,6 +327,101 @@ export async function ejecutarOCRRemito(
     return ret.data.text || "";
   } catch (err: any) {
     console.warn("Fallo en OCR Tesseract, activando modo asistido:", err);
+    throw err;
+  }
+}
+
+/**
+ * Extrae texto digital y genera vista previa para documentos PDF (ej: DTe oficial de SENASA).
+ * Funciona de manera autónoma en el navegador.
+ */
+export async function procesarArchivoPDFRemito(
+  file: File | Blob,
+  onProgress?: (porcentaje: number, mensaje: string) => void
+): Promise<{ textoCompleto: string; previewDataUrl: string }> {
+  if (typeof window === "undefined") {
+    return { textoCompleto: "", previewDataUrl: "" };
+  }
+
+  try {
+    if (onProgress) onProgress(15, "Iniciando lector de documentos PDF / DTe SENASA...");
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf");
+
+    if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version || "3.11.174"}/pdf.worker.min.js`;
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(arrayBuffer),
+      useSystemFonts: true,
+      isEvalSupported: false,
+    });
+
+    const pdfDoc = await loadingTask.promise;
+    const numPages = pdfDoc.numPages || 1;
+
+    let textoCompleto = "";
+    let previewDataUrl = "";
+
+    if (onProgress) onProgress(35, `Extrayendo texto digital de ${numPages} página(s) del DTe...`);
+
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageStrings = (textContent.items || [])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((item: any) => item.str || "")
+        .filter((s: string) => Boolean(s.trim()));
+      textoCompleto += pageStrings.join(" ") + "\n";
+
+      // Renderizamos la primera página a Canvas para generar la imagen de previsualización
+      if (pageNum === 1) {
+        if (onProgress) onProgress(65, "Generando vista previa del DTe...");
+        try {
+          const viewport = page.getViewport({ scale: 1.5 });
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(viewport.width);
+          canvas.height = Math.round(viewport.height);
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            await page.render({
+              canvasContext: ctx,
+              viewport,
+            }).promise;
+
+            previewDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          }
+        } catch (canvasErr) {
+          console.warn("No se pudo renderizar canvas de PDF, usando preview genérico:", canvasErr);
+        }
+      }
+    }
+
+    if (!previewDataUrl) {
+      previewDataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
+          <rect width="600" height="800" fill="#f8fafc"/>
+          <rect x="40" y="40" width="520" height="720" rx="12" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+          <rect x="70" y="70" width="460" height="60" rx="6" fill="#166534"/>
+          <text x="300" y="108" font-family="sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#ffffff">SENASA - DTe OFICIAL</text>
+          <text x="300" y="240" font-family="sans-serif" font-size="64" text-anchor="middle">📄</text>
+          <text x="300" y="320" font-family="sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#0f172a">Documento PDF DTe</text>
+          <text x="300" y="360" font-family="sans-serif" font-size="16" text-anchor="middle" fill="#475569">Documento de Tránsito Electrónico</text>
+          <text x="300" y="400" font-family="sans-serif" font-size="14" text-anchor="middle" fill="#166534">✓ Texto digital extraído y procesado</text>
+        </svg>
+      `);
+    }
+
+    if (onProgress) onProgress(90, "Estructurando datos y categorías del remito...");
+    return { textoCompleto, previewDataUrl };
+  } catch (err: any) {
+    console.error("Error al procesar PDF con pdfjs-dist:", err);
     throw err;
   }
 }

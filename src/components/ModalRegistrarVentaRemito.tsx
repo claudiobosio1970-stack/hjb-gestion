@@ -5,6 +5,7 @@ import {
   comprimirImagenRemito,
   ejecutarOCRRemito,
   procesarTextoOCRRemito,
+  procesarArchivoPDFRemito,
   ejecutarVentaHacienda,
   ResultadoVentaHacienda,
   DatosDetectadosRemito,
@@ -29,6 +30,7 @@ export function ModalRegistrarVentaRemito({
 
   // Estados del archivo y OCR
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
+  const [tipoArchivo, setTipoArchivo] = useState<"imagen" | "pdf" | null>(null);
   const [analizandoOcr, setAnalizandoOcr] = useState(false);
   const [ocrProgreso, setOcrProgreso] = useState<number>(0);
   const [ocrMensaje, setOcrMensaje] = useState<string>("");
@@ -69,38 +71,66 @@ export function ModalRegistrarVentaRemito({
   const pesoNetoEstimado = Number((pesoTotalKg * (1 - desbastePct / 100)).toFixed(1));
   const precioKgPromedio = pesoNetoEstimado > 0 ? Number((precioTotalArs / pesoNetoEstimado).toFixed(2)) : 0;
 
-  // Manejo de carga de imagen
+  // Manejo de carga de imagen o documento PDF
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setErrorMsg(null);
+    const esPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    setTipoArchivo(esPdf ? "pdf" : "imagen");
+
     try {
       setAnalizandoOcr(true);
-      setOcrProgreso(15);
-      setOcrMensaje("Optimizando resolución de la foto para lectura...");
-
-      // 1. Comprimir para almacenamiento local y OCR veloz
-      const optimizedDataUrl = await comprimirImagenRemito(file);
-      setFotoUrl(optimizedDataUrl);
-
-      setOcrProgreso(30);
-      setOcrMensaje("Ejecutando reconocimiento de texto en Remito / DTe...");
-
-      // 2. Ejecutar OCR inteligente
       let rawText = "";
-      try {
-        rawText = await ejecutarOCRRemito(optimizedDataUrl, (porcentaje, msg) => {
+
+      if (esPdf) {
+        setOcrProgreso(15);
+        setOcrMensaje("Cargando y leyendo documento PDF de SENASA...");
+
+        const { textoCompleto, previewDataUrl } = await procesarArchivoPDFRemito(file, (porcentaje, msg) => {
           setOcrProgreso(porcentaje);
           setOcrMensaje(msg);
         });
-      } catch (ocrErr) {
-        console.warn("OCR en segundo plano no disponible, aplicando lectura asistida de comprobante:", ocrErr);
-        // Si Tesseract falla por red, usamos lectura con nombre del archivo
-        rawText = `DTe ${file.name} Novillos 15 Vacas 5 Peso 8200 Kg Rafaela Alimentos`;
+
+        setFotoUrl(previewDataUrl);
+        rawText = textoCompleto;
+
+        // Si el PDF era un escaneo (sin texto vectorial embebido), ejecutamos OCR sobre la imagen generada
+        if (!rawText || rawText.trim().length < 30) {
+          setOcrProgreso(65);
+          setOcrMensaje("PDF escaneado: ejecutando reconocimiento óptico de caracteres...");
+          rawText = await ejecutarOCRRemito(previewDataUrl, (porcentaje, msg) => {
+            setOcrProgreso(porcentaje);
+            setOcrMensaje(msg);
+          });
+        }
+      } else {
+        setOcrProgreso(15);
+        setOcrMensaje("Optimizando resolución de la foto para lectura...");
+
+        // 1. Comprimir para almacenamiento local y OCR veloz
+        const optimizedDataUrl = await comprimirImagenRemito(file);
+        setFotoUrl(optimizedDataUrl);
+
+        setOcrProgreso(30);
+        setOcrMensaje("Ejecutando reconocimiento de texto en Remito / DTe...");
+
+        // 2. Ejecutar OCR inteligente
+        try {
+          rawText = await ejecutarOCRRemito(optimizedDataUrl, (porcentaje, msg) => {
+            setOcrProgreso(porcentaje);
+            setOcrMensaje(msg);
+          });
+        } catch (ocrErr) {
+          console.warn("OCR en segundo plano no disponible, aplicando lectura asistida de comprobante:", ocrErr);
+          rawText = `DTe ${file.name} Novillos 15 Vacas 5 Peso 8200 Kg Rafaela Alimentos`;
+        }
       }
 
-      // 3. Procesar semántica del remito
+      // 3. Procesar semántica del remito / DTe
+      setOcrProgreso(85);
+      setOcrMensaje("Analizando datos comerciales y caravanas...");
       const datos = procesarTextoOCRRemito(rawText, file.name);
       setDatosDetectados(datos);
 
@@ -113,10 +143,10 @@ export function ModalRegistrarVentaRemito({
       if (datos.fecha) setFecha(datos.fecha);
 
       setOcrProgreso(100);
-      setOcrMensaje("✓ Datos extraídos y calculados exitosamente.");
+      setOcrMensaje(esPdf ? "✓ DTe oficial de SENASA procesado exitosamente." : "✓ Remito analizado y calculado exitosamente.");
     } catch (err: any) {
-      console.error("Error al procesar foto de remito:", err);
-      setErrorMsg("No se pudo analizar la foto automáticamente. Puedes ingresar o ajustar los datos manualmente.");
+      console.error("Error al procesar archivo de remito:", err);
+      setErrorMsg("No se pudo analizar el archivo automáticamente. Puedes ingresar o ajustar los datos manualmente.");
     } finally {
       setTimeout(() => setAnalizandoOcr(false), 800);
     }
@@ -267,13 +297,13 @@ export function ModalRegistrarVentaRemito({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "28px" }}>📸</span>
+            <span style={{ fontSize: "28px" }}>📄📸</span>
             <div>
               <h2 style={{ fontSize: "18px", fontWeight: 800, margin: 0, color: "var(--slate-900)" }}>
-                Registrar Venta de Hacienda con Foto de Remito
+                Registrar Venta de Hacienda con Foto o PDF de Remito
               </h2>
               <p style={{ fontSize: "12.5px", color: "var(--slate-600)", margin: "2px 0 0 0" }}>
-                Detecta novillos y vacas vendidas, descuenta stock en <strong>Ganadería</strong> y <strong>Tambo</strong>, y calcula totales.
+                Detecta novillos y vacas vendidas desde <strong>PDFs oficiales del SENASA (DTe)</strong> o fotos de remitos, descuenta stock en <strong>Ganadería</strong> y <strong>Tambo</strong>, y calcula totales.
               </p>
             </div>
           </div>
@@ -299,16 +329,16 @@ export function ModalRegistrarVentaRemito({
           
           {/* COLUMNA IZQUIERDA: Carga de Foto y OCR */}
           <div>
-            <h3 style={{ fontSize: "13.5px", fontWeight: 800, textTransform: "uppercase", color: "#334155", margin: "0 0 10px 0" }}>
-              1. Foto del Remito / DTe de Venta
+            <h3 style={{ fontSize: "13.5px", fontWeight: 800, textTransform: "uppercase", color: "#334155", margin: "0 0 10px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>1.</span>
+              <span>Comprobante DTe / Remito (PDF o Foto)</span>
             </h3>
 
-            {/* Input file oculto */}
+            {/* Input file oculto con soporte para PDFs e imágenes */}
             <input
               type="file"
               ref={fileInputRef}
-              accept="image/*"
-              capture="environment"
+              accept="image/*,application/pdf,.pdf"
               onChange={handleFileChange}
               style={{ display: "none" }}
             />
@@ -326,23 +356,23 @@ export function ModalRegistrarVentaRemito({
                   transition: "all 0.2s",
                 }}
               >
-                <div style={{ fontSize: "42px", marginBottom: "8px" }}>📷</div>
+                <div style={{ fontSize: "40px", marginBottom: "8px" }}>📄 📸</div>
                 <div style={{ fontWeight: 800, fontSize: "14px", color: "#1e293b" }}>
-                  Toca para Tomar Foto o Subir Remito
+                  Toca para Subir Remito o DTe en PDF / Foto
                 </div>
                 <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
-                  Soporta fotos de celular, escaneos o DTe de SENASA (JPG, PNG)
+                  Soporta DTe oficial de SENASA en PDF, fotos de celular o escaneos (PDF, JPG, PNG)
                 </div>
                 <button
                   type="button"
                   className="primaryButton"
-                  style={{ marginTop: "14px", fontSize: "12.5px", padding: "8px 16px" }}
+                  style={{ marginTop: "14px", fontSize: "12.5px", padding: "8px 16px", background: "#166534", borderColor: "#166534" }}
                   onClick={(e) => {
                     e.stopPropagation();
                     fileInputRef.current?.click();
                   }}
                 >
-                  📁 Seleccionar Archivo / Cámara
+                  📁 Seleccionar PDF / Foto / Cámara
                 </button>
               </div>
             ) : (
@@ -351,7 +381,7 @@ export function ModalRegistrarVentaRemito({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={fotoUrl}
-                    alt="Remito de venta"
+                    alt="Remito o DTe de venta"
                     style={{ width: "100%", height: "240px", objectFit: "contain", display: "block" }}
                   />
                   {analizandoOcr && (
@@ -359,7 +389,7 @@ export function ModalRegistrarVentaRemito({
                       style={{
                         position: "absolute",
                         inset: 0,
-                        backgroundColor: "rgba(15, 23, 42, 0.8)",
+                        backgroundColor: "rgba(15, 23, 42, 0.82)",
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
@@ -370,7 +400,7 @@ export function ModalRegistrarVentaRemito({
                     >
                       <div style={{ fontSize: "28px", animation: "spin 1s infinite linear" }}>🔍</div>
                       <div style={{ fontWeight: 800, fontSize: "13px", marginTop: "8px" }}>
-                        Escaneando Remito ({ocrProgreso}%)
+                        Leyendo Comprobante ({ocrProgreso}%)
                       </div>
                       <div style={{ fontSize: "11px", color: "#94a3b8", textAlign: "center", marginTop: "4px" }}>
                         {ocrMensaje}
@@ -380,8 +410,9 @@ export function ModalRegistrarVentaRemito({
                 </div>
 
                 <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f1f5f9" }}>
-                  <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#166534" }}>
-                    ✓ Foto cargada y lista
+                  <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#166534", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span>✓</span>
+                    <span>{tipoArchivo === "pdf" ? "Documento PDF de SENASA procesado" : "Foto cargada y procesada"}</span>
                   </span>
                   <button
                     type="button"
@@ -395,7 +426,7 @@ export function ModalRegistrarVentaRemito({
                       cursor: "pointer",
                     }}
                   >
-                    🔄 Cambiar Foto
+                    🔄 Cambiar Archivo (PDF / Foto)
                   </button>
                 </div>
               </div>
