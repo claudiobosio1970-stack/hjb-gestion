@@ -20,6 +20,8 @@ import {
   savePesajes,
   saveTropas,
   saveVentas,
+  actualizarVenta,
+  eliminarVenta,
   resetCorralesToDefault,
   getPartosRecientesDelPro,
   HJB_GANADERIA_SYNC_EVENT,
@@ -41,7 +43,13 @@ import {
   esHembraPorCaravana,
 } from "@/lib/delproData";
 import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
-import { ResultadoVentaHacienda, getVentasHacienda } from "@/lib/ventasHaciendaData";
+import {
+  ResultadoVentaHacienda,
+  getVentasHacienda,
+  saveVentasHacienda,
+  eliminarVentaHacienda,
+  actualizarVentaHacienda,
+} from "@/lib/ventasHaciendaData";
 
 export default function GanaderiaPage() {
   const [activeTab, setActiveTab] = useState<"corrales" | "dietas" | "pesajes" | "ventas" | "partos_delpro">("corrales");
@@ -73,7 +81,21 @@ export default function GanaderiaPage() {
 
   // Modales
   const [modalFichaVenta, setModalFichaVenta] = useState<FichaVentaFrigorifico | null>(null);
+  const [modalEditarVenta, setModalEditarVenta] = useState<FichaVentaFrigorifico | null>(null);
   const [modalNuevaVentaOpen, setModalNuevaVentaOpen] = useState(false);
+  const [formEditarVenta, setFormEditarVenta] = useState({
+    id: "",
+    fecha: "",
+    frigorifico: "",
+    remitoDte: "",
+    tropaCodigo: "",
+    cabezas: 1,
+    pesoBrutoTotalKg: 0,
+    desbastePct: 7,
+    precioKgVivoArs: 0,
+    otrosGastosArs: 0,
+    costoAlimentacionTotalArs: 0,
+  });
   const [modalMoverCorralOpen, setModalMoverCorralOpen] = useState(false);
   const [tropaAMover, setTropaAMover] = useState<TropaGanadera | null>(null);
   const [modalNuevoPesajeOpen, setModalNuevoPesajeOpen] = useState(false);
@@ -379,6 +401,110 @@ export default function GanaderiaPage() {
       const ficha = getVentas().find((v) => v.remitoDte === resultado.venta.remitoDte) || getVentas()[0];
       if (ficha) setModalFichaVenta(ficha);
     }
+  }
+
+  // Handler para Abrir Modal de Edición de Venta
+  function handleAbrirEditarVenta(v: FichaVentaFrigorifico) {
+    setFormEditarVenta({
+      id: v.id,
+      fecha: v.fecha,
+      frigorifico: v.frigorifico,
+      remitoDte: v.remitoDte,
+      tropaCodigo: v.tropaCodigo,
+      cabezas: v.cabezas,
+      pesoBrutoTotalKg: v.pesoBrutoTotalKg,
+      desbastePct: v.desbastePct !== undefined ? v.desbastePct : 7,
+      precioKgVivoArs: v.precioKgVivoArs,
+      otrosGastosArs: v.otrosGastosArs || 0,
+      costoAlimentacionTotalArs: v.costoAlimentacionTotalArs || Math.round(721058 * v.cabezas),
+    });
+    setModalEditarVenta(v);
+  }
+
+  // Handler para Guardar la Venta Editada
+  function handleGuardarEdicionVenta() {
+    if (!modalEditarVenta) return;
+    const cabezas = Math.max(1, Number(formEditarVenta.cabezas) || 1);
+    const pesoBrutoTotal = Math.max(0, Number(formEditarVenta.pesoBrutoTotalKg) || 0);
+    const desbastePct = Number(formEditarVenta.desbastePct) || 0;
+    const precioKg = Math.max(0, Number(formEditarVenta.precioKgVivoArs) || 0);
+    const otrosGastos = Math.max(0, Number(formEditarVenta.otrosGastosArs) || 0);
+
+    const pesoBrutoPromedio = Number((pesoBrutoTotal / cabezas).toFixed(1));
+    const pesoNetoTotal = Number((pesoBrutoTotal * (1 - desbastePct / 100)).toFixed(1));
+    const pesoNetoPromedio = Number((pesoNetoTotal / cabezas).toFixed(1));
+    const facturacionTotal = Math.round(pesoNetoTotal * precioKg);
+    const costoAlimTotal = Number(formEditarVenta.costoAlimentacionTotalArs) || Math.round(721058 * cabezas);
+    const costoTotal = costoAlimTotal + otrosGastos;
+    const gananciaNetaTotal = facturacionTotal - costoTotal;
+    const gananciaNetaPorCabeza = Math.round(gananciaNetaTotal / cabezas);
+    const margenPct = costoTotal > 0 ? Number(((gananciaNetaTotal / costoTotal) * 100).toFixed(1)) : 0;
+
+    const fichaActualizada: FichaVentaFrigorifico = {
+      ...modalEditarVenta,
+      fecha: formEditarVenta.fecha.trim() || modalEditarVenta.fecha,
+      frigorifico: formEditarVenta.frigorifico.trim() || modalEditarVenta.frigorifico,
+      remitoDte: formEditarVenta.remitoDte.trim() || modalEditarVenta.remitoDte,
+      tropaCodigo: formEditarVenta.tropaCodigo.trim() || modalEditarVenta.tropaCodigo,
+      cabezas,
+      pesoBrutoTotalKg: pesoBrutoTotal,
+      pesoBrutoPromedioKg: pesoBrutoPromedio,
+      desbastePct,
+      pesoNetoTotalKg: pesoNetoTotal,
+      pesoNetoPromedioKg: pesoNetoPromedio,
+      precioKgVivoArs: precioKg,
+      facturacionTotalArs: facturacionTotal,
+      costoAlimentacionTotalArs: costoAlimTotal,
+      otrosGastosArs: otrosGastos,
+      costoTotalArs: costoTotal,
+      gananciaNetaTotalArs: gananciaNetaTotal,
+      gananciaNetaPorCabezaArs: gananciaNetaPorCabeza,
+      margenSobreCostoPct: margenPct,
+    };
+
+    const nuevasVentas = actualizarVenta(fichaActualizada);
+    setVentas(nuevasVentas);
+
+    // Sincronizar en el registro de remitos si existe
+    actualizarVentaHacienda(modalEditarVenta.remitoDte, {
+      fecha: fichaActualizada.fecha,
+      frigorifico: fichaActualizada.frigorifico,
+      remitoDte: fichaActualizada.remitoDte,
+      cabezasNovillos: fichaActualizada.cabezas,
+      pesoTotalKg: fichaActualizada.pesoBrutoTotalKg,
+      desbastePct: fichaActualizada.desbastePct,
+      precioTotalArs: fichaActualizada.facturacionTotalArs,
+      otrosGastosArs: fichaActualizada.otrosGastosArs,
+    });
+
+    if (modalFichaVenta && (modalFichaVenta.id === modalEditarVenta.id || modalFichaVenta.remitoDte === modalEditarVenta.remitoDte)) {
+      setModalFichaVenta(fichaActualizada);
+    }
+
+    setModalEditarVenta(null);
+    triggerFeedback(`✅ Venta a "${fichaActualizada.frigorifico}" actualizada correctamente.`);
+  }
+
+  // Handler para Eliminar una Venta
+  function handleEliminarVenta(venta: FichaVentaFrigorifico) {
+    const confirmacion = window.confirm(
+      `¿Confirmás la eliminación de la venta a "${venta.frigorifico}" (${venta.remitoDte || venta.tropaCodigo}) del ${venta.fecha}?\n\nSe eliminará la ficha de liquidación comercial del historial.`
+    );
+    if (!confirmacion) return;
+
+    const nuevasVentas = eliminarVenta(venta.id);
+    setVentas(nuevasVentas);
+
+    // Eliminar también del historial de remitos asociados
+    if (venta.remitoDte) {
+      eliminarVentaHacienda(venta.remitoDte);
+    }
+
+    if (modalFichaVenta && modalFichaVenta.id === venta.id) {
+      setModalFichaVenta(null);
+    }
+
+    triggerFeedback(`🗑️ La venta a "${venta.frigorifico}" ha sido eliminada del historial.`);
   }
 
   // Handler Nueva Camada Guachera
@@ -1503,7 +1629,7 @@ export default function GanaderiaPage() {
                   <th style={{ textAlign: "right" }}>Precio/kg</th>
                   <th style={{ textAlign: "right" }}>Facturación Total</th>
                   <th style={{ textAlign: "right" }}>Ganancia Neta</th>
-                  <th style={{ textAlign: "center" }}>Ficha Oficial</th>
+                  <th style={{ textAlign: "center", minWidth: "180px" }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -1544,14 +1670,53 @@ export default function GanaderiaPage() {
                       </div>
                     </td>
                     <td style={{ textAlign: "center" }}>
-                      <button
-                        type="button"
-                        className="primaryButton"
-                        onClick={() => setModalFichaVenta(v)}
-                        style={{ padding: "4px 10px", fontSize: "12px", background: "#0f172a" }}
-                      >
-                        📄 Ver Ficha
-                      </button>
+                      <div style={{ display: "inline-flex", gap: "5px", alignItems: "center", justifyContent: "center" }}>
+                        <button
+                          type="button"
+                          className="primaryButton"
+                          onClick={() => setModalFichaVenta(v)}
+                          title="Ver Ficha Oficial de Liquidación"
+                          style={{ padding: "4px 8px", fontSize: "11.5px", background: "#0f172a", whiteSpace: "nowrap" }}
+                        >
+                          📄 Ficha
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAbrirEditarVenta(v)}
+                          title="Editar Venta y Liquidación"
+                          style={{
+                            padding: "4px 8px",
+                            fontSize: "11.5px",
+                            background: "#2563eb",
+                            color: "#ffffff",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarVenta(v)}
+                          title="Eliminar Registro de Venta"
+                          style={{
+                            padding: "4px 8px",
+                            fontSize: "11.5px",
+                            background: "#fee2e2",
+                            color: "#b91c1c",
+                            border: "1px solid #fecaca",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -2488,20 +2653,341 @@ export default function GanaderiaPage() {
               );
             })()}
 
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginTop: "12px", paddingTop: "14px", borderTop: "1px solid var(--line)" }}>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = modalFichaVenta;
+                    setModalFichaVenta(null);
+                    handleAbrirEditarVenta(current);
+                  }}
+                  style={{
+                    padding: "7px 14px",
+                    fontSize: "12.5px",
+                    fontWeight: 700,
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                >
+                  ✏️ Editar Esta Venta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = modalFichaVenta;
+                    handleEliminarVenta(current);
+                  }}
+                  style={{
+                    padding: "7px 14px",
+                    fontSize: "12.5px",
+                    fontWeight: 700,
+                    background: "#fee2e2",
+                    color: "#b91c1c",
+                    border: "1px solid #fecaca",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                >
+                  🗑️ Eliminar Venta
+                </button>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="ghostButton"
+                  onClick={() => window.print()}
+                >
+                  🖨️ Imprimir Ficha
+                </button>
+                <button
+                  type="button"
+                  className="primaryButton"
+                  onClick={() => setModalFichaVenta(null)}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: EDITAR VENTA & LIQUIDACIÓN DE HACIENDA                              */}
+      {/* ========================================================================= */}
+      {modalEditarVenta && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.65)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "14px",
+              maxWidth: "700px",
+              width: "100%",
+              maxHeight: "92vh",
+              overflowY: "auto",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              border: "1px solid var(--line)",
+              padding: "24px 26px",
+            }}
+          >
+            {/* Cabecera */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid #e2e8f0", paddingBottom: "14px", marginBottom: "18px" }}>
+              <div>
+                <h3 style={{ fontSize: "18px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>✏️</span>
+                  <span>Editar Registro de Venta & Liquidación</span>
+                </h3>
+                <p className="muted" style={{ fontSize: "12.5px", margin: "3px 0 0 0" }}>
+                  Modificá los datos comerciales, peso de balanza, precio pactado o deducciones del remito.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEditarVenta(null)}
+                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--slate-400)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formulario en Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "14px", marginBottom: "16px" }}>
+              {/* Fecha */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px", color: "var(--slate-700)" }}>
+                  Fecha de Venta (DD/MM/AA):
+                </label>
+                <input
+                  type="text"
+                  value={formEditarVenta.fecha}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, fecha: e.target.value })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+
+              {/* Frigorífico */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px", color: "var(--slate-700)" }}>
+                  Frigorífico / Comprador:
+                </label>
+                <input
+                  type="text"
+                  value={formEditarVenta.frigorifico}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, frigorifico: e.target.value })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+
+              {/* Nº Remito / DTe */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px", color: "var(--slate-700)" }}>
+                  Nº Remito / DTe Oficial:
+                </label>
+                <input
+                  type="text"
+                  value={formEditarVenta.remitoDte}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, remitoDte: e.target.value })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+
+              {/* Tropa Código */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px", color: "var(--slate-700)" }}>
+                  Tropa / Código:
+                </label>
+                <input
+                  type="text"
+                  value={formEditarVenta.tropaCodigo}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, tropaCodigo: e.target.value })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+
+              {/* Cabezas */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px", color: "var(--slate-700)" }}>
+                  Cantidad de Cabezas Vendidas:
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={formEditarVenta.cabezas}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, cabezas: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+
+              {/* Peso Bruto Total (kg) */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px", color: "var(--slate-700)" }}>
+                  Peso Bruto Total Balanza (kg):
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={formEditarVenta.pesoBrutoTotalKg}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, pesoBrutoTotalKg: Math.max(0, parseFloat(e.target.value) || 0) })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+
+              {/* Desbaste (%) */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px", color: "var(--slate-700)" }}>
+                  Desbaste Comercial (% merma):
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="30"
+                  value={formEditarVenta.desbastePct}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, desbastePct: Math.max(0, parseFloat(e.target.value) || 0) })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+
+              {/* Precio por kg vivo ($/kg) */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px", color: "var(--slate-700)" }}>
+                  Precio Pactado por kg Vivo ($/kg neto):
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={formEditarVenta.precioKgVivoArs}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, precioKgVivoArs: Math.max(0, parseFloat(e.target.value) || 0) })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+
+              {/* Otros Gastos ($) */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px", color: "var(--slate-700)" }}>
+                  Flete, Guías y DTe ($):
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formEditarVenta.otrosGastosArs}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, otrosGastosArs: Math.max(0, parseFloat(e.target.value) || 0) })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+
+              {/* Costo Alimentación ($) */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--slate-700)" }}>
+                    Costo Alimentación ($):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setFormEditarVenta({ ...formEditarVenta, costoAlimentacionTotalArs: Math.round(721058 * formEditarVenta.cabezas) })}
+                    style={{ fontSize: "11px", background: "none", border: "none", color: "#2563eb", cursor: "pointer", textDecoration: "underline" }}
+                  >
+                    Auto ($721k/cab)
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  value={formEditarVenta.costoAlimentacionTotalArs}
+                  onChange={(e) => setFormEditarVenta({ ...formEditarVenta, costoAlimentacionTotalArs: Math.max(0, parseFloat(e.target.value) || 0) })}
+                  style={{ width: "100%", padding: "7px 10px", fontSize: "13px", borderRadius: "6px", border: "1px solid var(--line)" }}
+                />
+              </div>
+            </div>
+
+            {/* Resumen Calculado en Vivo */}
+            {(() => {
+              const cab = Math.max(1, formEditarVenta.cabezas || 1);
+              const pBruto = Math.max(0, formEditarVenta.pesoBrutoTotalKg || 0);
+              const desb = Math.max(0, formEditarVenta.desbastePct || 0);
+              const pNeto = Number((pBruto * (1 - desb / 100)).toFixed(1));
+              const facturacion = Math.round(pNeto * (formEditarVenta.precioKgVivoArs || 0));
+              const costoTotal = (formEditarVenta.costoAlimentacionTotalArs || 0) + (formEditarVenta.otrosGastosArs || 0);
+              const ganancia = facturacion - costoTotal;
+              const gananciaCab = Math.round(ganancia / cab);
+              const margen = costoTotal > 0 ? Number(((ganancia / costoTotal) * 100).toFixed(1)) : 0;
+
+              return (
+                <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "12px 14px", marginBottom: "18px" }}>
+                  <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#475569", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    📊 Resumen de Liquidación Calculado:
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px", textAlign: "center" }}>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Peso Neto Liquidado</div>
+                      <strong style={{ fontSize: "13.5px", color: "#1e293b" }}>{pNeto.toLocaleString("es-AR")} kg</strong>
+                      <div style={{ fontSize: "10.5px", color: "#64748b" }}>({(pNeto / cab).toFixed(1)} kg/cab)</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Facturación Bruta</div>
+                      <strong style={{ fontSize: "13.5px", color: "#0f172a" }}>${facturacion.toLocaleString("es-AR")}</strong>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Costo Total</div>
+                      <strong style={{ fontSize: "13.5px", color: "#991b1b" }}>${costoTotal.toLocaleString("es-AR")}</strong>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Ganancia Neta</div>
+                      <strong style={{ fontSize: "13.5px", color: ganancia >= 0 ? "#166534" : "#991b1b" }}>
+                        {ganancia >= 0 ? "+" : ""}${ganancia.toLocaleString("es-AR")}
+                      </strong>
+                      <div style={{ fontSize: "10.5px", color: ganancia >= 0 ? "#15803d" : "#b91c1c" }}>
+                        ({ganancia >= 0 ? "+" : ""}{margen}%)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Botones de acción */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
               <button
                 type="button"
                 className="ghostButton"
-                onClick={() => window.print()}
+                onClick={() => setModalEditarVenta(null)}
               >
-                🖨️ Imprimir Ficha
+                Cancelar
               </button>
               <button
                 type="button"
                 className="primaryButton"
-                onClick={() => setModalFichaVenta(null)}
+                onClick={handleGuardarEdicionVenta}
+                style={{ background: "#2563eb", borderColor: "#2563eb" }}
               >
-                Cerrar
+                💾 Guardar Cambios
               </button>
             </div>
           </div>

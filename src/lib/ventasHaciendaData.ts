@@ -349,6 +349,31 @@ export function saveVentasHacienda(ventas: VentaHaciendaRemito[]) {
 }
 
 /**
+ * Elimina un registro de remito por ID o por número de Remito/DTe
+ */
+export function eliminarVentaHacienda(remitoDteOId: string): VentaHaciendaRemito[] {
+  const ventas = getVentasHacienda();
+  const updated = ventas.filter((v) => v.id !== remitoDteOId && v.remitoDte !== remitoDteOId);
+  saveVentasHacienda(updated);
+  return updated;
+}
+
+/**
+ * Actualiza los datos de un remito existente
+ */
+export function actualizarVentaHacienda(remitoDteOId: string, partial: Partial<VentaHaciendaRemito>): VentaHaciendaRemito[] {
+  const ventas = getVentasHacienda();
+  const updated = ventas.map((v) => {
+    if (v.id === remitoDteOId || v.remitoDte === remitoDteOId) {
+      return { ...v, ...partial };
+    }
+    return v;
+  });
+  saveVentasHacienda(updated);
+  return updated;
+}
+
+/**
  * EJECUTA EL REGISTRO DE VENTA Y DESCUENTA EN CADA SECCIÓN CORRESPONDIENTE:
  * 1. Descuenta los NOVILLOS de Ganadería (de la tropa de Terminación Gordos y del stock de recría machos).
  * 2. Descuenta las VACAS de Tambo (del censo del rodeo lechero, vacas secas/descarte).

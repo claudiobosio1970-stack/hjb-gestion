@@ -527,6 +527,27 @@ export function saveVentas(ventas: FichaVentaFrigorifico[]) {
   localStorage.setItem(STORAGE_VENTAS, JSON.stringify(ventas));
 }
 
+export function actualizarVenta(ventaActualizada: FichaVentaFrigorifico): FichaVentaFrigorifico[] {
+  const ventas = getVentas();
+  const index = ventas.findIndex((v) => v.id === ventaActualizada.id);
+  let updated: FichaVentaFrigorifico[];
+  if (index >= 0) {
+    updated = [...ventas];
+    updated[index] = ventaActualizada;
+  } else {
+    updated = [ventaActualizada, ...ventas];
+  }
+  saveVentas(updated);
+  return updated;
+}
+
+export function eliminarVenta(id: string): FichaVentaFrigorifico[] {
+  const ventas = getVentas();
+  const updated = ventas.filter((v) => v.id !== id);
+  saveVentas(updated);
+  return updated;
+}
+
 // =========================================================================
 // 4. CÁLCULO DINÁMICO DE COSTOS DE ALIMENTACIÓN CRUZADOS CON VALORES MÓVILES
 // =========================================================================
