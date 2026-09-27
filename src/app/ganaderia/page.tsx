@@ -37,6 +37,8 @@ import {
   evaluarYEjecutarTraspasosAutomaticos,
   calcularPesoEstimativoVida,
   resolverPesoAnimal,
+  esMachoPorCaravana,
+  esHembraPorCaravana,
 } from "@/lib/delproData";
 import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
 import { ResultadoVentaHacienda, getVentasHacienda } from "@/lib/ventasHaciendaData";
@@ -803,8 +805,9 @@ export default function GanaderiaPage() {
           {/* ========================================================================= */}
           {(() => {
             // EN GANADERÍA SOLO ESTÁN LOS MACHOS (100% MACHOS)
+            // Regla HJB: Caravanas de 2 o 3 dígitos (< 1.000) o sexo Macho explícito
             const soloMachosRecria = animalesRecria.filter(
-              (a) => a.sexo === "Macho" || (a as any).Sex === 1 || !(a.sexo === "Hembra" || (a as any).Sex === 2)
+              (a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho" || (a as any).Sex === 1 || !(a.sexo === "Hembra" || (a as any).Sex === 2 || esHembraPorCaravana(a.rp))
             );
 
             const animalesFiltrados = soloMachosRecria.filter((a) => {
@@ -852,9 +855,12 @@ export default function GanaderiaPage() {
                   }}
                 >
                   <div>
-                    <h3 style={{ fontSize: "16px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "8px" }}>
+                    <h3 style={{ fontSize: "16px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       <span>🏷️</span>
                       <span>Trazabilidad Individual de Machos por Caravana / RP ({soloMachosRecria.length} cabezas 100% Machos)</span>
+                      <span style={{ fontSize: "11px", fontWeight: 700, background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", border: "1px solid #bfdbfe" }}>
+                        🏷️ 2 y 3 dígitos (&lt; 1.000) = Machos
+                      </span>
                     </h3>
                     <p className="muted" style={{ fontSize: "12px", margin: "2px 0 0 0" }}>
                       Circuito exclusivo de terneros y novillos machos en recría y terminación comercial para frigorífico con curva biológica continua.
@@ -865,7 +871,7 @@ export default function GanaderiaPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <input
                       type="text"
-                      placeholder="🔍 Buscar RP (ej: RP-8750)..."
+                      placeholder="🔍 Buscar RP (ej: RP-105 o RP-401)..."
                       value={filtroRecriaBusqueda}
                       onChange={(e) => {
                         setFiltroRecriaBusqueda(e.target.value);
@@ -908,7 +914,7 @@ export default function GanaderiaPage() {
                       color: filtroRecriaCorral === "todos" ? "#ffffff" : "#475569",
                     }}
                   >
-                    Todos ({animalesRecria.length})
+                    Todos ({soloMachosRecria.length})
                   </button>
                   <button
                     type="button"

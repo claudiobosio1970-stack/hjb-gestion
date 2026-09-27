@@ -230,6 +230,36 @@ export function procesarTextoOCRRemito(rawText: string, nombreArchivo?: string):
     }
   }
 
+  // 5. Análisis de caravanas individuales si aparecen listadas en el remito / DTe
+  // REGLA HJB: Caravanas de 2 o 3 dígitos (< 1.000) = Machos / Novillos
+  //            Caravanas de 4 dígitos (>= 1.000) = Hembras / Vacas de Tambo
+  if (cabezasNovillos === 0 && cabezasVacas === 0) {
+    const caravanasMatches = Array.from(text.matchAll(/(?:RP[-_ ]?|Caravana[:\s]*|N[ºo\.]\s*)?([0-9]{2,4})\b/gi));
+    let novillosDetectados = 0;
+    let vacasDetectadas = 0;
+    const yaVistos = new Set<number>();
+
+    for (const match of caravanasMatches) {
+      const num = parseInt(match[1], 10);
+      if (num && !yaVistos.has(num)) {
+        // Excluir años como 2024, 2025, 2026 y códigos de prefijo de guía
+        if (num >= 2020 && num <= 2030) continue;
+        if (num === 48 || num === 100) continue;
+        yaVistos.add(num);
+        if (num > 0 && num < 1000) {
+          novillosDetectados++;
+        } else if (num >= 1000 && num <= 9999) {
+          vacasDetectadas++;
+        }
+      }
+    }
+
+    if (novillosDetectados > 0 || vacasDetectadas > 0) {
+      cabezasNovillos = novillosDetectados;
+      cabezasVacas = vacasDetectadas;
+    }
+  }
+
   // Si no se detectó DTe pero hay nombre de archivo sugerente
   if (!remitoDte && nombreArchivo) {
     const matchFn = nombreArchivo.match(/([0-9]{4,8})/);

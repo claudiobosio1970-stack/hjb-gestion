@@ -291,6 +291,33 @@ export function determinarCorralHembra(v: {
   return CORRALES_HEMBRAS_DEFINICION[7];
 }
 
+/**
+ * REGLA FUNDAMENTAL DE IDENTIFICACIÓN HJB POR NÚMERO DE CARAVANA:
+ * - MACHOS (Ganadería): Número chico de 2 o 3 dígitos (< 1.000, ej: 1 a 999).
+ *   Comenzaron recientemente con la recría y engorde intensivo.
+ * - HEMBRAS (Tambo): Número grande de 4 dígitos (>= 1.000, ej: 1000 a 9999).
+ *   Llevan años de historia lechera en el establecimiento.
+ */
+export function esMachoPorCaravana(rp?: string | number | null): boolean {
+  if (!rp) return false;
+  const num = parseInt(String(rp).replace(/\D/g, ""), 10);
+  if (!num || isNaN(num)) return false;
+  return num > 0 && num < 1000;
+}
+
+export function esHembraPorCaravana(rp?: string | number | null): boolean {
+  if (!rp) return true;
+  const num = parseInt(String(rp).replace(/\D/g, ""), 10);
+  if (!num || isNaN(num)) return true;
+  return num >= 1000;
+}
+
+export function resolverSexoPorCaravana(rp?: string | number | null, fallback?: string): "Macho" | "Hembra" {
+  if (esMachoPorCaravana(rp)) return "Macho";
+  if (esHembraPorCaravana(rp)) return "Hembra";
+  return fallback === "Macho" ? "Macho" : "Hembra";
+}
+
 export interface DelProSyncPayload {
   fechaSincronizacion: string;
   totalRodeoGeneral?: number; // Total stock bovino general en DelPro (Machos + Hembras)
@@ -800,11 +827,12 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   const animales: AnimalRecriaIndividual[] = [];
 
   // Guachera: 9 animales machos (los otros terneros de crianza son hembras para reposición tambo)
+  // Regla HJB: 2 o 3 dígitos para machos (ej: RP-11 a RP-19)
   for (let i = 1; i <= 9; i++) {
     const dias = 12 + i * 4;
     const calc = calcularPesoEstimativoVida({ corralId: "guachera", diasEnCorral: dias });
     animales.push({
-      rp: `RP-${8810 + i}`,
+      rp: `RP-${10 + i}`,
       sexo: "Macho",
       corralId: "guachera",
       pesoActualKg: calc.pesoEstimadoKg,
@@ -819,9 +847,10 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   }
 
   // RM1: 22 animales machos (edad 68 a 108 días de vida)
+  // Regla HJB: 3 dígitos para machos (ej: RP-101 a RP-122)
   for (let i = 1; i <= 22; i++) {
     const dias = 8 + Math.round(i * 1.8);
-    const rp = `RP-${8750 + i}`;
+    const rp = `RP-${100 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "rm1", diasEnCorral: dias });
 
     // Animales pesados oficialmente en DelPro
@@ -847,9 +876,10 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   }
 
   // RM2: 28 animales machos (edad 115 a 159 días de vida)
+  // Regla HJB: 3 dígitos para machos (ej: RP-201 a RP-228)
   for (let i = 1; i <= 28; i++) {
     const dias = 8 + Math.round(i * 1.6);
-    const rp = `RP-${8700 + i}`;
+    const rp = `RP-${200 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "rm2", diasEnCorral: dias });
 
     const esPesadoDelPro = i === 5;
@@ -874,9 +904,10 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   }
 
   // RM3: 15 animales machos (edad 170 a 248 días de vida)
+  // Regla HJB: 3 dígitos para machos (ej: RP-301 a RP-315)
   for (let i = 1; i <= 15; i++) {
     const dias = 10 + Math.round(i * 2.6);
-    const rp = `RP-${8650 + i}`;
+    const rp = `RP-${300 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "rm3", diasEnCorral: dias });
 
     const esPesadoDelPro = i === 5;
@@ -901,9 +932,10 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   }
 
   // Terminación: 25 animales machos (edad 261 a 346 días de vida, peso 280 a 405 kg)
+  // Regla HJB: 3 dígitos para machos (ej: RP-401 a RP-425)
   for (let i = 1; i <= 25; i++) {
     const dias = 10 + Math.round(i * 3.3);
-    const rp = `RP-${8600 + i}`;
+    const rp = `RP-${400 + i}`;
     const calc = calcularPesoEstimativoVida({ corralId: "terminacion", diasEnCorral: dias });
 
     const esPesadoDelPro = i === 5 || i === 10;
@@ -984,7 +1016,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "tr-hist-1",
         fecha: "18/09/26",
-        rpAnimal: "RP-8749",
+        rpAnimal: "RP-120",
         corralOrigen: "rm1",
         corralDestino: "rm2",
         pesoAlTraspaso: 121.5,
@@ -994,7 +1026,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "tr-hist-2",
         fecha: "15/09/26",
-        rpAnimal: "RP-8699",
+        rpAnimal: "RP-225",
         corralOrigen: "rm2",
         corralDestino: "rm3",
         pesoAlTraspaso: 172.0,
@@ -1004,7 +1036,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "tr-hist-3",
         fecha: "10/09/26",
-        rpAnimal: "RP-8649",
+        rpAnimal: "RP-312",
         corralOrigen: "rm3",
         corralDestino: "terminacion",
         pesoAlTraspaso: 274.0,
@@ -1016,7 +1048,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "mov-delpro-init-1",
         fecha: "18/09/26",
-        rpAnimal: "RP-8749",
+        rpAnimal: "RP-120",
         grupoOrigen: "Recría 1 (RM1)",
         grupoDestino: "Recría 2 (RM2)",
         corralOrigenId: "rm1",
@@ -1030,7 +1062,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
         id: "p-26-0901",
         fecha: "18/09/26",
         rpMadre: "RP-4102",
-        rpCria: "RP-8812 (Macho)",
+        rpCria: "RP-12 (Macho)",
         sexo: "Macho",
         pesoNacimientoKg: 39,
         destino: "Engorde / Novillo (Venta Comercial)",
@@ -1592,7 +1624,12 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
     const prom = Number(kpis.litrosPromedioVO || parsed.litrosPromedioVO) || (vacasVO > 0 ? Number((litros / vacasVO).toFixed(2)) : 26.24);
 
     let animalesRecriaExtraidos: AnimalRecriaIndividual[] = (parsed.animalesRecria || [])
-      .filter((a: any) => a.sexo === "Macho" || a.Sex === 1 || (a.Sex !== 2 && (a.ProductiveStatus === "Male" || (a.grupoDelPro || "").toLowerCase().includes("macho") || (a.grupoDelPro || "").toLowerCase().includes("engorde"))))
+      .filter((a: any) => {
+        const idVal = a.rp || a.OfficialRegNo || a.AnimalNumber;
+        if (esMachoPorCaravana(idVal)) return true;
+        if (esHembraPorCaravana(idVal)) return false;
+        return a.sexo === "Macho" || a.Sex === 1 || (a.Sex !== 2 && (a.ProductiveStatus === "Male" || (a.grupoDelPro || "").toLowerCase().includes("macho") || (a.grupoDelPro || "").toLowerCase().includes("engorde")));
+      })
       .map((a: any) => ({ ...a, sexo: "Macho" }));
     let censoExtraido: CensoRodeoTambo | undefined = parsed.censoRodeoTambo;
     let vacasSecasCount = Number(parsed.vacasSecasPreparto) || 0;
@@ -1609,10 +1646,12 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
         const grNombre = item.NameGroup || item.GroupName || item.GrupoDelPro || "";
         const grLower = grNombre.toLowerCase();
 
-        // REGLA FUNDAMENTAL DE SEGREGACIÓN HJB:
-        // 1. MACHOS (Sex === 1 ó Male ó grupo Machos/Engorde): 100% EXCLUSIVO GANADERÍA (recriaList)
-        // 2. HEMBRAS (Sex === 2 ó Hembra ó grupo Ordeñe/Secas/Recria Hembras/Vaquillonas): 100% EXCLUSIVO TAMBO (vacasTamboList)
-        const esMacho = item.Sex === 1 || item.Sexo === "Macho" || item.ProductiveStatus === "Male" || (item.Sex !== 2 && (grLower.includes("macho") || grLower.includes("engorde")));
+        // REGLA FUNDAMENTAL DE SEGREGACIÓN HJB POR NÚMERO DE CARAVANA:
+        // 1. MACHOS (Ganadería): Caravana de 2 o 3 dígitos (< 1.000, ej: 1 a 999) o Sex === 1 / Macho
+        // 2. HEMBRAS (Tambo): Caravana de 4 dígitos (>= 1.000, ej: 1000 a 9999) o Sex === 2 / Hembra
+        const machoPorCaravana = esMachoPorCaravana(numId);
+        const hembraPorCaravana = esHembraPorCaravana(numId);
+        const esMacho = machoPorCaravana || (!hembraPorCaravana && (item.Sex === 1 || item.Sexo === "Macho" || item.ProductiveStatus === "Male" || (item.Sex !== 2 && (grLower.includes("macho") || grLower.includes("engorde")))));
 
         if (esMacho) {
           const corralId = parseDelProGrupoToCorralId(grNombre) || "guachera";

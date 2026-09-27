@@ -27,6 +27,8 @@ import {
   CORRALES_HEMBRAS_DEFINICION,
   CorralHembraId,
   determinarCorralHembra,
+  esMachoPorCaravana,
+  esHembraPorCaravana,
 } from "@/lib/delproData";
 import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
 import { ResultadoVentaHacienda } from "@/lib/ventasHaciendaData";
@@ -200,7 +202,9 @@ export default function TamboPage() {
     : 514;
 
   // EN TAMBO SOLO ESTÁN LAS HEMBRAS (los machos van a Ganadería):
+  // Regla HJB: 4 dígitos (>= 1.000) son hembras del tambo. 2 o 3 dígitos (< 1.000) son machos.
   const vacasDetalle = (censoRodeo.detalleVacas || []).filter((v) => {
+    if (esMachoPorCaravana(v.rp)) return false;
     const gr = (v.grupoDelPro || "").toLowerCase();
     const esMacho = (v as any).sexo === "Macho" || (v as any).Sex === 1 || v.estadoProductivo === "Macho" || gr.includes("macho") || gr.includes("engorde") || gr.includes("novill");
     return !esMacho;
@@ -681,6 +685,9 @@ export default function TamboPage() {
                   </span>
                   <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
                     ♀️ {totalAnimalesHembra} Total Hembras en Tambo
+                  </span>
+                  <span className="pill" style={{ fontSize: "11px", fontWeight: 700, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" }}>
+                    🏷️ 4 dígitos (≥ 1.000) = Hembras
                   </span>
                 </div>
               </div>

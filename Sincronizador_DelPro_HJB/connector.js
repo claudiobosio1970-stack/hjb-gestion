@@ -388,24 +388,32 @@ async function ejecutar() {
     const todasLasVacasRodeo = rodeoCompleto.map(a => {
       const rpNum = a.AnimalNumber || a.OfficialRegNo || a.Vaca;
       const numStr = String(rpNum).replace(/^RP-/i, "").trim();
+      const numCaravana = parseInt(numStr.replace(/\D/g, ""), 10) || 0;
       const leche = lecheMap.get(numStr);
 
       const grNombre = a.NameGroup || a.GrupoDelPro || "";
       const grLower = grNombre.toLowerCase();
 
+      // REGLA FUNDAMENTAL HJB POR NÚMERO DE CARAVANA:
+      // Machos: 2 o 3 dígitos (< 1.000, ej: 12, 105, 340) -> Empezaron hace poco con recría/engorde
+      // Hembras: 4 dígitos (>= 1.000, ej: 1005, 3890, 4102) -> Años de trayectoria lechera
+      const esMachoPorCaravana = numCaravana > 0 && numCaravana < 1000;
+      const esHembraPorCaravana = numCaravana >= 1000;
+
       const esOrdeño = leche !== undefined || a.ProductiveStatus === "InLactation" || grLower.includes("ordeñ") || grLower.includes("punta");
       const esSeca = !esOrdeño && (a.ProductiveStatus === "DryOff" || grLower.includes("seca") || grLower.includes("preparto"));
       const esCrianza = !esOrdeño && !esSeca && (grLower.includes("crianza") || grLower.includes("guachera") || grLower.includes("terner"));
-      const esMacho = !esOrdeño && !esSeca && !esCrianza && (a.Sex === 1 || a.ProductiveStatus === "Male" || grLower.includes("macho") || grLower.includes("engorde") || grLower.includes("novill"));
-      const esVaquillona = !esOrdeño && !esSeca && !esCrianza && !esMacho && (a.ProductiveStatus === "Heifer" || grLower.includes("vaquillona") || grLower.includes("vq") || grLower.includes("recria hembra"));
+      
+      const esMacho = esMachoPorCaravana || (!esHembraPorCaravana && (a.Sex === 1 || a.ProductiveStatus === "Male" || grLower.includes("macho") || grLower.includes("engorde") || grLower.includes("novill")));
+      const esVaquillona = !esMacho && !esOrdeño && !esSeca && !esCrianza && (a.ProductiveStatus === "Heifer" || grLower.includes("vaquillona") || grLower.includes("vq") || grLower.includes("recria hembra"));
 
       let estadoProd = "Vaquillona";
-      if (esOrdeño) estadoProd = "En Ordeñe";
+      if (esMacho) estadoProd = "Macho";
+      else if (esOrdeño) estadoProd = "En Ordeñe";
       else if (esSeca) estadoProd = "Seca";
       else if (esCrianza) estadoProd = "Crianza";
-      else if (esMacho) estadoProd = "Macho";
       else if (esVaquillona) estadoProd = "Vaquillona";
-      else estadoProd = a.Sex === 1 ? "Macho" : "Vaquillona";
+      else estadoProd = "Vaquillona";
 
       let estadoRepro = "Vacía";
       if (a.IsPregnant === 1 || a.BreedingState === 6) {
@@ -434,15 +442,18 @@ async function ejecutar() {
         litrosAyer: leche ? Number(leche.Ayer) || 0 : 0,
         promedio7d: leche ? Number(leche.Prom7) || 0 : 0,
         partoNumero: Number(a.LactationNumber) || (leche ? Number(leche.Lactancia) || 1 : 0),
-        sexo: a.Sex === 1 ? "Macho" : "Hembra",
+        sexo: esMacho ? "Macho" : "Hembra",
         pesoKg: esOrdeño ? 580 : (esSeca ? 620 : (esMacho ? 320 : 420)),
       };
     });
 
     // Segregación 100% estricta HJB:
-    // Tambo = 100% Hembras (Vacas, Vaquillonas y Terneras de reposición)
-    // Ganadería = 100% Machos (Terneros y Novillos en engorde/recría)
-    const soloHembrasTambo = todasLasVacasRodeo.filter(v => v.sexo === "Hembra");
+    // Tambo = 100% Hembras (Caravanas de 4 dígitos >= 1000)
+    // Ganadería = 100% Machos (Caravanas de 2 o 3 dígitos < 1000)
+    const soloHembrasTambo = todasLasVacasRodeo.filter(v => {
+      const num = parseInt(String(v.rp).replace(/\D/g, ""), 10) || 0;
+      return num >= 1000 || v.sexo === "Hembra";
+    });
 
     const vacasOrdeñeCount = soloHembrasTambo.filter(v => v.estadoProductivo === "En Ordeñe").length || totalVacasLeche;
     const vacasSecasCount = soloHembrasTambo.filter(v => v.estadoProductivo === "Seca").length;
@@ -453,8 +464,15 @@ async function ejecutar() {
 
     const animalesRecriaParaNube = rodeoCompleto
       .filter(a => {
+        const rpNum = a.AnimalNumber || a.OfficialRegNo || a.Vaca;
+        const numCaravana = parseInt(String(rpNum).replace(/\D/g, ""), 10) || 0;
         const gr = (a.NameGroup || a.GrupoDelPro || "").toLowerCase();
-        // Estrictamente MACHOS: Sex === 1 o estado Male/Engorde/Novillo, descartando hembras
+
+        // Regla por dígitos: 2 o 3 dígitos (< 1.000) = Macho garantizado
+        if (numCaravana > 0 && numCaravana < 1000) return true;
+        // Si tiene 4 dígitos (>= 1.000) es hembra lechera
+        if (numCaravana >= 1000) return false;
+
         const esMacho = a.Sex === 1 || a.ProductiveStatus === "Male" || gr.includes("macho") || gr.includes("engorde") || gr.includes("novill");
         return esMacho && a.Sex !== 2;
       })
