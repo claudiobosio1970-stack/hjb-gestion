@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
 import {
@@ -793,6 +794,22 @@ export default function GanaderiaPage() {
             : delproConfig.datosSincronizados.partosRecientes?.length || 0}
           )
         </button>
+        <Link
+          href="/ganaderia/ventas-gordos"
+          className="tab"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            textDecoration: "none",
+            backgroundColor: "#eff6ff",
+            color: "#1d4ed8",
+            fontWeight: 800,
+            border: "1px solid #bfdbfe",
+          }}
+        >
+          🥩 Ventas de Gordos (Expedientes) ↗
+        </Link>
       </div>
 
       {/* ========================================================================= */}
@@ -1569,6 +1586,50 @@ export default function GanaderiaPage() {
       {/* ========================================================================= */}
       {activeTab === "ventas" && (
         <section className="panel" style={{ padding: "20px" }}>
+          {/* Banner destacado Nuevo Módulo Ventas de Gordos */}
+          <div
+            style={{
+              backgroundColor: "#f0fdf4",
+              border: "1.5px solid #86efac",
+              borderRadius: "10px",
+              padding: "14px 18px",
+              marginBottom: "18px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "12px",
+            }}
+          >
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "20px" }}>🥩</span>
+                <strong style={{ fontSize: "14px", color: "#14532d" }}>
+                  Nuevo Módulo HJB Carne: Ventas de Gordos (Expediente Único)
+                </strong>
+                <span className="pill badgeGreen" style={{ fontSize: "10px" }}>OFICIAL</span>
+              </div>
+              <p style={{ margin: "4px 0 0 0", fontSize: "12.5px", color: "#166534" }}>
+                Gestione cada venta desde su primera proyección económica, compare Kilo Vivo vs. Rendimiento al Gancho, adjunte DT-e y romaneos, y analice los desvíos reales de frigorífico.
+              </p>
+            </div>
+            <Link
+              href="/ganaderia/ventas-gordos"
+              className="primaryButton"
+              style={{
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                backgroundColor: "#16a34a",
+                fontSize: "12.5px",
+                padding: "8px 14px",
+              }}
+            >
+              Abrir Módulo Ventas de Gordos ➔
+            </Link>
+          </div>
+
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div>
               <h2 style={{ fontSize: "17px", margin: 0 }}>Historial de Ventas a Frigorífico</h2>
