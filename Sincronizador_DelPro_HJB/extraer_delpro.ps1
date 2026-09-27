@@ -127,9 +127,10 @@ function New-DefaultVacasTambo() {
 
 function New-DefaultAnimalesRecria() {
     $animales = @()
-    for ($i = 1; $i -le 24; $i++) {
+    # Guachera Machos (2 dígitos: RP-11 a RP-19)
+    for ($i = 1; $i -le 9; $i++) {
         $animales += [ordered]@{
-            "rp" = ("RP-" + (8800 + $i))
+            "rp" = ("RP-" + (10 + $i))
             "corralId" = "guachera"
             "pesoActualKg" = [math]::Round(42.0 + ($i * 1.5), 1)
             "diasEnCorral" = (10 + $i * 2)
@@ -139,9 +140,10 @@ function New-DefaultAnimalesRecria() {
             "listoFaena" = $false
         }
     }
+    # RM1 Machos (3 dígitos: RP-101 a RP-122)
     for ($i = 1; $i -le 22; $i++) {
         $animales += [ordered]@{
-            "rp" = ("RP-" + (8750 + $i))
+            "rp" = ("RP-" + (100 + $i))
             "corralId" = "rm1"
             "pesoActualKg" = [math]::Round(82.0 + ($i * 1.7), 1)
             "diasEnCorral" = (12 + $i * 2)
@@ -151,9 +153,10 @@ function New-DefaultAnimalesRecria() {
             "listoFaena" = $false
         }
     }
+    # RM2 Machos (3 dígitos: RP-201 a RP-228)
     for ($i = 1; $i -le 28; $i++) {
         $animales += [ordered]@{
-            "rp" = ("RP-" + (8700 + $i))
+            "rp" = ("RP-" + (200 + $i))
             "corralId" = "rm2"
             "pesoActualKg" = [math]::Round(122.0 + ($i * 1.65), 1)
             "diasEnCorral" = (15 + $i * 2)
@@ -163,9 +166,10 @@ function New-DefaultAnimalesRecria() {
             "listoFaena" = $false
         }
     }
-    for ($i = 1; $i -le 30; $i++) {
+    # RM3 Machos (3 dígitos: RP-301 a RP-315)
+    for ($i = 1; $i -le 15; $i++) {
         $animales += [ordered]@{
-            "rp" = ("RP-" + (8650 + $i))
+            "rp" = ("RP-" + (300 + $i))
             "corralId" = "rm3"
             "pesoActualKg" = [math]::Round(172.0 + ($i * 3.2), 1)
             "diasEnCorral" = (20 + $i * 3)
@@ -175,10 +179,11 @@ function New-DefaultAnimalesRecria() {
             "listoFaena" = $false
         }
     }
-    for ($i = 1; $i -le 26; $i++) {
+    # Terminación Machos (3 dígitos: RP-401 a RP-425)
+    for ($i = 1; $i -le 25; $i++) {
         $peso = [math]::Round(280.0 + ($i * 5.0), 1)
         $animales += [ordered]@{
-            "rp" = ("RP-" + (8600 + $i))
+            "rp" = ("RP-" + (400 + $i))
             "corralId" = "terminacion"
             "pesoActualKg" = $peso
             "diasEnCorral" = (15 + $i * 2)

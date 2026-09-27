@@ -1101,7 +1101,7 @@ export function getDelProConfig(): DelProConfig {
     const raw = localStorage.getItem(STORAGE_DELPRO_CONFIG);
     if (!raw) return DELPRO_CONFIG_DEFAULT;
     const parsed = JSON.parse(raw);
-    return {
+    const config = {
       ...DELPRO_CONFIG_DEFAULT,
       ...parsed,
       datosSincronizados: {
@@ -1112,6 +1112,17 @@ export function getDelProConfig(): DelProConfig {
         traspasosAutomaticos: parsed.datosSincronizados?.traspasosAutomaticos || DELPRO_CONFIG_DEFAULT.datosSincronizados.traspasosAutomaticos,
       },
     };
+    // Purgar datos ficticios 8600..8900 heredados de la maqueta demo vieja
+    if (Array.isArray(config.datosSincronizados.animalesRecria)) {
+      const tiene8600 = config.datosSincronizados.animalesRecria.some((a: any) => {
+        const num = parseInt(String(a.rp || "").replace(/\D/g, ""), 10);
+        return num >= 8600 && num <= 8900;
+      });
+      if (tiene8600) {
+        config.datosSincronizados.animalesRecria = defaultAnimales;
+      }
+    }
+    return config;
   } catch {
     return DELPRO_CONFIG_DEFAULT;
   }
@@ -1123,7 +1134,18 @@ export function getAnimalesRecria(): AnimalRecriaIndividual[] {
     const raw = localStorage.getItem(STORAGE_ANIMALES_RECRIA);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Purgar de localStorage si contiene animales ficticios 8600..8900
+        const tiene8600 = parsed.some((a: any) => {
+          const num = parseInt(String(a.rp || "").replace(/\D/g, ""), 10);
+          return num >= 8600 && num <= 8900;
+        });
+        if (tiene8600) {
+          localStorage.removeItem(STORAGE_ANIMALES_RECRIA);
+          return defaultAnimales;
+        }
+        return parsed;
+      }
     }
   } catch {}
   return getDelProConfig().datosSincronizados.animalesRecria || defaultAnimales;
