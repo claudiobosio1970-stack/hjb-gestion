@@ -31,7 +31,13 @@ export default function VentasGordosPage() {
 
   // Carga inicial y sync en tiempo real
   function refrescarVentas() {
-    setVentas(getVentasGordos());
+    const data = getVentasGordos();
+    setVentas((prev) => {
+      if (prev.length === data.length && JSON.stringify(prev) === JSON.stringify(data)) {
+        return prev;
+      }
+      return data;
+    });
   }
 
   useEffect(() => {

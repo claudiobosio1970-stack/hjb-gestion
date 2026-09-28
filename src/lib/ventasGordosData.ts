@@ -632,16 +632,18 @@ export function getVentasGordos(): VentaGordoExpediente[] {
   } catch (err) {
     console.error("Error al leer ventas gordos de localStorage:", err);
   }
-  // Si no hay datos, inicializamos con la Venta N° 1 histórica de referencia
-  saveVentasGordos([VENTA_HISTORICA_1_DEFAULT]);
+  // Si no hay datos, inicializamos con la Venta N° 1 histórica de referencia (sin disparar evento redundante)
+  saveVentasGordos([VENTA_HISTORICA_1_DEFAULT], false);
   return [VENTA_HISTORICA_1_DEFAULT];
 }
 
-export function saveVentasGordos(ventas: VentaGordoExpediente[]) {
+export function saveVentasGordos(ventas: VentaGordoExpediente[], notify: boolean = true) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_VENTAS_GORDOS, JSON.stringify(ventas));
-    window.dispatchEvent(new Event(HJB_VENTAS_GORDOS_SYNC_EVENT));
+    if (notify) {
+      window.dispatchEvent(new Event(HJB_VENTAS_GORDOS_SYNC_EVENT));
+    }
   } catch (err) {
     console.error("Error al guardar ventas gordos en localStorage:", err);
   }
@@ -1034,16 +1036,45 @@ export function eliminarVentaGordoLogico(params: {
   return true;
 }
 
+let isVentasGordosSyncActive = false;
+let unsubscribeVentasGordos: (() => void) | null = null;
+let activeListenersCount = 0;
+
 /**
  * Inicializa la escucha en tiempo real de Firestore para multiusuario.
+ * REGLA ESTRICTA DE ARQUITECTURA: Esta función es de LECTURA PURA.
+ * NUNCA debe ejecutar setDoc, addDoc o updateDoc desde el callback de onSnapshot
+ * ni ante colecciones vacías para prevenir bucles de escrituras repetitivas y saturación del write stream.
  */
 export function initVentasGordosFirestoreSync(): () => void {
-  if (typeof window === "undefined") return () => {};
+  if (typeof window === "undefined" || !db) return () => {};
+
+  activeListenersCount++;
+
+  // Si ya existe una suscripción activa, reutilizarla y mantener contador de referencias
+  if (isVentasGordosSyncActive && unsubscribeVentasGordos) {
+    return () => {
+      activeListenersCount = Math.max(0, activeListenersCount - 1);
+      if (activeListenersCount === 0 && unsubscribeVentasGordos) {
+        unsubscribeVentasGordos();
+        unsubscribeVentasGordos = null;
+        isVentasGordosSyncActive = false;
+      }
+    };
+  }
+
+  isVentasGordosSyncActive = true;
+
   try {
     const colRef = collection(db, "ventas_gordos");
     const unsubscribe = onSnapshot(
       colRef,
       (snapshot) => {
+        // Ignorar snapshots transitorios de mutaciones locales pendientes
+        if (snapshot.metadata.hasPendingWrites) {
+          return;
+        }
+
         if (!snapshot.empty) {
           const remotos: VentaGordoExpediente[] = [];
           snapshot.forEach((d) => {
@@ -1052,25 +1083,40 @@ export function initVentasGordosFirestoreSync(): () => void {
               remotos.push(data);
             }
           });
+
           if (remotos.length > 0) {
-            // Ordenar por número descendente
             remotos.sort((a, b) => (b.numeroVenta || 0) - (a.numeroVenta || 0));
-            // Actualizar localStorage sin disparar bucle infinito
-            localStorage.setItem(STORAGE_VENTAS_GORDOS, JSON.stringify(remotos));
-            window.dispatchEvent(new Event(HJB_VENTAS_GORDOS_SYNC_EVENT));
+            const newJson = JSON.stringify(remotos);
+            const currentJson = localStorage.getItem(STORAGE_VENTAS_GORDOS);
+
+            // Solo actualizar y notificar si los datos cambiaron efectivamente
+            if (currentJson !== newJson) {
+              localStorage.setItem(STORAGE_VENTAS_GORDOS, newJson);
+              window.dispatchEvent(new Event(HJB_VENTAS_GORDOS_SYNC_EVENT));
+            }
           }
-        } else {
-          // Si Firestore está vacío, subimos la Venta N° 1 inicial
-          setDoc(doc(db, "ventas_gordos", VENTA_HISTORICA_1_DEFAULT.id), sanitizeForFirestore(VENTA_HISTORICA_1_DEFAULT)).catch(console.error);
         }
+        // Si la colección está vacía, no se ejecuta ninguna escritura automática.
+        // La lectura es estrictamente pasiva.
       },
       (error) => {
         console.warn("Error en listener de Firestore ventas_gordos:", error);
       }
     );
-    return unsubscribe;
+
+    unsubscribeVentasGordos = unsubscribe;
+
+    return () => {
+      activeListenersCount = Math.max(0, activeListenersCount - 1);
+      if (activeListenersCount === 0 && unsubscribeVentasGordos) {
+        unsubscribeVentasGordos();
+        unsubscribeVentasGordos = null;
+        isVentasGordosSyncActive = false;
+      }
+    };
   } catch (err) {
     console.warn("No se pudo iniciar listener Firestore ventas_gordos:", err);
+    isVentasGordosSyncActive = false;
     return () => {};
   }
 }
