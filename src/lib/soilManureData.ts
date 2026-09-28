@@ -1043,6 +1043,7 @@ export function initSoilFirestoreSync() {
     onSnapshot(
       docRef,
       (snap) => {
+        if (snap.metadata.hasPendingWrites) return;
         if (snap.exists()) {
           const data = snap.data();
           if (Array.isArray(data.soil_analyses)) {
@@ -1064,29 +1065,16 @@ export function initSoilFirestoreSync() {
             localStorage.setItem(LIQUID_MANURE_STORAGE_KEY, JSON.stringify(data.liquid_manure_analysis));
           } else {
             localStorage.setItem(LIQUID_MANURE_STORAGE_KEY, JSON.stringify(DEFAULT_LIQUID_MANURE_ANALYSIS));
-            setDoc(docRef, { liquid_manure_analysis: DEFAULT_LIQUID_MANURE_ANALYSIS, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
           }
           if (data.bioavailability_config && typeof data.bioavailability_config === "object") {
             localStorage.setItem(BIOAVAILABILITY_STORAGE_KEY, JSON.stringify(data.bioavailability_config));
           } else {
             localStorage.setItem(BIOAVAILABILITY_STORAGE_KEY, JSON.stringify(DEFAULT_BIOAVAILABILITY_CONFIG));
-            setDoc(docRef, { bioavailability_config: DEFAULT_BIOAVAILABILITY_CONFIG, updatedAt: new Date().toISOString() }, { merge: true }).catch(console.error);
           }
           if (Array.isArray(data.other_analyses)) {
             localStorage.setItem(OTHER_ANALYSES_STORAGE_KEY, JSON.stringify(data.other_analyses));
           }
           notifySoilSync();
-        } else {
-          // Inicializar por primera vez en la nube
-          setDoc(docRef, {
-            soil_analyses: DEFAULT_SOIL_ANALYSES,
-            moisture_profiles: DEFAULT_MOISTURE_PROFILES,
-            manure_analysis: DEFAULT_MANURE_ANALYSIS,
-            liquid_manure_analysis: DEFAULT_LIQUID_MANURE_ANALYSIS,
-            bioavailability_config: DEFAULT_BIOAVAILABILITY_CONFIG,
-            other_analyses: DEFAULT_OTHER_ANALYSES,
-            updatedAt: new Date().toISOString(),
-          }).catch(console.error);
         }
       },
       (err) => {

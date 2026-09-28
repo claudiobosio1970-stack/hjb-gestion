@@ -403,6 +403,7 @@ export function initAgricultureFirestoreSync() {
     onSnapshot(
       activitiesCol,
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (!snapshot.empty) {
           const remoteActivities: Activity[] = [];
           snapshot.forEach((d) => {
@@ -411,14 +412,6 @@ export function initAgricultureFirestoreSync() {
           const sorted = sortActivitiesRecentFirst(remoteActivities);
           writeArray(KEYS.activities, sorted);
           notifyAgricultureSync();
-        } else {
-          // Si Firestore está vacío pero el dispositivo ya tiene datos guardados, migrarlos a la nube
-          const local = readArray<Activity>(KEYS.activities);
-          if (local.length > 0) {
-            local.forEach((act) => {
-              setDoc(doc(db, "activities", act.id), sanitizeForFirestore(act)).catch(console.error);
-            });
-          }
         }
       },
       (error) => {
@@ -431,6 +424,7 @@ export function initAgricultureFirestoreSync() {
     onSnapshot(
       lotesCol,
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (!snapshot.empty) {
           const remoteLotes: Lote[] = [];
           snapshot.forEach((d) => {
@@ -438,13 +432,6 @@ export function initAgricultureFirestoreSync() {
           });
           writeArray(KEYS.lotes, remoteLotes);
           notifyAgricultureSync();
-        } else {
-          // Si no hay lotes en la nube, inicializar con los lotes locales o predeterminados
-          const local = readArray<Lote>(KEYS.lotes);
-          const toUpload = local.length > 0 ? local : INITIAL_LOTES;
-          toUpload.forEach((lote) => {
-            setDoc(doc(db, "lotes", lote.id), sanitizeForFirestore(lote)).catch(console.error);
-          });
         }
       },
       (error) => {
@@ -456,6 +443,7 @@ export function initAgricultureFirestoreSync() {
     onSnapshot(
       collection(db, "soils"),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (!snapshot.empty) {
           const remote: SoilAnalysis[] = [];
           snapshot.forEach((d) => remote.push(d.data() as SoilAnalysis));
@@ -470,6 +458,7 @@ export function initAgricultureFirestoreSync() {
     onSnapshot(
       collection(db, "documents"),
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (!snapshot.empty) {
           const remote: DocumentRecord[] = [];
           snapshot.forEach((d) => remote.push(d.data() as DocumentRecord));

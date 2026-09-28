@@ -473,6 +473,7 @@ export function initGeoFirestoreSync() {
     onSnapshot(
       geoDocRef,
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (snapshot.exists()) {
           const data = snapshot.data();
           if (data.campos_coords && typeof data.campos_coords === "object") {
@@ -483,18 +484,6 @@ export function initGeoFirestoreSync() {
             localStorage.setItem(LOTES_GEO_STORAGE_KEY, JSON.stringify(sanitized));
           }
           notifyGeoSync();
-        } else {
-          // Si no hay documento en la nube, inicializarlo una sola vez con los valores predeterminados
-          const localCoordsRaw = localStorage.getItem(GEO_STORAGE_KEY);
-          const localLotesRaw = localStorage.getItem(LOTES_GEO_STORAGE_KEY);
-          const campos_coords = localCoordsRaw ? JSON.parse(localCoordsRaw) : {};
-          const lotes_geo = localLotesRaw ? JSON.parse(localLotesRaw) : DEFAULT_LOTES_GEO;
-
-          setDoc(geoDocRef, {
-            campos_coords,
-            lotes_geo,
-            updatedAt: new Date().toISOString(),
-          }).catch(console.error);
         }
       },
       (error) => {

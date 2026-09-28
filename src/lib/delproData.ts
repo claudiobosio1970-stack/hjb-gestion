@@ -1291,6 +1291,8 @@ export function evaluarYEjecutarTraspasosAutomaticos(
 }
 
 let isDelProFirestoreSyncInitialized = false;
+let lastProcessedPayloadJson = "";
+let lastProcessedFechaSincronizacion = "";
 
 export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => void) {
   if (typeof window === "undefined" || !db) return;
@@ -1307,7 +1309,16 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
 
       if (snapshot.exists()) {
         const data = snapshot.data();
+        const fecha = data.fechaSincronizacion || "";
+
+        // Si ya procesamos exactamente este mismo payload y fecha, omitir para no recrear objetos en memoria
+        if (data.payloadJson && data.payloadJson === lastProcessedPayloadJson && fecha === lastProcessedFechaSincronizacion) {
+          return;
+        }
+
         if (data.payloadJson) {
+          lastProcessedPayloadJson = data.payloadJson;
+          lastProcessedFechaSincronizacion = fecha;
           try {
             // NUNCA persistir a Firestore desde el listener reactivo de onSnapshot
             const res = importarPayloadDesdeJson(data.payloadJson, false);

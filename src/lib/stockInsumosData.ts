@@ -1027,6 +1027,7 @@ export function initStockFirestoreSync() {
     onSnapshot(
       colIngresos,
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (!snapshot.empty) {
           const remote: IngresoStockManual[] = [];
           snapshot.forEach((d) => {
@@ -1050,6 +1051,7 @@ export function initStockFirestoreSync() {
     onSnapshot(
       colCanjes,
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (!snapshot.empty) {
           const remote: CanjeGranoPellet[] = [];
           snapshot.forEach((d) => {
@@ -1073,6 +1075,7 @@ export function initStockFirestoreSync() {
     onSnapshot(
       docDieta,
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (snapshot.exists()) {
           const remote = snapshot.data() as DietaTamboConfig;
           if (remote && typeof window !== "undefined") {
@@ -1092,6 +1095,7 @@ export function initStockFirestoreSync() {
     onSnapshot(
       colAjustes,
       (snapshot) => {
+        if (snapshot.metadata.hasPendingWrites) return;
         if (!snapshot.empty) {
           const remote: AjusteStockManual[] = [];
           snapshot.forEach((d) => {
