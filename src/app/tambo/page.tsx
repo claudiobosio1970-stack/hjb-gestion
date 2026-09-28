@@ -23,7 +23,6 @@ import {
   CensoRodeoTambo,
   VacaTamboIndividual,
   importarPayloadDesdeJson,
-  resolverPesoAnimal,
   CORRALES_HEMBRAS_DEFINICION,
   CorralHembraId,
   determinarCorralHembra,
@@ -32,6 +31,7 @@ import {
   limpiarCaravana,
 } from "@/lib/delproData";
 import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
+import ModalFichaVaca from "@/components/tambo/ModalFichaVaca";
 import { ResultadoVentaHacienda } from "@/lib/ventasHaciendaData";
 
 function formatearCaravana(rp?: string | null): string {
@@ -65,12 +65,13 @@ export default function TamboPage() {
   const [filtroGestacionCol, setFiltroGestacionCol] = useState<"todos" | "con_gestacion" | "sin_gestacion" | "gest_desc" | "gest_asc">("todos");
   const [filtroPartoCol, setFiltroPartoCol] = useState<"todos" | "proximas" | "con_fecha" | "sin_fecha">("todos");
   const [filtroLitrosCol, setFiltroLitrosCol] = useState<"todos" | "litros_desc" | "litros_asc" | "alta" | "baja">("todos");
-  const [filtroPesoCol, setFiltroPesoCol] = useState<"todos" | "peso_desc" | "peso_asc" | "oficial">("todos");
+  const [filtroHistoricoCol, setFiltroHistoricoCol] = useState<"todos" | "hist_desc" | "hist_asc" | "alta" | "baja">("todos");
+  const [vacaSeleccionadaModal, setVacaSeleccionadaModal] = useState<VacaTamboIndividual | null>(null);
 
   // Filtros rápidos superiores
   const [busquedaVacaRP, setBusquedaVacaRP] = useState("");
   const [filtroEstadoVaca, setFiltroEstadoVaca] = useState<"todas" | "en_ordenie" | "secas" | "vaquillonas" | "terneras" | "preniadas" | "inseminadas" | "vacias">("todas");
-  const [ordenCenso, setOrdenCenso] = useState<"rp_asc" | "caravana_desc" | "del_desc" | "del_asc" | "litros_desc" | "litros_asc" | "parto_proximo" | "peso_desc" | "peso_asc" | "gest_desc" | "gest_asc">("rp_asc");
+  const [ordenCenso, setOrdenCenso] = useState<"rp_asc" | "caravana_desc" | "del_desc" | "del_asc" | "litros_desc" | "litros_asc" | "parto_proximo" | "hist_desc" | "hist_asc" | "gest_desc" | "gest_asc">("rp_asc");
   const [elementosPorPagina, setElementosPorPagina] = useState(50);
   const [paginaVacas, setPaginaVacas] = useState(1);
 
@@ -267,7 +268,7 @@ export default function TamboPage() {
     filtroGestacionCol !== "todos" ||
     filtroPartoCol !== "todos" ||
     filtroLitrosCol !== "todos" ||
-    filtroPesoCol !== "todos" ||
+    filtroHistoricoCol !== "todos" ||
     filtroEstadoVaca !== "todas";
 
   const limpiarFiltros = () => {
@@ -280,7 +281,7 @@ export default function TamboPage() {
     setFiltroGestacionCol("todos");
     setFiltroPartoCol("todos");
     setFiltroLitrosCol("todos");
-    setFiltroPesoCol("todos");
+    setFiltroHistoricoCol("todos");
     setFiltroEstadoVaca("todas");
     setOrdenCenso("rp_asc");
     setPaginaVacas(1);
@@ -354,8 +355,10 @@ export default function TamboPage() {
       if (filtroLitrosCol === "alta" && (v.litrosAyer || 0) < 25) return false;
       if (filtroLitrosCol === "baja" && ((v.litrosAyer || 0) <= 0 || (v.litrosAyer || 0) >= 20)) return false;
 
-      // 8. Filtro Peso
-      if (filtroPesoCol === "oficial" && v.origenPeso !== "delpro_oficial") return false;
+      // 8. Filtro Promedio Histórico
+      const histVal = v.promedioHistorico || v.promedio7d || v.litrosAyer || 0;
+      if (filtroHistoricoCol === "alta" && histVal < 26) return false;
+      if (filtroHistoricoCol === "baja" && (histVal <= 0 || histVal >= 22)) return false;
 
       return true;
     })
@@ -363,7 +366,7 @@ export default function TamboPage() {
       const criterio =
         filtroDELCol === "del_desc" || filtroDELCol === "del_asc" ? filtroDELCol :
         filtroLitrosCol === "litros_desc" || filtroLitrosCol === "litros_asc" ? filtroLitrosCol :
-        filtroPesoCol === "peso_desc" || filtroPesoCol === "peso_asc" ? filtroPesoCol :
+        filtroHistoricoCol === "hist_desc" || filtroHistoricoCol === "hist_asc" ? filtroHistoricoCol :
         filtroGestacionCol === "gest_desc" || filtroGestacionCol === "gest_asc" ? filtroGestacionCol :
         filtroPartoCol === "proximas" ? "parto_proximo" :
         ordenCenso;
@@ -372,18 +375,18 @@ export default function TamboPage() {
       if (criterio === "del_asc") return (a.diasLactancia || 0) - (b.diasLactancia || 0);
       if (criterio === "litros_desc") return (b.litrosAyer || 0) - (a.litrosAyer || 0);
       if (criterio === "litros_asc") return (a.litrosAyer || 0) - (b.litrosAyer || 0);
+      if (criterio === "hist_desc") {
+        const hA = a.promedioHistorico || a.promedio7d || a.litrosAyer || 0;
+        const hB = b.promedioHistorico || b.promedio7d || b.litrosAyer || 0;
+        return hB - hA;
+      }
+      if (criterio === "hist_asc") {
+        const hA = a.promedioHistorico || a.promedio7d || a.litrosAyer || 0;
+        const hB = b.promedioHistorico || b.promedio7d || b.litrosAyer || 0;
+        return hA - hB;
+      }
       if (criterio === "gest_desc") return (b.diasGestacion || 0) - (a.diasGestacion || 0);
       if (criterio === "gest_asc") return (a.diasGestacion || 0) - (b.diasGestacion || 0);
-      if (criterio === "peso_desc") {
-        const pA = a.pesoOficialDelPro || a.pesoKg || 0;
-        const pB = b.pesoOficialDelPro || b.pesoKg || 0;
-        return pB - pA;
-      }
-      if (criterio === "peso_asc") {
-        const pA = a.pesoOficialDelPro || a.pesoKg || 0;
-        const pB = b.pesoOficialDelPro || b.pesoKg || 0;
-        return pA - pB;
-      }
       if (criterio === "parto_proximo") {
         const diasFaltanA = a.diasGestacion ? Math.max(0, 282 - a.diasGestacion) : 99999;
         const diasFaltanB = b.diasGestacion ? Math.max(0, 282 - b.diasGestacion) : 99999;
@@ -1425,16 +1428,16 @@ export default function TamboPage() {
                     </div>
                   </th>
 
-                  <th style={{ minWidth: "135px", textAlign: "right" }}>
+                  <th style={{ minWidth: "140px", textAlign: "right" }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                       <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
-                        PESO CORPORAL
+                        HISTÓRICO PROM.
                       </span>
                       <select
-                        value={filtroPesoCol}
+                        value={filtroHistoricoCol}
                         onChange={(e) => {
-                          setFiltroPesoCol(e.target.value as any);
-                          if (e.target.value === "peso_desc" || e.target.value === "peso_asc") {
+                          setFiltroHistoricoCol(e.target.value as any);
+                          if (e.target.value === "hist_desc" || e.target.value === "hist_asc") {
                             setOrdenCenso(e.target.value as any);
                           }
                           setPaginaVacas(1);
@@ -1443,18 +1446,19 @@ export default function TamboPage() {
                           width: "100%",
                           padding: "3px 4px",
                           fontSize: "11px",
-                          fontWeight: filtroPesoCol !== "todos" ? 700 : 500,
+                          fontWeight: filtroHistoricoCol !== "todos" ? 700 : 500,
                           borderRadius: "4px",
-                          border: filtroPesoCol !== "todos" ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
-                          background: filtroPesoCol !== "todos" ? "#eff6ff" : "#ffffff",
-                          color: filtroPesoCol !== "todos" ? "#1d4ed8" : "#334155",
+                          border: filtroHistoricoCol !== "todos" ? "1.5px solid #7c3aed" : "1px solid #cbd5e1",
+                          background: filtroHistoricoCol !== "todos" ? "#faf5ff" : "#ffffff",
+                          color: filtroHistoricoCol !== "todos" ? "#6d28d9" : "#334155",
                           cursor: "pointer",
                         }}
                       >
                         <option value="todos">Todos</option>
-                        <option value="peso_desc">▼ Mayor a menor</option>
-                        <option value="peso_asc">▲ Menor a mayor</option>
-                        <option value="oficial">⚖️ Balanza Oficial DelPro</option>
+                        <option value="hist_desc">▼ Litros: Mayor a menor</option>
+                        <option value="hist_asc">▲ Litros: Menor a mayor</option>
+                        <option value="alta">Alta (&gt;26 lts)</option>
+                        <option value="baja">Baja (&lt;22 lts)</option>
                       </select>
                     </div>
                   </th>
@@ -1469,23 +1473,29 @@ export default function TamboPage() {
                   </tr>
                 ) : (
                   vacasPaginadas.map((v) => (
-                    <tr key={v.rp}>
+                    <tr
+                      key={v.rp}
+                      onClick={() => setVacaSeleccionadaModal(v)}
+                      style={{ cursor: "pointer" }}
+                      title={`Click para abrir la ficha técnica de la Vaca ${formatearCaravana(v.rp)}`}
+                    >
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <strong style={{ fontSize: "14px", color: "var(--slate-900)" }}>
+                          <strong style={{ fontSize: "14px", color: "#1e40af" }}>
                             🏷️ {formatearCaravana(v.rp)}
                           </strong>
                           <span
                             style={{
                               fontSize: "10px",
-                              padding: "1px 5px",
+                              padding: "2px 6px",
                               borderRadius: "4px",
-                              background: "#fce7f3",
-                              color: "#be185d",
+                              background: "#eff6ff",
+                              color: "#1d4ed8",
                               fontWeight: 700,
+                              border: "1px solid #bfdbfe",
                             }}
                           >
-                            ♀️ Hembra
+                            🔍 Ver Ficha
                           </span>
                         </div>
                       </td>
@@ -1623,37 +1633,27 @@ export default function TamboPage() {
                         )}
                       </td>
                       <td style={{ textAlign: "right" }}>
-                        {(() => {
-                          const infoPeso = resolverPesoAnimal(v);
-                          return (
-                            <div>
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "5px" }}>
-                                <strong style={{ fontSize: "13px", color: infoPeso.esOficialDelPro ? "#166534" : "#0f172a" }}>
-                                  {infoPeso.pesoKg} kg
-                                </strong>
-                                <span
-                                  className={`pill ${infoPeso.badgeClase}`}
-                                  style={{
-                                    fontSize: "9.5px",
-                                    fontWeight: 700,
-                                    padding: "1px 5px",
-                                    border: infoPeso.esOficialDelPro ? "1px solid #86efac" : "1px solid #bae6fd",
-                                    background: infoPeso.esOficialDelPro ? "#dcfce7" : "#e0f2fe",
-                                    color: infoPeso.esOficialDelPro ? "#166534" : "#0369a1",
-                                  }}
-                                  title={infoPeso.detalleCalculo}
-                                >
-                                  {infoPeso.icono} {infoPeso.origenEtiqueta}
-                                </span>
-                              </div>
-                              {infoPeso.esOficialDelPro && (
-                                <div style={{ fontSize: "10px", color: "#166534", fontWeight: 600, marginTop: "1px" }}>
-                                  {infoPeso.detalleCalculo}
-                                </div>
-                              )}
+                        {v.promedioHistorico ? (
+                          <div>
+                            <strong style={{ color: "#6b21a8", fontSize: "13.5px" }}>
+                              {v.promedioHistorico} lts/d
+                            </strong>
+                            <div style={{ fontSize: "10.5px", color: "var(--slate-500)", marginTop: "1px" }}>
+                              {v.partoNumero && v.partoNumero > 0 ? `Lact. ${v.partoNumero}` : "Histórico"}
                             </div>
-                          );
-                        })()}
+                          </div>
+                        ) : v.partoNumero && v.partoNumero > 0 ? (
+                          <div>
+                            <strong style={{ color: "#1e40af", fontSize: "12.5px" }}>
+                              Lact. {v.partoNumero}
+                            </strong>
+                            <div style={{ fontSize: "10.5px", color: "var(--slate-400)" }}>
+                              {v.partoNumero === 1 ? "Primeriza" : `${v.partoNumero}° Parto`}
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={{ color: "var(--slate-400)", fontSize: "11px" }}>—</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -2235,6 +2235,15 @@ export default function TamboPage() {
         onVentaCompletada={handleVentaRemitoCompletada}
         seccionInicial="tambo"
       />
+
+      {/* Modal de Ficha Técnica Individual de Vaca (DelPro) */}
+      {vacaSeleccionadaModal && (
+        <ModalFichaVaca
+          isOpen={!!vacaSeleccionadaModal}
+          vaca={vacaSeleccionadaModal}
+          onClose={() => setVacaSeleccionadaModal(null)}
+        />
+      )}
     </AppShell>
   );
 }

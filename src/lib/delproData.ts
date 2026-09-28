@@ -44,6 +44,9 @@ export interface VacaTamboIndividual {
   diasAbiertos?: number; // OpenDays oficial DelPro
   litrosAyer: number;
   promedio7d?: number; // AvgYieldPrev7d
+  promedioHistorico?: number; // Cantidad media de litros histórico registrada en DelPro
+  fechaNacimiento?: string; // Fecha de nacimiento en ficha DelPro
+  edadMeses?: number; // Edad en meses
   scc?: number; // Células somáticas de control lechero
   grasaPct?: number; // % grasa en leche
   proteinaPct?: number; // % proteína en leche
@@ -385,9 +388,11 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       ? new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR")
       : undefined;
 
-    const esPesadoDelPro = i % 5 === 0;
-    const pesoOficial = esPesadoDelPro ? Number((565 + ((i * 7) % 90)).toFixed(1)) : undefined;
-    const pesoEst = Number((580 + ((i * 3) % 60)).toFixed(1));
+    const partoNum = 1 + (i % 4);
+    const edadMeses = partoNum === 1 ? 26 + (i % 6) : partoNum === 2 ? 38 + (i % 8) : partoNum === 3 ? 50 + (i % 10) : 62 + (i % 12);
+    const fechaNac = new Date(Date.now() - edadMeses * 30.4375 * 86400000).toLocaleDateString("es-AR");
+    const prom7d = Number((lts * 0.98).toFixed(1));
+    const promHist = Number((lts * (0.94 + ((i * 3) % 10) / 100)).toFixed(1));
 
     vacas.push({
       rp: String(rpNum),
@@ -400,12 +405,11 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       diasGestacion: diasGest,
       fechaProbableParto: fechaPartoProb,
       litrosAyer: lts,
-      promedio7d: Number((lts * 0.98).toFixed(1)),
-      partoNumero: 1 + (i % 4),
-      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
-      pesoOficialDelPro: pesoOficial,
-      fechaPesajeDelPro: esPesadoDelPro ? "20/09/26" : undefined,
-      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
+      promedio7d: prom7d,
+      promedioHistorico: promHist,
+      fechaNacimiento: fechaNac,
+      edadMeses,
+      partoNumero: partoNum,
       grupoDelPro: "Vacas en ordeño",
     });
   }
@@ -422,9 +426,11 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       ? new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR")
       : undefined;
 
-    const esPesadoDelPro = i % 4 === 0;
-    const pesoOficial = esPesadoDelPro ? Number((590 + ((i * 5) % 80)).toFixed(1)) : undefined;
-    const pesoEst = Number((600 + ((i * 4) % 60)).toFixed(1));
+    const partoNum = 1 + (i % 3);
+    const edadMeses = partoNum === 1 ? 27 + (i % 5) : partoNum === 2 ? 39 + (i % 6) : 51 + (i % 8);
+    const fechaNac = new Date(Date.now() - edadMeses * 30.4375 * 86400000).toLocaleDateString("es-AR");
+    const prom7d = Number((lts * 0.99).toFixed(1));
+    const promHist = Number((lts * (0.95 + ((i * 2) % 8) / 100)).toFixed(1));
 
     vacas.push({
       rp: String(rpNum),
@@ -437,12 +443,11 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       diasGestacion: diasGest,
       fechaProbableParto: fechaPartoProb,
       litrosAyer: lts,
-      promedio7d: Number((lts * 0.99).toFixed(1)),
-      partoNumero: 1 + (i % 3),
-      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
-      pesoOficialDelPro: pesoOficial,
-      fechaPesajeDelPro: esPesadoDelPro ? "21/09/26" : undefined,
-      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
+      promedio7d: prom7d,
+      promedioHistorico: promHist,
+      fechaNacimiento: fechaNac,
+      edadMeses,
+      partoNumero: partoNum,
       grupoDelPro: "Rodeo de punta",
     });
   }
@@ -454,9 +459,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const diasFaltan = 282 - diasGest;
     const fechaPartoProb = new Date(Date.now() + diasFaltan * 86400000).toLocaleDateString("es-AR");
 
-    const esPesadoDelPro = i % 3 === 0;
-    const pesoOficial = esPesadoDelPro ? Number((625 + (i * 4)).toFixed(1)) : undefined;
-    const pesoEst = Number((630 + (i * 3)).toFixed(1));
+    const partoNum = 2 + (i % 3);
+    const edadMeses = 34 + (i % 24);
+    const fechaNac = new Date(Date.now() - edadMeses * 30.4375 * 86400000).toLocaleDateString("es-AR");
+    const promHist = Number((24.5 + ((i * 5) % 80) / 10).toFixed(1));
 
     vacas.push({
       rp: String(rpNum),
@@ -471,11 +477,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       fechaProbableParto: fechaPartoProb,
       litrosAyer: 0,
       promedio7d: 0,
-      partoNumero: 2 + (i % 3),
-      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
-      pesoOficialDelPro: pesoOficial,
-      fechaPesajeDelPro: esPesadoDelPro ? "19/09/26" : undefined,
-      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
+      promedioHistorico: promHist,
+      fechaNacimiento: fechaNac,
+      edadMeses,
+      partoNumero: partoNum,
       grupoDelPro: "Preparto",
     });
   }
@@ -487,9 +492,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const diasFaltan = 282 - diasGest;
     const fechaPartoProb = new Date(Date.now() + diasFaltan * 86400000).toLocaleDateString("es-AR");
 
-    const esPesadoDelPro = i % 2 === 0;
-    const pesoOficial = esPesadoDelPro ? Number((615 + (i * 5)).toFixed(1)) : undefined;
-    const pesoEst = Number((620 + (i * 4)).toFixed(1));
+    const partoNum = 2 + (i % 4);
+    const edadMeses = 44 + (i % 20);
+    const fechaNac = new Date(Date.now() - edadMeses * 30.4375 * 86400000).toLocaleDateString("es-AR");
+    const promHist = Number((25.0 + ((i * 7) % 70) / 10).toFixed(1));
 
     vacas.push({
       rp: String(rpNum),
@@ -504,11 +510,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       fechaProbableParto: fechaPartoProb,
       litrosAyer: 0,
       promedio7d: 0,
-      partoNumero: 2 + (i % 4),
-      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
-      pesoOficialDelPro: pesoOficial,
-      fechaPesajeDelPro: esPesadoDelPro ? "18/09/26" : undefined,
-      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
+      promedioHistorico: promHist,
+      fechaNacimiento: fechaNac,
+      edadMeses,
+      partoNumero: partoNum,
       grupoDelPro: "Vacas Secas",
     });
   }
@@ -520,9 +525,8 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const diasFaltan = 282 - diasGest;
     const fechaPartoProb = new Date(Date.now() + diasFaltan * 86400000).toLocaleDateString("es-AR");
 
-    const esPesadoDelPro = i % 5 === 0;
-    const pesoOficial = esPesadoDelPro ? Number((450 + (i * 3)).toFixed(1)) : undefined;
-    const pesoEst = Number((460 + (i * 2)).toFixed(1));
+    const edadMeses = 21 + (i % 5);
+    const fechaNac = new Date(Date.now() - edadMeses * 30.4375 * 86400000).toLocaleDateString("es-AR");
 
     vacas.push({
       rp: String(rpNum),
@@ -537,11 +541,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       fechaProbableParto: fechaPartoProb,
       litrosAyer: 0,
       promedio7d: 0,
+      fechaNacimiento: fechaNac,
+      edadMeses,
       partoNumero: 0,
-      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
-      pesoOficialDelPro: pesoOficial,
-      fechaPesajeDelPro: esPesadoDelPro ? "20/09/26" : undefined,
-      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       grupoDelPro: "Vq Preñada",
     });
   }
@@ -551,9 +553,8 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const rpNum = 4100 + i;
     const isInsem = i % 2 === 0;
 
-    const esPesadoDelPro = i % 6 === 0;
-    const pesoOficial = esPesadoDelPro ? Number((370 + (i * 3)).toFixed(1)) : undefined;
-    const pesoEst = Number((380 + (i * 2)).toFixed(1));
+    const edadMeses = 15 + (i % 4);
+    const fechaNac = new Date(Date.now() - edadMeses * 30.4375 * 86400000).toLocaleDateString("es-AR");
 
     vacas.push({
       rp: String(rpNum),
@@ -565,11 +566,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       diasLactancia: 0,
       litrosAyer: 0,
       promedio7d: 0,
+      fechaNacimiento: fechaNac,
+      edadMeses,
       partoNumero: 0,
-      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
-      pesoOficialDelPro: pesoOficial,
-      fechaPesajeDelPro: esPesadoDelPro ? "19/09/26" : undefined,
-      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       grupoDelPro: "Vq Servicio",
     });
   }
@@ -578,16 +577,14 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
   for (let i = 1; i <= 117; i++) {
     const rpNum = 4200 + i;
 
-    const esPesadoDelPro = i % 10 === 0;
     const esRH1 = i <= 35;
     const esRH2 = i > 35 && i <= 77;
     const corralAsignado: CorralHembraId = esRH1 ? "rh1" : (esRH2 ? "rh2" : "rh3");
     const nombreCorralAsignado = esRH1 ? "Recría Hembras 1" : (esRH2 ? "Recría Hembras 2" : "Recría 3 / Vq Servicio");
     const grupoDelProStr = esRH1 ? "Recría Hembras 1 (RH1)" : (esRH2 ? "Recría Hembras 2 (RH2)" : "Recría Hembras 3 (RH3)");
 
-    const basePeso = esRH1 ? 85 + (i * 0.8) : (esRH2 ? 120 + ((i - 35) * 1.1) : 175 + ((i - 77) * 2.2));
-    const pesoOficial = esPesadoDelPro ? Number((basePeso + 2.5).toFixed(1)) : undefined;
-    const pesoEst = Number(basePeso.toFixed(1));
+    const edadMeses = esRH1 ? 4 + (i % 4) : esRH2 ? 8 + (i % 5) : 13 + (i % 3);
+    const fechaNac = new Date(Date.now() - edadMeses * 30.4375 * 86400000).toLocaleDateString("es-AR");
 
     vacas.push({
       rp: String(rpNum),
@@ -599,11 +596,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       diasLactancia: 0,
       litrosAyer: 0,
       promedio7d: 0,
+      fechaNacimiento: fechaNac,
+      edadMeses,
       partoNumero: 0,
-      pesoKg: esPesadoDelPro ? pesoOficial : pesoEst,
-      pesoOficialDelPro: pesoOficial,
-      fechaPesajeDelPro: esPesadoDelPro ? "18/09/26" : undefined,
-      origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       grupoDelPro: grupoDelProStr,
     });
   }
@@ -611,7 +606,8 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
   // 8. Crianza Hembras - 17 cabezas (Grupo 11 DelPro: 17 hembras reales en guachera p/ reposición lechera)
   for (let i = 1; i <= 17; i++) {
     const rpNum = 8800 + i;
-    const pesoEst = Number((40 + i * 2.5).toFixed(1));
+    const diasVida = 15 + i * 3;
+    const fechaNac = new Date(Date.now() - diasVida * 86400000).toLocaleDateString("es-AR");
 
     vacas.push({
       rp: String(rpNum),
@@ -623,9 +619,9 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       diasLactancia: 0,
       litrosAyer: 0,
       promedio7d: 0,
+      fechaNacimiento: fechaNac,
+      edadMeses: 1,
       partoNumero: 0,
-      pesoKg: pesoEst,
-      origenPeso: "estimado_curva",
       grupoDelPro: "Guachera Hembras",
     });
   }
