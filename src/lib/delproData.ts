@@ -368,8 +368,37 @@ export function normalizarDatosReproductivosVaca(v: VacaTamboIndividual): VacaTa
   const esVaquillona = v.estadoProductivo === "Vaquillona" || v.partoNumero === 0;
   const esSeca = v.estadoProductivo === "Seca" || v.corralId === "secas" || v.corralId === "preparto";
 
+  // Sanitización estricta de fecha de nacimiento: si DelPro no la informa, NUNCA dejar placeholders ni textos inventados
+  let fechaNacimientoSanitizada: string | undefined = v.fechaNacimiento;
+  if (
+    !fechaNacimientoSanitizada ||
+    typeof fechaNacimientoSanitizada !== "string" ||
+    fechaNacimientoSanitizada.toLowerCase().includes("delpro") ||
+    fechaNacimientoSanitizada.trim() === "" ||
+    fechaNacimientoSanitizada === "—" ||
+    fechaNacimientoSanitizada === "null" ||
+    fechaNacimientoSanitizada === "undefined"
+  ) {
+    fechaNacimientoSanitizada = undefined;
+  }
+
+  let edadMesesSanitizada = v.edadMeses;
+  if (!edadMesesSanitizada && fechaNacimientoSanitizada) {
+    const fnac = parsearFechaFlexible(fechaNacimientoSanitizada);
+    if (fnac && !isNaN(fnac.getTime())) {
+      const diffMs = Date.now() - fnac.getTime();
+      if (diffMs > 0) {
+        edadMesesSanitizada = Math.floor(diffMs / (30.4375 * 86400000));
+      }
+    }
+  }
+
   if (!esPreñada) {
-    return v;
+    return {
+      ...v,
+      fechaNacimiento: fechaNacimientoSanitizada,
+      edadMeses: edadMesesSanitizada,
+    };
   }
 
   let diasGest = v.diasGestacion;
@@ -413,6 +442,8 @@ export function normalizarDatosReproductivosVaca(v: VacaTamboIndividual): VacaTa
 
   return {
     ...v,
+    fechaNacimiento: fechaNacimientoSanitizada,
+    edadMeses: edadMesesSanitizada,
     diasGestacion: diasGestFinal,
     diasParaParto,
     fechaProbableParto: fechaParto,
@@ -2115,6 +2146,42 @@ export function importarPayloadDesdeJson(jsonString: string, persistToFirestore:
             ? Number((Number(item.TotalYield) / Number(item.DIM)).toFixed(1))
             : undefined;
 
+          const rawBirthDate = item.BirthDate || item["Birth Date"] || item.FechaNacimiento || item["Fecha de nacimiento"] || item["Fecha Nacimiento"] || item.Born || item.fechaNacimiento || item.Birth_Date;
+          let fechaNacParsed: string | undefined = undefined;
+          if (rawBirthDate) {
+            if (rawBirthDate instanceof Date && !isNaN(rawBirthDate.getTime())) {
+              fechaNacParsed = rawBirthDate.toLocaleDateString("es-AR");
+            } else if (typeof rawBirthDate === "string") {
+              const s = rawBirthDate.trim();
+              if (s && !s.toLowerCase().includes("delpro") && s !== "—" && s !== "null" && s !== "undefined") {
+                if (s.includes("T")) {
+                  const d = new Date(s);
+                  if (!isNaN(d.getTime())) fechaNacParsed = d.toLocaleDateString("es-AR");
+                } else if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+                  const parts = s.split(/[-T ]/);
+                  fechaNacParsed = `${parts[2].padStart(2, "0")}/${parts[1].padStart(2, "0")}/${parts[0]}`;
+                } else if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(s)) {
+                  fechaNacParsed = s;
+                }
+              }
+            }
+          }
+
+          let edadMesesParsed: number | undefined = undefined;
+          if (item.EdadMeses !== undefined && item.EdadMeses !== null && !isNaN(Number(item.EdadMeses))) {
+            edadMesesParsed = Number(item.EdadMeses);
+          } else if (item.AgeMonths !== undefined && item.AgeMonths !== null && !isNaN(Number(item.AgeMonths))) {
+            edadMesesParsed = Number(item.AgeMonths);
+          } else if (fechaNacParsed) {
+            const d = parsearFechaFlexible(fechaNacParsed);
+            if (d && !isNaN(d.getTime())) {
+              const diffMs = Date.now() - d.getTime();
+              if (diffMs > 0) {
+                edadMesesParsed = Math.floor(diffMs / (30.4375 * 86400000));
+              }
+            }
+          }
+
           const vacaObj: VacaTamboIndividual = {
             rp,
             sexo: "Hembra",
@@ -2130,6 +2197,8 @@ export function importarPayloadDesdeJson(jsonString: string, persistToFirestore:
             litrosAyer: Number(item.Ayer || item.TotalYield || item.DailyYield || (isOrdenie ? 26.2 : 0)),
             promedio7d: item.AvgYieldPrev7d ? Number(item.AvgYieldPrev7d) : undefined,
             promedioHistorico: promHistReal,
+            fechaNacimiento: fechaNacParsed,
+            edadMeses: edadMesesParsed,
             partoNumero: item.LactationNumber ? Number(item.LactationNumber) : (isOrdenie ? 2 : 0),
             grupoDelPro: grNombre || (isOrdenie ? "Vacas en ordeño" : isSeca ? "Vacas Secas" : isCrianza ? "Guachera Hembras" : "Recría Hembras"),
           };
@@ -2299,7 +2368,9 @@ SELECT
     CASE WHEN a.LactationStatus = 1 THEN 'En Ordeñe' ELSE 'Seca' END AS EstadoProductivo,
     CASE WHEN a.Pregnant = 1 THEN 'Preñada' ELSE 'Vacía' END AS EstadoReproductivo,
     ISNULL(DATEDIFF(day, c.EventDate, GETDATE()), 120) AS DiasLactancia,
-    ROUND(ISNULL(y.TotalYield, 27.0), 1) AS LitrosAyer
+    ROUND(ISNULL(y.TotalYield, 27.0), 1) AS LitrosAyer,
+    CONVERT(VARCHAR(10), a.BirthDate, 103) AS FechaNacimiento,
+    DATEDIFF(month, a.BirthDate, GETDATE()) AS EdadMeses
 FROM Animal a WITH (NOLOCK)
 LEFT JOIN (SELECT MotherAnimalOID, MAX(EventDate) AS EventDate FROM Calving WITH (NOLOCK) GROUP BY MotherAnimalOID) c ON c.MotherAnimalOID = a.OID
 LEFT JOIN (SELECT AnimalOID, TotalYield FROM DailyMilkYield WITH (NOLOCK) WHERE YieldDate >= CAST(DATEADD(day, -2, GETDATE()) AS DATE)) y ON y.AnimalOID = a.OID

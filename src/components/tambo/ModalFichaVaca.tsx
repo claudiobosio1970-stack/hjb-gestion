@@ -16,15 +16,20 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
     return calcularInfoSecado(vaca);
   }, [vaca]);
 
-  // Cálculo de edad exacta en años y meses
+  // Cálculo de edad exacta en años y meses (solo si DelPro registró fecha de nacimiento o edad)
   const edadFormateada = useMemo(() => {
-    if (!vaca) return "—";
-    if (vaca.edadMeses) {
+    if (!vaca) return null;
+    if (vaca.edadMeses && vaca.edadMeses > 0) {
       const anios = Math.floor(vaca.edadMeses / 12);
       const meses = vaca.edadMeses % 12;
       return `${anios} años${meses > 0 ? ` y ${meses} meses` : ""}`;
     }
-    if (vaca.fechaNacimiento) {
+    if (
+      vaca.fechaNacimiento &&
+      typeof vaca.fechaNacimiento === "string" &&
+      !vaca.fechaNacimiento.toLowerCase().includes("delpro") &&
+      vaca.fechaNacimiento !== "—"
+    ) {
       const partes = vaca.fechaNacimiento.split("/");
       if (partes.length === 3) {
         const dia = parseInt(partes[0], 10);
@@ -32,20 +37,19 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
         let anio = parseInt(partes[2], 10);
         if (anio < 100) anio += 2000;
         const fnac = new Date(anio, mes, dia);
-        const diffMs = Date.now() - fnac.getTime();
-        const totalMeses = Math.max(0, Math.floor(diffMs / (30.4375 * 86400000)));
-        const a = Math.floor(totalMeses / 12);
-        const m = totalMeses % 12;
-        return `${a} años${m > 0 ? ` y ${m} meses` : ""}`;
+        if (!isNaN(fnac.getTime())) {
+          const diffMs = Date.now() - fnac.getTime();
+          if (diffMs > 0) {
+            const totalMeses = Math.floor(diffMs / (30.4375 * 86400000));
+            const a = Math.floor(totalMeses / 12);
+            const m = totalMeses % 12;
+            return `${a} años${m > 0 ? ` y ${m} meses` : ""}`;
+          }
+        }
       }
     }
-    // Si no está registrado explícitamente, derivar de su ciclo de lactancia
-    const lact = vaca.partoNumero || (vaca.estadoProductivo === "Vaquillona" ? 0 : 2);
-    if (lact === 0) return "1 año y 9 meses";
-    if (lact === 1) return "2 años y 6 meses";
-    if (lact === 2) return "3 años y 8 meses";
-    if (lact === 3) return "4 años y 10 meses";
-    return `${3 + lact} años`;
+    // Cero invención de datos: si DelPro no la informa, no inventar
+    return null;
   }, [vaca]);
 
   if (!isOpen || !vaca) return null;
@@ -292,19 +296,31 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
                 </div>
               </div>
 
-              <div>
-                <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Edad Actual</div>
-                <div style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>
-                  {edadFormateada}
+              {edadFormateada && (
+                <div>
+                  <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Edad Actual</div>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>
+                    {edadFormateada}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div>
-                <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Fecha de Nacimiento</div>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: "#334155", marginTop: "2px" }}>
-                  {vaca.fechaNacimiento || "Registrada en DelPro"}
+              {Boolean(
+                vaca.fechaNacimiento &&
+                typeof vaca.fechaNacimiento === "string" &&
+                vaca.fechaNacimiento.trim() !== "" &&
+                !vaca.fechaNacimiento.toLowerCase().includes("delpro") &&
+                vaca.fechaNacimiento !== "—" &&
+                vaca.fechaNacimiento !== "null" &&
+                vaca.fechaNacimiento !== "undefined"
+              ) && (
+                <div>
+                  <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Fecha de Nacimiento</div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#334155", marginTop: "2px" }}>
+                    {vaca.fechaNacimiento}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Ciclo de Lactancia (Parto N°)</div>
@@ -372,7 +388,7 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
                   <div>
                     <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Fecha Probable de Parto</div>
                     <div style={{ fontSize: "16px", fontWeight: 800, color: "#166534", marginTop: "2px" }}>
-                      {vaca.fechaProbableParto || "Estimada DelPro"}
+                      {vaca.fechaProbableParto && !vaca.fechaProbableParto.toLowerCase().includes("delpro") ? vaca.fechaProbableParto : "—"}
                     </div>
                   </div>
 
@@ -390,7 +406,7 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
                   <div>
                     <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Día Exacto para Secarla</div>
                     <div style={{ fontSize: "15.5px", fontWeight: 800, color: "#b45309", marginTop: "2px" }}>
-                      🍂 {infoSecado?.fechaSecado && infoSecado.fechaSecado !== "—" ? infoSecado.fechaSecado : vaca.fechaSecadoEstimada || "A determinar por DelPro"}
+                      🍂 {infoSecado?.fechaSecado && infoSecado.fechaSecado !== "—" ? infoSecado.fechaSecado : vaca.fechaSecadoEstimada || "—"}
                     </div>
                     {infoSecado?.fechaSecadoLarga && (
                       <div style={{ fontSize: "11px", color: "#78350f", fontWeight: 700, marginTop: "2px" }}>

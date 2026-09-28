@@ -522,7 +522,9 @@ SELECT
     CASE WHEN a.Pregnant = 1 THEN 'Preñada' ELSE 'Vacía' END AS EstadoReproductivo,
     ISNULL(DATEDIFF(day, c.EventDate, GETDATE()), 120) AS DiasLactancia,
     CASE WHEN a.Pregnant = 1 THEN 120 ELSE NULL END AS DiasGestacion,
-    ROUND(ISNULL(y.TotalYield, 27.0), 1) AS LitrosAyer
+    ROUND(ISNULL(y.TotalYield, 27.0), 1) AS LitrosAyer,
+    CONVERT(VARCHAR(10), a.BirthDate, 103) AS FechaNacimiento,
+    DATEDIFF(month, a.BirthDate, GETDATE()) AS EdadMeses
 FROM Animal a WITH (NOLOCK)
 LEFT JOIN (SELECT MotherAnimalOID, MAX(EventDate) AS EventDate FROM Calving WITH (NOLOCK) GROUP BY MotherAnimalOID) c ON c.MotherAnimalOID = a.OID
 LEFT JOIN (SELECT AnimalOID, TotalYield FROM DailyMilkYield WITH (NOLOCK) WHERE YieldDate >= CAST(DATEADD(day, -2, GETDATE()) AS DATE)) y ON y.AnimalOID = a.OID
@@ -541,6 +543,8 @@ if ($dtVacas -and $dtVacas.Rows.Count -gt 0) {
             "diasLactancia" = [int]$r["DiasLactancia"]
             "diasGestacion" = if ($r["DiasGestacion"] -ne [DBNull]::Value) { [int]$r["DiasGestacion"] } else { $null }
             "litrosAyer" = [double]$r["LitrosAyer"]
+            "fechaNacimiento" = if ($r["FechaNacimiento"] -ne [DBNull]::Value -and -not [string]::IsNullOrWhiteSpace($r["FechaNacimiento"])) { [string]$r["FechaNacimiento"] } else { $null }
+            "edadMeses" = if ($r["EdadMeses"] -ne [DBNull]::Value) { [int]$r["EdadMeses"] } else { $null }
         }
     }
 } else {
