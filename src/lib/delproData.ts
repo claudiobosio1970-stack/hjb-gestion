@@ -1300,11 +1300,17 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
   try {
     const docRef = doc(db, "delpro", "sincronizacion_actual");
     onSnapshot(docRef, (snapshot) => {
+      // Ignorar mutaciones locales pendientes para no re-procesar en bucle reactivo
+      if (snapshot.metadata.hasPendingWrites) {
+        return;
+      }
+
       if (snapshot.exists()) {
         const data = snapshot.data();
         if (data.payloadJson) {
           try {
-            const res = importarPayloadDesdeJson(data.payloadJson);
+            // NUNCA persistir a Firestore desde el listener reactivo de onSnapshot
+            const res = importarPayloadDesdeJson(data.payloadJson, false);
             if (res.success && res.config) {
               if (onUpdate) onUpdate(res.config);
               return;
@@ -1485,7 +1491,7 @@ export function propagarDatosDelProATodoElSistema(
     litrosPromedioVO: mergedDatos.litrosPromedioVO,
     racionesKgDia: racionesActualizadas,
     actualizadoPor: "DeLaval DelPro (Sincronización Automática)",
-  });
+  }, false);
 
   // 2. Procesar animales de recría y aplicar cambios de corral anotados en DelPro
   let animalesActuales = [...getAnimalesRecria()];
@@ -1633,7 +1639,7 @@ export function aplicarSincronizacionDelPro(payload: Partial<DelProSyncPayload>)
 /**
  * Importa y aplica un archivo delpro_sync.json extraído mediante Microsoft SQL Server
  */
-export function importarPayloadDesdeJson(jsonString: string): { success: boolean; mensaje: string; config?: DelProConfig } {
+export function importarPayloadDesdeJson(jsonString: string, persistToFirestore: boolean = false): { success: boolean; mensaje: string; config?: DelProConfig } {
   try {
     const parsed = JSON.parse(jsonString);
     if (!parsed || typeof parsed !== "object") {
@@ -1870,8 +1876,10 @@ export function importarPayloadDesdeJson(jsonString: string): { success: boolean
       mensajeEstado: `Datos reales extraídos de DeLaval DelPro SQL (${new Date().toLocaleTimeString("es-AR")})`,
     });
 
-    // Como es importación manual de archivo en la web, persistir explícitamente en Firestore
-    saveDelProConfig(config, true);
+    // Solo persistir si se solicita explícitamente (ej: carga manual de archivo por el usuario en la web), NUNCA en sincronización pasiva
+    if (persistToFirestore) {
+      saveDelProConfig(config, true);
+    }
 
     const totalRodeo = parsed.rodeoCompleto?.length || payload.vacasEnOrdeñe;
 

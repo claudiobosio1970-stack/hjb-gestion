@@ -549,7 +549,7 @@ export default function TamboPage() {
                     reader.onload = (ev) => {
                       const text = ev.target?.result as string;
                       if (text) {
-                        const res = importarPayloadDesdeJson(text);
+                        const res = importarPayloadDesdeJson(text, true);
                         if (res.success && res.config) {
                           setDelproConfig(res.config);
                           setCensoRodeo(getCensoRodeoTambo());

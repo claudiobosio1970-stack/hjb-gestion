@@ -133,7 +133,7 @@ export default function InicioPage() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
-      const res = importarPayloadDesdeJson(content);
+      const res = importarPayloadDesdeJson(content, true);
       if (res.success && res.config) {
         setDelproConfig(res.config);
         cargarTodo();

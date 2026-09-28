@@ -658,7 +658,7 @@ export function getDietaTambo(): DietaTamboConfig {
   }
 }
 
-export function saveDietaTambo(nueva: Partial<DietaTamboConfig>): DietaTamboConfig {
+export function saveDietaTambo(nueva: Partial<DietaTamboConfig>, persistToFirestore: boolean = true): DietaTamboConfig {
   if (typeof window === "undefined") return { ...DIETA_TAMBO_HJB_DEFAULT };
   const current = getDietaTambo();
   const precioLeche = nueva.precioLitroLecheArs !== undefined ? Number(nueva.precioLitroLecheArs) : (current.precioLitroLecheArs ?? 548.0);
@@ -690,7 +690,8 @@ export function saveDietaTambo(nueva: Partial<DietaTamboConfig>): DietaTamboConf
     notifyStockSync();
   }
 
-  if (typeof window !== "undefined" && db) {
+  // SOLO persistir en Firestore si se pide explícitamente, NUNCA en sincronización pasiva
+  if (persistToFirestore && typeof window !== "undefined" && db) {
     setDoc(doc(db, "tambo_config", "dieta_actual"), sanitizeForFirestore(updated), { merge: true }).catch((err) => {
       console.warn("Error guardando dieta de tambo en Firestore:", err);
     });
