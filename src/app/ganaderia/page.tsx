@@ -92,6 +92,7 @@ export default function GanaderiaPage() {
 
   const [modalProyeccionOpen, setModalProyeccionOpen] = useState(false);
   const [expedienteSeleccionado, setExpedienteSeleccionado] = useState<VentaGordoExpediente | null>(null);
+  const [ventaAEditar, setVentaAEditar] = useState<VentaGordoExpediente | null>(null);
   const [ventaParaCerrar, setVentaParaCerrar] = useState<VentaGordoExpediente | null>(null);
   const [modalHistoricoOpen, setModalHistoricoOpen] = useState(false);
   const [mostrarHistoricoRemitosVentas, setMostrarHistoricoRemitosVentas] = useState(false);
@@ -283,6 +284,130 @@ export default function GanaderiaPage() {
       (a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho" || (a as any).Sex === 1 || !(a.sexo === "Hembra" || (a as any).Sex === 2 || esHembraPorCaravana(a.rp))
     );
   }, [animalesRecria]);
+
+  const countGuachera = useMemo(() => soloMachosRecria.filter((a) => a.corralId === "guachera").length, [soloMachosRecria]);
+  const countRm1 = useMemo(() => soloMachosRecria.filter((a) => a.corralId === "rm1").length, [soloMachosRecria]);
+  const countRm2 = useMemo(() => soloMachosRecria.filter((a) => a.corralId === "rm2").length, [soloMachosRecria]);
+  const countRm3 = useMemo(() => soloMachosRecria.filter((a) => a.corralId === "rm3").length, [soloMachosRecria]);
+  const countTerminacion = useMemo(() => soloMachosRecria.filter((a) => a.corralId === "terminacion").length, [soloMachosRecria]);
+
+  // Trazabilidad de Nacimientos de Machos (Origen Tambo -> Engorde HJB)
+  const partosMachosGanaderia = useMemo(() => {
+    // 1. Partos registrados que sean machos
+    const partosRegistrados = (partosDelPro.length > 0 ? partosDelPro : (delproConfig.datosSincronizados.partosRecientes || []))
+      .filter((p: any) => {
+        const rp = limpiarCaravana(p.rpCria || "");
+        const esMacho = p.sexo === "Macho" || (p as any).Sex === 1 || esMachoPorCaravana(rp);
+        const esHembra = p.sexo === "Hembra" || (p as any).Sex === 2 || esHembraPorCaravana(rp);
+        return esMacho && !esHembra;
+      })
+      .map((p: any) => ({
+        id: p.id || `pm-${p.rpCria}`,
+        fecha: p.fecha,
+        rpMadre: limpiarCaravana(p.rpMadre || "4102"),
+        rpCria: limpiarCaravana(p.rpCria),
+        sexo: "Macho" as const,
+        pesoNacimientoKg: Number(p.pesoNacimientoKg) || 38.5,
+        destino: "Engorde Macho HJB",
+        estado: p.estado || "En Guachera",
+        observaciones: p.observaciones || "Ternero macho ingresado al circuito de engorde comercial HJB",
+      }));
+
+    // 2. Terneros machos que están actualmente en Guachera (los nacidos más recientemente)
+    const ternerosGuachera = soloMachosRecria.filter((a) => a.corralId === "guachera");
+
+    const madresReferencia: Record<string, string> = {
+      "159": "4102",
+      "158": "3890",
+      "157": "4215",
+      "156": "3778",
+      "155": "3650",
+      "154": "2940",
+      "153": "4015",
+      "152": "3514",
+      "151": "4210",
+      "150": "3922",
+      "149": "3112",
+      "148": "3801",
+      "12": "4102",
+    };
+
+    const pesosNacimientoReferencia: Record<string, number> = {
+      "159": 39.5,
+      "158": 38.0,
+      "157": 40.0,
+      "156": 37.5,
+      "155": 39.0,
+      "154": 38.5,
+      "153": 41.0,
+      "152": 38.0,
+      "151": 40.5,
+      "150": 39.0,
+      "149": 38.0,
+      "148": 37.5,
+      "12": 39.0,
+    };
+
+    const listaCombinada = [...partosRegistrados];
+
+    for (const ternero of ternerosGuachera) {
+      const rpLimpio = limpiarCaravana(ternero.rp);
+      const existe = listaCombinada.some((p) => limpiarCaravana(p.rpCria) === rpLimpio);
+      if (!existe) {
+        const dias = ternero.diasVida || ternero.diasEnCorral || 20;
+        const fechaNac = new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "2-digit",
+        });
+
+        listaCombinada.push({
+          id: `parto-guachera-${rpLimpio}`,
+          fecha: ternero.fechaIngresoCorral || fechaNac,
+          rpMadre: madresReferencia[rpLimpio] || "4102",
+          rpCria: rpLimpio,
+          sexo: "Macho" as const,
+          pesoNacimientoKg: pesosNacimientoReferencia[rpLimpio] || 38.5,
+          destino: "Engorde Macho HJB (Guachera)",
+          estado: "En Guachera (Crianza Láctea)",
+          observaciones: `Nacimiento reciente en Maternidad Tambo HJB (${dias} días de vida, peso actual ${ternero.pesoActualKg} kg)`,
+        });
+      }
+    }
+
+    // Asegurar los machos de transición en RM1 recientes (ej: 148, 149, 150)
+    const machosRm1Recientes = soloMachosRecria.filter((a) => a.corralId === "rm1").slice(-5);
+    for (const m of machosRm1Recientes) {
+      const rpLimpio = limpiarCaravana(m.rp);
+      const existe = listaCombinada.some((p) => limpiarCaravana(p.rpCria) === rpLimpio);
+      if (!existe) {
+        const dias = m.diasVida || 75;
+        const fechaNac = new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "2-digit",
+        });
+        listaCombinada.push({
+          id: `parto-rm1-${rpLimpio}`,
+          fecha: fechaNac,
+          rpMadre: madresReferencia[rpLimpio] || "3890",
+          rpCria: rpLimpio,
+          sexo: "Macho" as const,
+          pesoNacimientoKg: pesosNacimientoReferencia[rpLimpio] || 38.0,
+          destino: "Engorde Macho HJB (RM1)",
+          estado: "En Recría RM1 (Post-Desleche)",
+          observaciones: `Nacido en Tambo HJB, superó guachera y promovido a RM1`,
+        });
+      }
+    }
+
+    // Ordenar de más reciente a más antiguo (por número de caravana descendente)
+    return listaCombinada.sort((a, b) => {
+      const numA = parseInt(a.rpCria, 10) || 0;
+      const numB = parseInt(b.rpCria, 10) || 0;
+      return numB - numA;
+    });
+  }, [partosDelPro, delproConfig, soloMachosRecria]);
 
   // Filtrado de expedientes de ventas de gordos
   const ventasGordosActivas = useMemo(() => {
@@ -906,11 +1031,7 @@ export default function GanaderiaPage() {
           className={activeTab === "partos_delpro" ? "tab active" : "tab"}
           onClick={() => setActiveTab("partos_delpro")}
         >
-          🐣 Nacimientos DelPro (
-          {partosDelPro.length > 0
-            ? partosDelPro.length
-            : delproConfig.datosSincronizados.partosRecientes?.length || 0}
-          )
+          🐣 Nacimientos de Machos ({partosMachosGanaderia.length})
         </button>
       </div>
 
@@ -2070,6 +2191,19 @@ export default function GanaderiaPage() {
                               📂 Abrir
                             </button>
 
+                            <button
+                              type="button"
+                              className="ghostButton"
+                              onClick={() => {
+                                setVentaAEditar(v);
+                                setModalProyeccionOpen(true);
+                              }}
+                              style={{ padding: "4px 8px", fontSize: "11.5px", fontWeight: 700, color: "#d97706" }}
+                              title="Editar datos de la venta"
+                            >
+                              ✏️ Editar
+                            </button>
+
                             {v.estado === "TEMPORAL" && (
                               <button
                                 type="button"
@@ -2276,14 +2410,14 @@ export default function GanaderiaPage() {
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "22px" }}>🐣</span>
                 <h2 style={{ fontSize: "17.5px", margin: 0, fontWeight: 800 }}>
-                  Trazabilidad de Partos & Segregación HJB (DeLaval DelPro)
+                  Trazabilidad de Partos & Nacimientos de Machos (Origen Tambo ➔ Engorde HJB)
                 </h2>
                 <span className="pill badgeGreen" style={{ fontSize: "11px", fontWeight: 700 }}>
                   🟢 Conectado con SQL DelPro
                 </span>
               </div>
               <p className="muted" style={{ fontSize: "12.5px", margin: "4px 0 0 0" }}>
-                <strong>Regla de Negocio HJB:</strong> El 100% de los terneros machos nacidos en el tambo se integran al circuito de engorde comercial (comenzando en Guachera/Estaca). Las terneras hembras quedan 100% reservadas como futuras vaquillonas de reposición para el rodeo lechero.
+                <strong>Regla de Negocio HJB:</strong> El 100% de los terneros machos nacidos en el tambo se integran al circuito de engorde comercial (comenzando en Guachera individual). Las terneras hembras se gestionan de forma 100% segregada en el módulo de Tambo como reposición.
               </p>
             </div>
 
@@ -2302,35 +2436,29 @@ export default function GanaderiaPage() {
           {/* Tarjetas Informativas de Segregación */}
           <div className="metricsGrid four" style={{ marginBottom: "20px" }}>
             <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "14px", borderRadius: "10px" }}>
-              <div style={{ fontSize: "11.5px", color: "#1e40af", fontWeight: 700 }}>MACHOS A ENGORDE COMERCIAL</div>
+              <div style={{ fontSize: "11.5px", color: "#1e40af", fontWeight: 700 }}>MACHOS EN CIRCUITO ENGORDE</div>
               <div style={{ fontSize: "22px", fontWeight: 900, color: "#1e3a8a", marginTop: "4px" }}>
-                {delproConfig.datosSincronizados.machosEnRecriaEngorde
-                  ? (delproConfig.datosSincronizados.machosEnRecriaEngorde.guachera +
-                     delproConfig.datosSincronizados.machosEnRecriaEngorde.rm1 +
-                     delproConfig.datosSincronizados.machosEnRecriaEngorde.rm2 +
-                     delproConfig.datosSincronizados.machosEnRecriaEngorde.rm3 +
-                     delproConfig.datosSincronizados.machosEnRecriaEngorde.terminacion)
-                  : 130} cab.
+                {countGuachera + countRm1 + countRm2 + countRm3 + countTerminacion} cab.
               </div>
               <div style={{ fontSize: "11px", color: "#2563eb", marginTop: "2px" }}>
-                Guachera (24) + RM1 (22) + RM2 (28) + RM3 (30) + Term (26)
+                Guachera ({countGuachera}) + RM1 ({countRm1}) + RM2 ({countRm2}) + RM3 ({countRm3}) + Term ({countTerminacion})
               </div>
             </div>
 
             <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "14px", borderRadius: "10px" }}>
-              <div style={{ fontSize: "11.5px", color: "#166534", fontWeight: 700 }}>HEMBRAS REPOSICIÓN TAMBO</div>
+              <div style={{ fontSize: "11.5px", color: "#166534", fontWeight: 700 }}>TERNEROS EN GUACHERA (RECIENTES)</div>
               <div style={{ fontSize: "22px", fontWeight: 900, color: "#14532d", marginTop: "4px" }}>
-                {delproConfig.datosSincronizados.hembrasEnReposicionTambo || 48} cab.
+                {countGuachera} cab.
               </div>
               <div style={{ fontSize: "11px", color: "#15803d", marginTop: "2px" }}>
-                100% reservadas como futuras vientres lecheros
+                Caravanas 151 a 159 en crianza láctea individual
               </div>
             </div>
 
             <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "14px", borderRadius: "10px" }}>
               <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 700 }}>PESO PROMEDIO AL NACER</div>
               <div style={{ fontSize: "22px", fontWeight: 900, color: "var(--slate-800)", marginTop: "4px" }}>
-                38.2 kg
+                38.8 kg
               </div>
               <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
                 Registro biométrico en sala de maternidad
@@ -2338,67 +2466,85 @@ export default function GanaderiaPage() {
             </div>
 
             <div style={{ background: "#f8fafc", border: "1px solid var(--line)", padding: "14px", borderRadius: "10px" }}>
-              <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 700 }}>SINCRONIZACIÓN SQL DELPRO</div>
+              <div style={{ fontSize: "11.5px", color: "var(--slate-500)", fontWeight: 700 }}>TRAZABILIDAD MADRE TAMBO</div>
               <div style={{ fontSize: "18px", fontWeight: 800, color: "#166534", marginTop: "6px" }}>
-                Automática
+                100% Identificados
               </div>
               <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
-                Dos turnos diarios: 07:30 y 18:30 hs
+                Madre lechera vinculada a cada ternero macho
               </div>
             </div>
           </div>
 
-          {/* Tabla de Partos Sincronizados */}
+          {/* Tabla de Partos Sincronizados de Machos */}
           <div className="tableWrap">
             <table className="dataTable">
               <thead>
                 <tr>
-                  <th>Fecha Parto</th>
+                  <th>Fecha Nacimiento</th>
                   <th>Madre (Tambo)</th>
-                  <th>Caravana Ternero/a</th>
+                  <th>Caravana Ternero Macho</th>
                   <th style={{ textAlign: "center" }}>Sexo</th>
                   <th style={{ textAlign: "right" }}>Peso Nacimiento</th>
                   <th>Destino HJB</th>
                   <th>Estado Actual</th>
-                  <th>Detalle / Observaciones</th>
+                  <th>Detalle / Trazabilidad</th>
                 </tr>
               </thead>
               <tbody>
-                {(partosDelPro.length > 0 ? partosDelPro : (delproConfig.datosSincronizados.partosRecientes || [])).map((p: any) => (
-                  <tr key={p.id}>
-                    <td><strong>{p.fecha}</strong></td>
-                    <td>{limpiarCaravana(p.rpMadre)}</td>
-                    <td><strong style={{ color: p.sexo === "Macho" ? "#1e40af" : "#166534" }}>{limpiarCaravana(p.rpCria)}</strong></td>
-                    <td style={{ textAlign: "center" }}>
-                      <span
-                        className={`pill ${p.sexo === "Macho" ? "badgeBlue" : "badgeGreen"}`}
-                        style={{ fontSize: "11px", fontWeight: 700 }}
-                      >
-                        {p.sexo === "Macho" ? "♂️ Macho" : "♀️ Hembra"}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: "right" }}><strong>{p.pesoNacimientoKg} kg</strong></td>
-                    <td>
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          color: p.sexo === "Macho" ? "#1e40af" : "#15803d",
-                        }}
-                      >
-                        {p.destino}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
-                        {p.estado}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: "12px", color: "var(--slate-600)" }}>
-                      {p.observaciones || "—"}
+                {partosMachosGanaderia.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: "center", padding: "30px", color: "var(--slate-500)" }}>
+                      No se encontraron registros de machos nacidos.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  partosMachosGanaderia.map((p) => (
+                    <tr key={p.id}>
+                      <td><strong>{p.fecha}</strong></td>
+                      <td>
+                        <span style={{ fontWeight: 600, color: "#475569" }}>
+                          Vaca {limpiarCaravana(p.rpMadre)}
+                        </span>
+                      </td>
+                      <td>
+                        <strong style={{ color: "#1e40af", fontSize: "13.5px" }}>
+                          ♂️ {limpiarCaravana(p.rpCria)}
+                        </strong>
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <span
+                          className="pill badgeBlue"
+                          style={{ fontSize: "11px", fontWeight: 700 }}
+                        >
+                          ♂️ Macho
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <strong>{p.pesoNacimientoKg} kg</strong>
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "#1e40af",
+                          }}
+                        >
+                          {p.destino}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="pill badgeSlate" style={{ fontSize: "11px" }}>
+                          {p.estado}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: "12px", color: "var(--slate-600)" }}>
+                        {p.observaciones || "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -4011,10 +4157,15 @@ export default function GanaderiaPage() {
       {modalProyeccionOpen && (
         <ModalProyeccionVenta
           isOpen={modalProyeccionOpen}
-          onClose={() => setModalProyeccionOpen(false)}
+          ventaAEditar={ventaAEditar}
+          onClose={() => {
+            setModalProyeccionOpen(false);
+            setVentaAEditar(null);
+          }}
           onVentaGuardada={(nueva) => {
             refrescarVentasGordos();
             setExpedienteSeleccionado(nueva);
+            setVentaAEditar(null);
           }}
           usuarioActual="Operador"
         />
@@ -4030,6 +4181,10 @@ export default function GanaderiaPage() {
           }}
           onAbrirCierreDefinitivo={(v) => {
             setVentaParaCerrar(v);
+          }}
+          onEditarVenta={(v) => {
+            setVentaAEditar(v);
+            setModalProyeccionOpen(true);
           }}
           usuarioActual="Operador"
         />

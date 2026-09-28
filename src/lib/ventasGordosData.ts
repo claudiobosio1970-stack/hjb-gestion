@@ -775,6 +775,149 @@ export function crearProyeccionVenta(datos: {
 }
 
 /**
+ * Edita y actualiza una venta existente (sea PROYECCION, TEMPORAL o DEFINITIVO).
+ */
+export function editarVentaGordo(datos: {
+  ventaId: string;
+  fechaEstimada?: string;
+  fechaReal?: string;
+  clienteNombre?: string;
+  frigorificoDestino?: string;
+  cantidadEstimada?: number;
+  pesoPromedioEstimadoKg?: number;
+  periodoCosto?: string;
+  costoDirectoUnitario?: number;
+  porcentajeCostoIndirecto?: number;
+  gastosVentaArs?: number;
+  precioKgVivoArs?: number;
+  desbasteKiloVivoPct?: number;
+  precioKgResArs?: number;
+  desbasteTrasladoPct?: number;
+  rendimientoEstimadoPct?: number;
+  metodoElegido?: MetodoVentaGordo;
+  observaciones?: string;
+  usuario: string;
+}): VentaGordoExpediente {
+  const all = getVentasGordos();
+  const index = all.findIndex((v) => v.id === datos.ventaId);
+  if (index === -1) {
+    throw new Error(`Venta con ID ${datos.ventaId} no encontrada`);
+  }
+
+  const vActual = all[index];
+  const nowIso = new Date().toISOString();
+  const fechaStr = new Date().toLocaleString("es-AR");
+
+  const cantEst = datos.cantidadEstimada !== undefined ? datos.cantidadEstimada : vActual.cantidadEstimada;
+  const pesoPromEst =
+    datos.pesoPromedioEstimadoKg !== undefined
+      ? datos.pesoPromedioEstimadoKg
+      : Math.round(vActual.pesoCampoEstimadoKg / (vActual.cantidadEstimada || 1));
+  const pesoCampoTotalKg = Number((cantEst * pesoPromEst).toFixed(1));
+
+  const proyeccion = generarProyeccionComercial({
+    pesoCampoTotalKg,
+    cantidadCabezas: cantEst,
+    costoDirectoUnitario:
+      datos.costoDirectoUnitario !== undefined
+        ? datos.costoDirectoUnitario
+        : vActual.costoDirectoUnitarioAplicado,
+    porcentajeCostoIndirecto:
+      datos.porcentajeCostoIndirecto !== undefined
+        ? datos.porcentajeCostoIndirecto
+        : vActual.porcentajeCostoIndirecto,
+    gastosVentaArs:
+      datos.gastosVentaArs !== undefined
+        ? datos.gastosVentaArs
+        : vActual.proyeccion.altKiloVivo.gastosVentaEstimadosArs,
+    precioKgVivoArs:
+      datos.precioKgVivoArs !== undefined
+        ? datos.precioKgVivoArs
+        : vActual.proyeccion.altKiloVivo.precioKgVivoArs,
+    desbasteKiloVivoPct:
+      datos.desbasteKiloVivoPct !== undefined
+        ? datos.desbasteKiloVivoPct
+        : vActual.proyeccion.altKiloVivo.desbasteEstimadoPct,
+    precioKgResArs:
+      datos.precioKgResArs !== undefined
+        ? datos.precioKgResArs
+        : vActual.proyeccion.altRendimiento.precioKgResArs,
+    desbasteTrasladoPct:
+      datos.desbasteTrasladoPct !== undefined
+        ? datos.desbasteTrasladoPct
+        : vActual.proyeccion.altRendimiento.desbasteTrasladoPct,
+    rendimientoEstimadoPct:
+      datos.rendimientoEstimadoPct !== undefined
+        ? datos.rendimientoEstimadoPct
+        : vActual.proyeccion.altRendimiento.rendimientoEstimadoPct,
+  });
+
+  const nuevoEvento: EventoCronologiaVenta = {
+    id: `cro-${Date.now()}`,
+    fecha: fechaStr,
+    usuario: datos.usuario || "Operador",
+    accion: "Edición y Rectificación de Datos",
+    descripcion: `Venta modificada por ${datos.usuario || "Operador"}`,
+  };
+
+  const ventaActualizada: VentaGordoExpediente = {
+    ...vActual,
+    fechaEstimada: datos.fechaEstimada || vActual.fechaEstimada,
+    fechaReal: datos.fechaReal !== undefined ? datos.fechaReal : vActual.fechaReal,
+    clienteNombre: datos.clienteNombre !== undefined ? datos.clienteNombre : vActual.clienteNombre,
+    frigorificoDestino:
+      datos.frigorificoDestino !== undefined ? datos.frigorificoDestino : vActual.frigorificoDestino,
+    cantidadEstimada: cantEst,
+    pesoCampoEstimadoKg: pesoCampoTotalKg,
+    metodoElegido: datos.metodoElegido !== undefined ? datos.metodoElegido : vActual.metodoElegido,
+    proyeccion,
+    observaciones: datos.observaciones !== undefined ? datos.observaciones : vActual.observaciones,
+    cronologia: [nuevoEvento, ...(vActual.cronologia || [])],
+    auditoria: {
+      ...vActual.auditoria,
+      modificadoEn: nowIso,
+      modificadoPor: datos.usuario || "Operador",
+    },
+  };
+
+  if (datos.clienteNombre) agregarClienteComprador(datos.clienteNombre);
+  if (datos.frigorificoDestino) agregarFrigorificoDestino(datos.frigorificoDestino);
+
+  all[index] = ventaActualizada;
+  saveVentasGordos(all);
+
+  try {
+    setDoc(doc(db, "ventas_gordos", ventaActualizada.id), sanitizeForFirestore(ventaActualizada)).catch(console.error);
+  } catch (err) {
+    console.warn("Firestore sync error:", err);
+  }
+
+  return ventaActualizada;
+}
+
+/**
+ * Guarda directamente un expediente completo actualizado.
+ */
+export function actualizarVentaGordoCompleta(venta: VentaGordoExpediente): VentaGordoExpediente {
+  const all = getVentasGordos();
+  const index = all.findIndex((v) => v.id === venta.id);
+  if (index >= 0) {
+    all[index] = venta;
+  } else {
+    all.unshift(venta);
+  }
+  saveVentasGordos(all);
+
+  try {
+    setDoc(doc(db, "ventas_gordos", venta.id), sanitizeForFirestore(venta)).catch(console.error);
+  } catch (err) {
+    console.warn("Firestore sync error:", err);
+  }
+
+  return venta;
+}
+
+/**
  * Pasa una venta de PROYECCIÓN a TEMPORAL (con el método elegido).
  */
 export function pasarVentaATemporal(params: {

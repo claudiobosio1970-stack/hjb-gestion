@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   COSTOS_HISTORICOS_DEFAULT,
   generarProyeccionComercial,
   crearProyeccionVenta,
+  editarVentaGordo,
   pasarVentaATemporal,
   buscarOperacionSimilar,
   getClientesCompradores,
@@ -20,6 +21,7 @@ interface Props {
   onClose: () => void;
   onVentaGuardada: (venta: VentaGordoExpediente) => void;
   usuarioActual: string;
+  ventaAEditar?: VentaGordoExpediente | null;
 }
 
 export default function ModalProyeccionVenta({
@@ -27,6 +29,7 @@ export default function ModalProyeccionVenta({
   onClose,
   onVentaGuardada,
   usuarioActual,
+  ventaAEditar,
 }: Props) {
   // Lote y Parámetros Generales
   const [fechaEstimada, setFechaEstimada] = useState(() => new Date().toISOString().slice(0, 10));
@@ -67,6 +70,41 @@ export default function ModalProyeccionVenta({
   // Advertencia de Duplicado
   const [advertenciaDuplicado, setAdvertenciaDuplicado] = useState<VentaGordoExpediente | null>(null);
   const [accionPendienteTrasAdvertencia, setAccionPendienteTrasAdvertencia] = useState<"PROYECCION" | "TEMPORAL" | null>(null);
+
+  // Sincronizar datos si se abre en modo EDICIÓN
+  useEffect(() => {
+    if (isOpen && ventaAEditar) {
+      setFechaEstimada(ventaAEditar.fechaEstimada || ventaAEditar.fechaReal || new Date().toISOString().slice(0, 10));
+      if (ventaAEditar.clienteNombre) setClienteNombre(ventaAEditar.clienteNombre);
+      if (ventaAEditar.frigorificoDestino) setFrigorificoDestino(ventaAEditar.frigorificoDestino);
+      const cabezas = ventaAEditar.cantidadEstimada || ventaAEditar.cantidadReal || 25;
+      setCantidadCabezasStr(String(cabezas));
+      const pesoProm =
+        ventaAEditar.pesoCampoEstimadoKg && cabezas > 0
+          ? (ventaAEditar.pesoCampoEstimadoKg / cabezas).toFixed(1)
+          : "405";
+      setPesoPromedioCampoKgStr(String(pesoProm));
+      if (ventaAEditar.periodoCosto) setPeriodoCosto(ventaAEditar.periodoCosto);
+      if (ventaAEditar.costoDirectoUnitarioAplicado !== undefined) {
+        setCostoDirectoUnitarioStr(String(ventaAEditar.costoDirectoUnitarioAplicado));
+      }
+      if (ventaAEditar.porcentajeCostoIndirecto !== undefined) {
+        setPorcentajeCostoIndirectoStr(String(ventaAEditar.porcentajeCostoIndirecto));
+      }
+      if (ventaAEditar.proyeccion?.altKiloVivo) {
+        setGastosVentaArsStr(String(ventaAEditar.proyeccion.altKiloVivo.gastosVentaEstimadosArs ?? 35000));
+        setPrecioKgVivoArsStr(String(ventaAEditar.proyeccion.altKiloVivo.precioKgVivoArs ?? 4250));
+        setDesbasteKiloVivoPctStr(String(ventaAEditar.proyeccion.altKiloVivo.desbasteEstimadoPct ?? 8));
+      }
+      if (ventaAEditar.proyeccion?.altRendimiento) {
+        setPrecioKgResArsStr(String(ventaAEditar.proyeccion.altRendimiento.precioKgResArs ?? 7600));
+        setDesbasteTrasladoPctStr(String(ventaAEditar.proyeccion.altRendimiento.desbasteTrasladoPct ?? 4));
+        setRendimientoEstimadoPctStr(String(ventaAEditar.proyeccion.altRendimiento.rendimientoEstimadoPct ?? 55.82));
+      }
+      setObservaciones(ventaAEditar.observaciones || "");
+      setMetodoElegidoManual(ventaAEditar.metodoElegido || null);
+    }
+  }, [isOpen, ventaAEditar]);
 
   // Conversión reactiva a números para cálculos sin trabar el tipeo
   const cantidadCabezas = useMemo(() => {
@@ -195,6 +233,33 @@ export default function ModalProyeccionVenta({
       return;
     }
 
+    // Si estamos editando una venta existente
+    if (ventaAEditar) {
+      const editada = editarVentaGordo({
+        ventaId: ventaAEditar.id,
+        fechaEstimada,
+        clienteNombre: clienteNombre.trim(),
+        frigorificoDestino: frigorificoDestino.trim(),
+        cantidadEstimada: cantidadCabezas,
+        pesoPromedioEstimadoKg: pesoPromedioCampoKg,
+        periodoCosto,
+        costoDirectoUnitario,
+        porcentajeCostoIndirecto,
+        gastosVentaArs,
+        precioKgVivoArs,
+        desbasteKiloVivoPct,
+        precioKgResArs,
+        desbasteTrasladoPct,
+        rendimientoEstimadoPct,
+        metodoElegido: metodoFinal,
+        observaciones,
+        usuario: usuarioActual || "Operador",
+      });
+      onVentaGuardada(editada);
+      onClose();
+      return;
+    }
+
     // Verificar posible duplicado
     const similar = buscarOperacionSimilar({
       fecha: fechaEstimada,
@@ -286,26 +351,30 @@ export default function ModalProyeccionVenta({
         >
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ fontSize: "24px" }}>🥩</span>
+              <span style={{ fontSize: "24px" }}>{ventaAEditar ? "✏️" : "🥩"}</span>
               <h2 style={{ fontSize: "19px", fontWeight: 800, margin: 0, letterSpacing: "-0.01em" }}>
-                Nuevo Expediente de Venta: Proyección & Comparador Comercial
+                {ventaAEditar
+                  ? `Editar Operación: Venta N° ${ventaAEditar.numeroVenta}`
+                  : "Nuevo Expediente de Venta: Proyección & Comparador Comercial"}
               </h2>
               <span
                 style={{
-                  background: "rgba(59, 130, 246, 0.25)",
-                  color: "#93c5fd",
-                  border: "1px solid rgba(59, 130, 246, 0.5)",
+                  background: ventaAEditar ? "rgba(245, 158, 11, 0.25)" : "rgba(59, 130, 246, 0.25)",
+                  color: ventaAEditar ? "#fcd34d" : "#93c5fd",
+                  border: ventaAEditar ? "1px solid rgba(245, 158, 11, 0.5)" : "1px solid rgba(59, 130, 246, 0.5)",
                   padding: "2px 8px",
                   borderRadius: "999px",
                   fontSize: "11px",
                   fontWeight: 700,
                 }}
               >
-                ESTADO INICIAL: PROYECCIÓN
+                {ventaAEditar ? `MODO EDICIÓN - ESTADO: ${ventaAEditar.estado}` : "ESTADO INICIAL: PROYECCIÓN"}
               </span>
             </div>
             <p style={{ margin: "4px 0 0 0", fontSize: "12.5px", color: "#94a3b8" }}>
-              Analice simultáneamente la oferta por Kilo Vivo vs. Rendimiento al Gancho antes de cerrar el negocio.
+              {ventaAEditar
+                ? "Modifique los valores comerciales, cliente, pesos o precios. Los cambios impactarán en los cálculos y en la trazabilidad del expediente."
+                : "Analice simultáneamente la oferta por Kilo Vivo vs. Rendimiento al Gancho antes de cerrar el negocio."}
             </p>
           </div>
 
@@ -1169,48 +1238,74 @@ export default function ModalProyeccionVenta({
 
             {/* Acciones Finales */}
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <button
-                type="button"
-                onClick={() => ejecutarGuardado("TEMPORAL")}
-                style={{
-                  backgroundColor: "#16a34a",
-                  color: "#ffffff",
-                  border: "none",
-                  padding: "12px",
-                  borderRadius: "8px",
-                  fontWeight: 800,
-                  fontSize: "13.5px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  boxShadow: "0 4px 6px -1px rgba(22, 163, 74, 0.3)",
-                }}
-              >
-                <span>💾</span> Guardar como Venta Temporal
-              </button>
+              {ventaAEditar ? (
+                <button
+                  type="button"
+                  onClick={() => ejecutarGuardado("TEMPORAL")}
+                  style={{
+                    backgroundColor: "#f59e0b",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    fontWeight: 800,
+                    fontSize: "13.5px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    boxShadow: "0 4px 6px -1px rgba(245, 158, 11, 0.3)",
+                  }}
+                >
+                  <span>💾</span> Guardar Cambios en Venta N° {ventaAEditar.numeroVenta}
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => ejecutarGuardado("TEMPORAL")}
+                    style={{
+                      backgroundColor: "#16a34a",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "12px",
+                      borderRadius: "8px",
+                      fontWeight: 800,
+                      fontSize: "13.5px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      boxShadow: "0 4px 6px -1px rgba(22, 163, 74, 0.3)",
+                    }}
+                  >
+                    <span>💾</span> Guardar como Venta Temporal
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => ejecutarGuardado("PROYECCION")}
-                style={{
-                  backgroundColor: "#0f172a",
-                  color: "#ffffff",
-                  border: "none",
-                  padding: "10px",
-                  borderRadius: "8px",
-                  fontWeight: 700,
-                  fontSize: "12.5px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                }}
-              >
-                <span>📝</span> Guardar Solo Proyección (Borrador)
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => ejecutarGuardado("PROYECCION")}
+                    style={{
+                      backgroundColor: "#0f172a",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      fontWeight: 700,
+                      fontSize: "12.5px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <span>📝</span> Guardar Solo Proyección (Borrador)
+                  </button>
+                </>
+              )}
 
               <button
                 type="button"

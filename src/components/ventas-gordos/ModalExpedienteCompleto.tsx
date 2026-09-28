@@ -17,6 +17,7 @@ interface Props {
   onClose: () => void;
   onVentaActualizada: (venta: VentaGordoExpediente) => void;
   onAbrirCierreDefinitivo: (venta: VentaGordoExpediente) => void;
+  onEditarVenta?: (venta: VentaGordoExpediente) => void;
   usuarioActual: string;
 }
 
@@ -26,6 +27,7 @@ export default function ModalExpedienteCompleto({
   onClose,
   onVentaActualizada,
   onAbrirCierreDefinitivo,
+  onEditarVenta,
   usuarioActual,
 }: Props) {
   const [activeTab, setActiveTab] = useState<
@@ -204,22 +206,52 @@ export default function ModalExpedienteCompleto({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: "rgba(255, 255, 255, 0.1)",
-              border: "none",
-              color: "#ffffff",
-              width: "36px",
-              height: "36px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontSize: "18px",
-            }}
-          >
-            ✕
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {onEditarVenta && (
+              <button
+                type="button"
+                onClick={() => {
+                  onEditarVenta(venta);
+                }}
+                style={{
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "7px 14px",
+                  borderRadius: "8px",
+                  fontSize: "12.5px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                }}
+                title="Editar y rectificar datos de la venta"
+              >
+                ✏️ Editar Venta
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: "rgba(255, 255, 255, 0.1)",
+                border: "none",
+                color: "#ffffff",
+                width: "36px",
+                height: "36px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Barra de Pestañas */}
