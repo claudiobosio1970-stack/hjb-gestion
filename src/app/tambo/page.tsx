@@ -29,13 +29,14 @@ import {
   determinarCorralHembra,
   esMachoPorCaravana,
   esHembraPorCaravana,
+  limpiarCaravana,
 } from "@/lib/delproData";
 import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
 import { ResultadoVentaHacienda } from "@/lib/ventasHaciendaData";
 
 function formatearCaravana(rp?: string | null): string {
   if (!rp) return "";
-  return String(rp).replace(/^RP[-_ ]?/i, "").trim();
+  return limpiarCaravana(rp);
 }
 
 export default function TamboPage() {
@@ -668,7 +669,7 @@ export default function TamboPage() {
       </section>
 
       {/* ========================================================================= */}
-      {/* CENSO REPRODUCTIVO & TRAZABILIDAD INDIVIDUAL POR RP (DELAVAL DELPRO)       */}
+      {/* CENSO REPRODUCTIVO & TRAZABILIDAD INDIVIDUAL POR CARAVANA (DELAVAL DELPRO) */}
       {/* ========================================================================= */}
       <section className="section" style={{ marginBottom: "24px" }}>
         <div className="panel" style={{ padding: "20px" }}>

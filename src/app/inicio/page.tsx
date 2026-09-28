@@ -38,6 +38,7 @@ import {
   DELPRO_SQL_QUERIES_SAMPLE,
   DELPRO_CONFIG_DEFAULT,
   initDelProFirestoreSync,
+  limpiarCaravana,
 } from "@/lib/delproData";
 
 type TabDelProModal = "sql_extractor" | "resumen" | "queries";
@@ -1177,8 +1178,8 @@ export default function InicioPage() {
                 <thead>
                   <tr>
                     <th style={{ width: "40px", textAlign: "center" }}>Cargar</th>
-                    <th style={{ minWidth: "100px" }}>Caravana RP</th>
-                    <th style={{ minWidth: "90px" }}>RP Madre</th>
+                    <th style={{ minWidth: "100px" }}>Caravana</th>
+                    <th style={{ minWidth: "90px" }}>Madre</th>
                     <th style={{ minWidth: "90px" }}>Ingreso</th>
                     <th style={{ width: "100px", textAlign: "right" }}>Días Corral</th>
                     <th style={{ width: "90px", textAlign: "right" }}>Peso Ingreso</th>
@@ -1203,10 +1204,10 @@ export default function InicioPage() {
                         />
                       </td>
                       <td>
-                        <strong>{novillo.caravana}</strong>
+                        <strong>{limpiarCaravana(novillo.caravana)}</strong>
                       </td>
                       <td style={{ color: "var(--slate-500)" }}>
-                        {novillo.rpMadre || "-"}
+                        {limpiarCaravana(novillo.rpMadre) || "-"}
                       </td>
                       <td style={{ color: "var(--slate-600)" }}>
                         {novillo.fechaIngreso}

@@ -298,16 +298,22 @@ export function determinarCorralHembra(v: {
  * - HEMBRAS (Tambo): Número grande de 4 dígitos (>= 1.000, ej: 1000 a 9999).
  *   Llevan años de historia lechera en el establecimiento.
  */
+export function limpiarCaravana(rp?: string | number | null): string {
+  if (rp === undefined || rp === null) return "";
+  const soloDigitos = String(rp).replace(/\D/g, "").trim();
+  return soloDigitos || String(rp).trim();
+}
+
 export function esMachoPorCaravana(rp?: string | number | null): boolean {
   if (!rp) return false;
-  const num = parseInt(String(rp).replace(/\D/g, ""), 10);
+  const num = parseInt(limpiarCaravana(rp), 10);
   if (!num || isNaN(num)) return false;
   return num > 0 && num < 1000;
 }
 
 export function esHembraPorCaravana(rp?: string | number | null): boolean {
   if (!rp) return true;
-  const num = parseInt(String(rp).replace(/\D/g, ""), 10);
+  const num = parseInt(limpiarCaravana(rp), 10);
   if (!num || isNaN(num)) return true;
   return num >= 1000;
 }
@@ -384,7 +390,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const pesoEst = Number((580 + ((i * 3) % 60)).toFixed(1));
 
     vacas.push({
-      rp: `RP-${rpNum}`,
+      rp: String(rpNum),
       sexo: "Hembra",
       corralId: "ordenie",
       nombreCorral: "Vacas en Ordeñe",
@@ -421,7 +427,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const pesoEst = Number((600 + ((i * 4) % 60)).toFixed(1));
 
     vacas.push({
-      rp: `RP-${rpNum}`,
+      rp: String(rpNum),
       sexo: "Hembra",
       corralId: "ordenie",
       nombreCorral: "Rodeo de Punta",
@@ -453,7 +459,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const pesoEst = Number((630 + (i * 3)).toFixed(1));
 
     vacas.push({
-      rp: `RP-${rpNum}`,
+      rp: String(rpNum),
       sexo: "Hembra",
       corralId: "preparto",
       nombreCorral: "Preparto",
@@ -486,7 +492,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const pesoEst = Number((620 + (i * 4)).toFixed(1));
 
     vacas.push({
-      rp: `RP-${rpNum}`,
+      rp: String(rpNum),
       sexo: "Hembra",
       corralId: "secas",
       nombreCorral: "Vacas Secas",
@@ -519,7 +525,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const pesoEst = Number((460 + (i * 2)).toFixed(1));
 
     vacas.push({
-      rp: `RP-${rpNum}`,
+      rp: String(rpNum),
       sexo: "Hembra",
       corralId: "vq_preniada",
       nombreCorral: "Vaquillonas Preñadas",
@@ -550,7 +556,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const pesoEst = Number((380 + (i * 2)).toFixed(1));
 
     vacas.push({
-      rp: `RP-${rpNum}`,
+      rp: String(rpNum),
       sexo: "Hembra",
       corralId: "rh3",
       nombreCorral: "Recría 3 / Vq Servicio",
@@ -584,7 +590,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const pesoEst = Number(basePeso.toFixed(1));
 
     vacas.push({
-      rp: `RP-${rpNum}`,
+      rp: String(rpNum),
       sexo: "Hembra",
       corralId: corralAsignado,
       nombreCorral: nombreCorralAsignado,
@@ -608,7 +614,7 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const pesoEst = Number((40 + i * 2.5).toFixed(1));
 
     vacas.push({
-      rp: `RP-${rpNum}`,
+      rp: String(rpNum),
       sexo: "Hembra",
       corralId: "guachera_h",
       nombreCorral: "Guachera Hembras",
@@ -827,12 +833,12 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   const animales: AnimalRecriaIndividual[] = [];
 
   // Guachera: 9 animales machos (los otros terneros de crianza son hembras para reposición tambo)
-  // Regla HJB: 2 o 3 dígitos para machos (ej: RP-11 a RP-19)
+  // Regla HJB: 2 o 3 dígitos para machos (ej: 11 a 19)
   for (let i = 1; i <= 9; i++) {
     const dias = 12 + i * 4;
     const calc = calcularPesoEstimativoVida({ corralId: "guachera", diasEnCorral: dias });
     animales.push({
-      rp: `RP-${10 + i}`,
+      rp: String(10 + i),
       sexo: "Macho",
       corralId: "guachera",
       pesoActualKg: calc.pesoEstimadoKg,
@@ -847,10 +853,10 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   }
 
   // RM1: 22 animales machos (edad 68 a 108 días de vida)
-  // Regla HJB: 3 dígitos para machos (ej: RP-101 a RP-122)
+  // Regla HJB: 3 dígitos para machos (ej: 101 a 122)
   for (let i = 1; i <= 22; i++) {
     const dias = 8 + Math.round(i * 1.8);
-    const rp = `RP-${100 + i}`;
+    const rp = String(100 + i);
     const calc = calcularPesoEstimativoVida({ corralId: "rm1", diasEnCorral: dias });
 
     // Animales pesados oficialmente en DelPro
@@ -876,10 +882,10 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   }
 
   // RM2: 28 animales machos (edad 115 a 159 días de vida)
-  // Regla HJB: 3 dígitos para machos (ej: RP-201 a RP-228)
+  // Regla HJB: 3 dígitos para machos (ej: 201 a 228)
   for (let i = 1; i <= 28; i++) {
     const dias = 8 + Math.round(i * 1.6);
-    const rp = `RP-${200 + i}`;
+    const rp = String(200 + i);
     const calc = calcularPesoEstimativoVida({ corralId: "rm2", diasEnCorral: dias });
 
     const esPesadoDelPro = i === 5;
@@ -904,10 +910,10 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   }
 
   // RM3: 15 animales machos (edad 170 a 248 días de vida)
-  // Regla HJB: 3 dígitos para machos (ej: RP-301 a RP-315)
+  // Regla HJB: 3 dígitos para machos (ej: 301 a 315)
   for (let i = 1; i <= 15; i++) {
     const dias = 10 + Math.round(i * 2.6);
-    const rp = `RP-${300 + i}`;
+    const rp = String(300 + i);
     const calc = calcularPesoEstimativoVida({ corralId: "rm3", diasEnCorral: dias });
 
     const esPesadoDelPro = i === 5;
@@ -932,10 +938,10 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   }
 
   // Terminación: 25 animales machos (edad 261 a 346 días de vida, peso 280 a 405 kg)
-  // Regla HJB: 3 dígitos para machos (ej: RP-401 a RP-425)
+  // Regla HJB: 3 dígitos para machos (ej: 401 a 425)
   for (let i = 1; i <= 25; i++) {
     const dias = 10 + Math.round(i * 3.3);
-    const rp = `RP-${400 + i}`;
+    const rp = String(400 + i);
     const calc = calcularPesoEstimativoVida({ corralId: "terminacion", diasEnCorral: dias });
 
     const esPesadoDelPro = i === 5 || i === 10;
@@ -1016,7 +1022,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "tr-hist-1",
         fecha: "18/09/26",
-        rpAnimal: "RP-120",
+        rpAnimal: "120",
         corralOrigen: "rm1",
         corralDestino: "rm2",
         pesoAlTraspaso: 121.5,
@@ -1026,7 +1032,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "tr-hist-2",
         fecha: "15/09/26",
-        rpAnimal: "RP-225",
+        rpAnimal: "225",
         corralOrigen: "rm2",
         corralDestino: "rm3",
         pesoAlTraspaso: 172.0,
@@ -1036,7 +1042,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "tr-hist-3",
         fecha: "10/09/26",
-        rpAnimal: "RP-312",
+        rpAnimal: "312",
         corralOrigen: "rm3",
         corralDestino: "terminacion",
         pesoAlTraspaso: 274.0,
@@ -1048,7 +1054,7 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "mov-delpro-init-1",
         fecha: "18/09/26",
-        rpAnimal: "RP-120",
+        rpAnimal: "120",
         grupoOrigen: "Recría 1 (RM1)",
         grupoDestino: "Recría 2 (RM2)",
         corralOrigenId: "rm1",
@@ -1061,8 +1067,8 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "p-26-0901",
         fecha: "18/09/26",
-        rpMadre: "RP-4102",
-        rpCria: "RP-12 (Macho)",
+        rpMadre: "4102",
+        rpCria: "12",
         sexo: "Macho",
         pesoNacimientoKg: 39,
         destino: "Engorde / Novillo (Venta Comercial)",
@@ -1072,8 +1078,8 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "p-26-0902",
         fecha: "19/09/26",
-        rpMadre: "RP-3890",
-        rpCria: "RP-8813 (Hembra)",
+        rpMadre: "3890",
+        rpCria: "8813",
         sexo: "Hembra",
         pesoNacimientoKg: 37,
         destino: "Tambo (Vaquillona de Reposición)",
@@ -1083,8 +1089,8 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       {
         id: "p-26-0903",
         fecha: "20/09/26",
-        rpMadre: "RP-4215",
-        rpCria: "RP-8814 (Hembra)",
+        rpMadre: "4215",
+        rpCria: "8814",
         sexo: "Hembra",
         pesoNacimientoKg: 38,
         destino: "Tambo (Vaquillona de Reposición)",
@@ -1135,25 +1141,34 @@ export function getAnimalesRecria(): AnimalRecriaIndividual[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Purgar de localStorage si contiene animales ficticios 8600..8900
-        const tiene8600 = parsed.some((a: any) => {
-          const num = parseInt(String(a.rp || "").replace(/\D/g, ""), 10);
-          return num >= 8600 && num <= 8900;
-        });
-        if (tiene8600) {
-          localStorage.removeItem(STORAGE_ANIMALES_RECRIA);
-          return defaultAnimales;
-        }
-        return parsed;
+        // Asegurar que las caravanas no tengan letras y correspondan a machos (< 1.000)
+        return parsed
+          .filter((a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho")
+          .map((a) => ({
+            ...a,
+            rp: limpiarCaravana(a.rp),
+            sexo: "Macho" as const,
+          }));
       }
     }
   } catch {}
-  return getDelProConfig().datosSincronizados.animalesRecria || defaultAnimales;
+  const fromConfig = getDelProConfig().datosSincronizados.animalesRecria;
+  if (Array.isArray(fromConfig) && fromConfig.length > 0) {
+    return fromConfig
+      .filter((a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho")
+      .map((a) => ({
+        ...a,
+        rp: limpiarCaravana(a.rp),
+        sexo: "Macho" as const,
+      }));
+  }
+  return defaultAnimales;
 }
 
 export function saveAnimalesRecria(animales: AnimalRecriaIndividual[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_ANIMALES_RECRIA, JSON.stringify(animales));
+  const limpios = animales.map((a) => ({ ...a, rp: limpiarCaravana(a.rp) }));
+  localStorage.setItem(STORAGE_ANIMALES_RECRIA, JSON.stringify(limpios));
 }
 
 export function getTraspasosCorrales(): TraspasoCorralRegistro[] {
@@ -1162,47 +1177,57 @@ export function getTraspasosCorrales(): TraspasoCorralRegistro[] {
     const raw = localStorage.getItem(STORAGE_TRASPASOS_CORRALES);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.map((t) => ({ ...t, rpAnimal: limpiarCaravana(t.rpAnimal) }));
+      }
     }
   } catch {}
-  return getDelProConfig().datosSincronizados.traspasosAutomaticos || [];
+  return DELPRO_CONFIG_DEFAULT.datosSincronizados.traspasosAutomaticos || [];
 }
 
 export function saveTraspasosCorrales(traspasos: TraspasoCorralRegistro[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_TRASPASOS_CORRALES, JSON.stringify(traspasos));
+  const limpios = traspasos.map((t) => ({ ...t, rpAnimal: limpiarCaravana(t.rpAnimal) }));
+  localStorage.setItem(STORAGE_TRASPASOS_CORRALES, JSON.stringify(limpios));
 }
 
 export function getCensoRodeoTambo(): CensoRodeoTambo {
   const config = getDelProConfig();
   const censo = config.datosSincronizados.censoRodeoTambo;
   if (censo) {
-    const tieneDetalleCompleto = Array.isArray(censo.detalleVacas) && censo.detalleVacas.length >= 400;
+    // EN EL TAMBO SOLO VAN LAS HEMBRAS (Caravanas >= 1.000). Eliminar cualquier macho filtrado por error
+    const hembrasLimpias = Array.isArray(censo.detalleVacas)
+      ? censo.detalleVacas
+          .filter((v) => esHembraPorCaravana(v.rp) && v.sexo !== "Macho")
+          .map((v) => ({ ...v, rp: limpiarCaravana(v.rp), sexo: "Hembra" as const }))
+      : defaultVacas;
+    const tieneDetalleCompleto = hembrasLimpias.length >= 200;
+
     return {
       ...censo,
-      totalRodeoGeneral: censo.totalRodeoGeneral && censo.totalRodeoGeneral >= 500 ? censo.totalRodeoGeneral : 514,
-      totalVacasAdultas: (censo.vacasEnOrdenie || 192) + ((censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 34),
-      vacasEnOrdenie: censo.vacasEnOrdenie || 192,
-      vacasSecas: (censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 34,
+      totalRodeoGeneral: censo.totalRodeoGeneral && censo.totalRodeoGeneral >= 500 ? censo.totalRodeoGeneral : 515,
+      totalVacasAdultas: (censo.vacasEnOrdenie || 191) + ((censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 35),
+      vacasEnOrdenie: censo.vacasEnOrdenie || 191,
+      vacasSecas: (censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 35,
       vaquillonasReposicion: censo.vaquillonasReposicion && censo.vaquillonasReposicion >= 100 ? censo.vaquillonasReposicion : 178,
-      ternerosCrianza: censo.ternerosCrianza || 26,
-      ternerasCrianzaHembras: censo.ternerasCrianzaHembras || 17,
+      ternerosCrianza: censo.ternerosCrianza || 27,
+      ternerasCrianzaHembras: censo.ternerasCrianzaHembras || 18,
       ternerosCrianzaMachos: censo.ternerosCrianzaMachos || 9,
       novillosRecriaEngorde: censo.novillosRecriaEngorde || 84,
-      detalleVacas: tieneDetalleCompleto ? censo.detalleVacas : defaultVacas,
+      detalleVacas: tieneDetalleCompleto ? hembrasLimpias : defaultVacas,
     };
   }
   return {
-    totalRodeoGeneral: 514,
+    totalRodeoGeneral: 515,
     totalVacasAdultas: 226,
-    vacasEnOrdenie: 192,
-    vacasSecas: 34,
+    vacasEnOrdenie: 191,
+    vacasSecas: 35,
     vacasPreniadas: 142,
     vacasVacias: 45,
     vaquillonasReposicion: 178,
     vaquillonasPreniadas: 31,
-    ternerosCrianza: 26,
-    ternerasCrianzaHembras: 17,
+    ternerosCrianza: 27,
+    ternerasCrianzaHembras: 18,
     ternerosCrianzaMachos: 9,
     novillosRecriaEngorde: 84,
     detalleVacas: defaultVacas,
@@ -1681,7 +1706,7 @@ export function importarPayloadDesdeJson(jsonString: string, persistToFirestore:
 
       for (const item of parsed.rodeoCompleto) {
         const numId = item.OfficialRegNo || item.AnimalNumber || item.Vaca || item.Number;
-        const rp = String(numId).startsWith("RP-") ? String(numId) : `RP-${numId}`;
+        const rp = limpiarCaravana(numId);
         const grNombre = item.NameGroup || item.GroupName || item.GrupoDelPro || "";
         const grLower = grNombre.toLowerCase();
 
@@ -1841,13 +1866,17 @@ export function importarPayloadDesdeJson(jsonString: string, persistToFirestore:
         terminacion: animalesRecriaExtraidos.filter(a => a.corralId === "terminacion").length,
       },
       partosRecientes: Array.isArray(parsed.partosRecientes) && parsed.partosRecientes.length > 0
-        ? parsed.partosRecientes
+        ? parsed.partosRecientes.map((p: any) => ({
+            ...p,
+            rpMadre: limpiarCaravana(p.rpMadre),
+            rpCria: limpiarCaravana(p.rpCria),
+          }))
         : Array.isArray(parsed.calvings)
         ? parsed.calvings.map((c: any, idx: number) => ({
-            id: `p-delpro-${c.OfficialRegNo || c.AnimalNumber || idx}`,
+            id: `p-delpro-${limpiarCaravana(c.OfficialRegNo || c.AnimalNumber || idx)}`,
             fecha: c.CalvingDate ? (c.CalvingDate instanceof Date ? c.CalvingDate.toLocaleDateString("es-AR") : String(c.CalvingDate).slice(0, 10)) : new Date().toLocaleDateString("es-AR"),
-            rpMadre: `RP-${c.MotherId || c.OfficialRegNo || c.AnimalNumber}`,
-            rpCria: `RP-${c.AnimalNumber || c.OfficialRegNo}`,
+            rpMadre: limpiarCaravana(c.MotherId || c.OfficialRegNo || c.AnimalNumber),
+            rpCria: limpiarCaravana(c.AnimalNumber || c.OfficialRegNo),
             sexo: (c.Sex === 1 || c.Sexo === "Macho") ? "Macho" : "Hembra",
             pesoNacimientoKg: Number(c.BirthWeight) || 38,
             destino: (c.Sex === 1 || c.Sexo === "Macho") ? "Engorde / Novillo (Venta Comercial)" : "Tambo (Vaquillona de Reposición)",
@@ -1859,7 +1888,10 @@ export function importarPayloadDesdeJson(jsonString: string, persistToFirestore:
       animalesRecria: animalesRecriaExtraidos,
       traspasosAutomaticos: parsed.traspasosAutomaticos,
       movimientosCorralDelPro: Array.isArray(parsed.movimientosCorralDelPro) && parsed.movimientosCorralDelPro.length > 0
-        ? parsed.movimientosCorralDelPro
+        ? parsed.movimientosCorralDelPro.map((m: any) => ({
+            ...m,
+            rpAnimal: limpiarCaravana(m.rpAnimal),
+          }))
         : Array.isArray(parsed.historialCambiosGrupo)
         ? parsed.historialCambiosGrupo.map((m: any, idx: number) => {
             const origenId = parseDelProGrupoToCorralId(m.GroupNameOld || "");
@@ -1867,7 +1899,7 @@ export function importarPayloadDesdeJson(jsonString: string, persistToFirestore:
             return {
               id: `mov-delpro-${idx}-${Date.now()}`,
               fecha: m.DateAndTime ? (m.DateAndTime instanceof Date ? m.DateAndTime.toLocaleDateString("es-AR") : String(m.DateAndTime).slice(0, 10)) : new Date().toLocaleDateString("es-AR"),
-              rpAnimal: `RP-${m.AnimalNumber || m.OfficialRegNo}`,
+              rpAnimal: limpiarCaravana(m.AnimalNumber || m.OfficialRegNo),
               grupoOrigen: m.GroupNameOld || `Grupo ${m.GroupNumberOld}`,
               grupoDestino: m.GroupNameNew || m.NameGroup || `Grupo ${m.GroupNumberNew}`,
               corralOrigenId: origenId || undefined,

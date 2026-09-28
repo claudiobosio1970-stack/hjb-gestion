@@ -42,6 +42,7 @@ import {
   resolverPesoAnimal,
   esMachoPorCaravana,
   esHembraPorCaravana,
+  limpiarCaravana,
 } from "@/lib/delproData";
 import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
 import {
@@ -944,7 +945,7 @@ export default function GanaderiaPage() {
 
 
           {/* ========================================================================= */}
-          {/* TABLA DE TRAZABILIDAD INDIVIDUAL Y CENSO DE TERNEROS POR CARAVANA / RP     */}
+          {/* TABLA DE TRAZABILIDAD INDIVIDUAL Y CENSO DE TERNEROS POR CARAVANA          */}
           {/* ========================================================================= */}
           {(() => {
             // EN GANADERÍA SOLO ESTÁN LOS MACHOS (100% MACHOS)
@@ -953,6 +954,7 @@ export default function GanaderiaPage() {
               (a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho" || (a as any).Sex === 1 || !(a.sexo === "Hembra" || (a as any).Sex === 2 || esHembraPorCaravana(a.rp))
             );
 
+            const busqTrim = filtroRecriaBusqueda.trim().toLowerCase();
             const animalesFiltrados = soloMachosRecria.filter((a) => {
               const cumpleCorral =
                 filtroRecriaCorral === "todos"
@@ -960,7 +962,8 @@ export default function GanaderiaPage() {
                   : filtroRecriaCorral === "faena"
                   ? a.listoFaena
                   : a.corralId === filtroRecriaCorral;
-              const cumpleRP = filtroRecriaBusqueda.trim() === "" || a.rp.toLowerCase().includes(filtroRecriaBusqueda.toLowerCase());
+              const rpLimpio = limpiarCaravana(a.rp).toLowerCase();
+              const cumpleRP = busqTrim === "" || rpLimpio.includes(busqTrim) || a.rp.toLowerCase().includes(busqTrim);
               return cumpleCorral && cumpleRP;
             });
 
@@ -1000,7 +1003,7 @@ export default function GanaderiaPage() {
                   <div>
                     <h3 style={{ fontSize: "16px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       <span>🏷️</span>
-                      <span>Trazabilidad Individual de Machos por Caravana / RP ({soloMachosRecria.length} cabezas 100% Machos)</span>
+                      <span>Trazabilidad Individual de Machos por Caravana ({soloMachosRecria.length} cabezas 100% Machos)</span>
                       <span style={{ fontSize: "11px", fontWeight: 700, background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", border: "1px solid #bfdbfe" }}>
                         🏷️ 2 y 3 dígitos (&lt; 1.000) = Machos
                       </span>
@@ -1010,11 +1013,11 @@ export default function GanaderiaPage() {
                     </p>
                   </div>
 
-                  {/* Buscador de RP */}
+                  {/* Buscador de Caravana */}
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <input
                       type="text"
-                      placeholder="🔍 Buscar RP (ej: RP-105 o RP-401)..."
+                      placeholder="🔍 Buscar caravana (ej: 49 o 105)..."
                       value={filtroRecriaBusqueda}
                       onChange={(e) => {
                         setFiltroRecriaBusqueda(e.target.value);
@@ -1162,7 +1165,7 @@ export default function GanaderiaPage() {
                   <table className="dataTable">
                     <thead>
                       <tr>
-                        <th>Caravana / RP</th>
+                        <th>Caravana</th>
                         <th>Corral Actual</th>
                         <th style={{ textAlign: "right" }}>Peso Animal (Balanza / Estimado)</th>
                         <th style={{ textAlign: "right" }}>Ganancia (GDPV)</th>
@@ -1189,7 +1192,7 @@ export default function GanaderiaPage() {
                           <tr key={a.rp}>
                             <td>
                               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <strong style={{ fontFamily: "monospace", fontSize: "13.5px" }}>{a.rp}</strong>
+                                <strong style={{ fontFamily: "monospace", fontSize: "13.5px" }}>{limpiarCaravana(a.rp)}</strong>
                                 <span className="pill badgeBlue" style={{ fontSize: "10px", fontWeight: 700, padding: "1px 6px" }}>
                                   ♂️ Macho
                                 </span>
@@ -1875,8 +1878,8 @@ export default function GanaderiaPage() {
               <thead>
                 <tr>
                   <th>Fecha Parto</th>
-                  <th>RP Madre (Tambo)</th>
-                  <th>RP Ternero/a</th>
+                  <th>Madre (Tambo)</th>
+                  <th>Caravana Ternero/a</th>
                   <th style={{ textAlign: "center" }}>Sexo</th>
                   <th style={{ textAlign: "right" }}>Peso Nacimiento</th>
                   <th>Destino HJB</th>
@@ -1888,8 +1891,8 @@ export default function GanaderiaPage() {
                 {(partosDelPro.length > 0 ? partosDelPro : (delproConfig.datosSincronizados.partosRecientes || [])).map((p: any) => (
                   <tr key={p.id}>
                     <td><strong>{p.fecha}</strong></td>
-                    <td>{p.rpMadre}</td>
-                    <td><strong style={{ color: p.sexo === "Macho" ? "#1e40af" : "#166534" }}>{p.rpCria}</strong></td>
+                    <td>{limpiarCaravana(p.rpMadre)}</td>
+                    <td><strong style={{ color: p.sexo === "Macho" ? "#1e40af" : "#166534" }}>{limpiarCaravana(p.rpCria)}</strong></td>
                     <td style={{ textAlign: "center" }}>
                       <span
                         className={`pill ${p.sexo === "Macho" ? "badgeBlue" : "badgeGreen"}`}
@@ -2372,11 +2375,15 @@ export default function GanaderiaPage() {
                 )}
               </div>
 
-              {/* 5. ANIMALES INDIVIDUALES EN ESTE CORRAL POR CARAVANA / RP */}
+              {/* 5. ANIMALES INDIVIDUALES EN ESTE CORRAL POR CARAVANA */}
               {(() => {
                 const animalesCorral = animalesRecria.filter((a) => a.corralId === corralModalSeleccionado.id);
-                const animalesFiltrados = busquedaAnimalModal.trim()
-                  ? animalesCorral.filter((a) => a.rp.toLowerCase().includes(busquedaAnimalModal.toLowerCase()))
+                const busqModalTrim = busquedaAnimalModal.trim().toLowerCase();
+                const animalesFiltrados = busqModalTrim
+                  ? animalesCorral.filter((a) => {
+                      const rpLimpio = limpiarCaravana(a.rp).toLowerCase();
+                      return rpLimpio.includes(busqModalTrim) || a.rp.toLowerCase().includes(busqModalTrim);
+                    })
                   : animalesCorral;
 
                 return (
@@ -2385,7 +2392,7 @@ export default function GanaderiaPage() {
                       <div>
                         <h3 style={{ fontSize: "14.5px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "6px" }}>
                           <span>🏷️</span>
-                          <span>Animales Individuales en este Corral por Caravana / RP ({animalesCorral.length} cab.)</span>
+                          <span>Animales Individuales en este Corral por Caravana ({animalesCorral.length} cab.)</span>
                         </h3>
                         <p className="muted" style={{ fontSize: "12px", margin: "2px 0 0 0" }}>
                           Identificación unívoca extraída de DeLaval DelPro y seguimiento individual de ganancia diaria.
@@ -2395,7 +2402,7 @@ export default function GanaderiaPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <input
                           type="text"
-                          placeholder="Buscar RP (ej: RP-8750)..."
+                          placeholder="Buscar caravana (ej: 49 o 105)..."
                           value={busquedaAnimalModal}
                           onChange={(e) => setBusquedaAnimalModal(e.target.value)}
                           style={{
@@ -2411,14 +2418,14 @@ export default function GanaderiaPage() {
 
                     {animalesFiltrados.length === 0 ? (
                       <div style={{ padding: "18px", textAlign: "center", color: "var(--slate-500)", background: "#f8fafc", borderRadius: "8px", fontSize: "13px" }}>
-                        {animalesCorral.length === 0 ? "No hay terneros individuales en este corral actualmente." : "No se encontraron animales con el RP buscado."}
+                        {animalesCorral.length === 0 ? "No hay terneros individuales en este corral actualmente." : "No se encontraron animales con la caravana buscada."}
                       </div>
                     ) : (
                       <div className="tableWrap" style={{ maxHeight: "300px", overflowY: "auto" }}>
                         <table className="dataTable">
                           <thead>
                             <tr>
-                              <th>Caravana / RP</th>
+                              <th>Caravana</th>
                               <th style={{ textAlign: "right" }}>Peso Actual</th>
                               <th style={{ textAlign: "right" }}>Ganancia (GDPV)</th>
                               <th style={{ textAlign: "right" }}>Días en Corral</th>
@@ -2441,7 +2448,7 @@ export default function GanaderiaPage() {
                               return (
                                 <tr key={a.rp}>
                                   <td>
-                                    <strong style={{ fontFamily: "monospace", fontSize: "13px" }}>{a.rp}</strong>
+                                    <strong style={{ fontFamily: "monospace", fontSize: "13px" }}>{limpiarCaravana(a.rp)}</strong>
                                     <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{a.origen}</div>
                                     {a.grupoDelPro && (
                                       <div style={{ fontSize: "10px", color: "#2563eb", fontWeight: 600 }}>
