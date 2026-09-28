@@ -30,6 +30,7 @@ import {
   esHembraPorCaravana,
   limpiarCaravana,
   calcularInfoSecado,
+  normalizarDatosReproductivosVaca,
 } from "@/lib/delproData";
 import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
 import ModalFichaVaca from "@/components/tambo/ModalFichaVaca";
@@ -206,12 +207,14 @@ export default function TamboPage() {
 
   // EN TAMBO SOLO ESTÁN LAS HEMBRAS (los machos van a Ganadería):
   // Regla HJB: 4 dígitos (>= 1.000) son hembras del tambo. 2 o 3 dígitos (< 1.000) son machos.
-  const vacasDetalle = (censoRodeo.detalleVacas || []).filter((v) => {
-    if (esMachoPorCaravana(v.rp)) return false;
-    const gr = (v.grupoDelPro || "").toLowerCase();
-    const esMacho = (v as any).sexo === "Macho" || (v as any).Sex === 1 || v.estadoProductivo === "Macho" || gr.includes("macho") || gr.includes("engorde") || gr.includes("novill");
-    return !esMacho;
-  });
+  const vacasDetalle = (censoRodeo.detalleVacas || [])
+    .filter((v) => {
+      if (esMachoPorCaravana(v.rp)) return false;
+      const gr = (v.grupoDelPro || "").toLowerCase();
+      const esMacho = (v as any).sexo === "Macho" || (v as any).Sex === 1 || v.estadoProductivo === "Macho" || gr.includes("macho") || gr.includes("engorde") || gr.includes("novill");
+      return !esMacho;
+    })
+    .map((v) => normalizarDatosReproductivosVaca(v));
 
   // Conteo exclusivo de hembras por corral oficial de Tambo:
   const countGuacheraH = vacasDetalle.filter(v => determinarCorralHembra(v).id === "guachera_h").length || (censoRodeo.ternerasCrianzaHembras || 17);

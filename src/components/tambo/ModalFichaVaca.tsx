@@ -390,7 +390,7 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
                   <div>
                     <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Día Exacto para Secarla</div>
                     <div style={{ fontSize: "15.5px", fontWeight: 800, color: "#b45309", marginTop: "2px" }}>
-                      🍂 {infoSecado?.fechaSecado || vaca.fechaSecadoEstimada || "60 días preparto"}
+                      🍂 {infoSecado?.fechaSecado && infoSecado.fechaSecado !== "—" ? infoSecado.fechaSecado : vaca.fechaSecadoEstimada || "A determinar por DelPro"}
                     </div>
                     {infoSecado?.fechaSecadoLarga && (
                       <div style={{ fontSize: "11px", color: "#78350f", fontWeight: 700, marginTop: "2px" }}>
@@ -490,7 +490,7 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
                   </span>
                   <div>
                     <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#475569" }}>
-                      Instrucción Operativa de Secado (60 días preparto / día 222 gestación)
+                      Instrucción Operativa de Secado (Protocolo DeLaval DelPro)
                     </div>
                     <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#0f172a", marginTop: "2px" }}>
                       {infoSecado.mensaje}
