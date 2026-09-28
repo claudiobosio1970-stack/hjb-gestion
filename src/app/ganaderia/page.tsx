@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
@@ -43,6 +43,7 @@ import {
   esMachoPorCaravana,
   esHembraPorCaravana,
   limpiarCaravana,
+  initDelProFirestoreSync,
 } from "@/lib/delproData";
 import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
 import {
@@ -52,6 +53,19 @@ import {
   eliminarVentaHacienda,
   actualizarVentaHacienda,
 } from "@/lib/ventasHaciendaData";
+import {
+  VentaGordoExpediente,
+  getVentasGordos,
+  initVentasGordosFirestoreSync,
+  HJB_VENTAS_GORDOS_SYNC_EVENT,
+  getEstadoDocumentacion,
+  eliminarVentaGordoLogico,
+  EstadoVentaGordo,
+} from "@/lib/ventasGordosData";
+import ModalProyeccionVenta from "@/components/ventas-gordos/ModalProyeccionVenta";
+import ModalExpedienteCompleto from "@/components/ventas-gordos/ModalExpedienteCompleto";
+import ModalCierreVentaDefinitivo from "@/components/ventas-gordos/ModalCierreVentaDefinitivo";
+import ModalHistoricoComparativo from "@/components/ventas-gordos/ModalHistoricoComparativo";
 
 export default function GanaderiaPage() {
   const [activeTab, setActiveTab] = useState<"corrales" | "dietas" | "pesajes" | "ventas" | "partos_delpro">("corrales");
@@ -70,13 +84,24 @@ export default function GanaderiaPage() {
   const [mostrarHistorialTraspasos, setMostrarHistorialTraspasos] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  // Expedientes de Ventas de Gordos
+  const [ventasGordos, setVentasGordos] = useState<VentaGordoExpediente[]>(() => getVentasGordos());
+  const [filtroVentasTexto, setFiltroVentasTexto] = useState("");
+  const [filtroVentasEstado, setFiltroVentasEstado] = useState<"TODOS" | EstadoVentaGordo>("TODOS");
+  const [filtroVentasMetodo, setFiltroVentasMetodo] = useState<"TODOS" | "KILO_VIVO" | "RENDIMIENTO">("TODOS");
+
+  const [modalProyeccionOpen, setModalProyeccionOpen] = useState(false);
+  const [expedienteSeleccionado, setExpedienteSeleccionado] = useState<VentaGordoExpediente | null>(null);
+  const [ventaParaCerrar, setVentaParaCerrar] = useState<VentaGordoExpediente | null>(null);
+  const [modalHistoricoOpen, setModalHistoricoOpen] = useState(false);
+  const [mostrarHistoricoRemitosVentas, setMostrarHistoricoRemitosVentas] = useState(false);
+
   // Modal de Venta con Foto de Remito
   const [modalVentaRemitoOpen, setModalVentaRemitoOpen] = useState(false);
 
   // Ficha Técnica Dedicada del Corral (Modal Enfocado)
   const [modalFichaCorralId, setModalFichaCorralId] = useState<EtapaCorralId | null>(null);
   const [modoEdicionDietaModal, setModoEdicionDietaModal] = useState(false);
-
 
   // Dietas con modificaciones no guardadas
   const [hasDietChanges, setHasDietChanges] = useState(false);
@@ -137,6 +162,41 @@ export default function GanaderiaPage() {
     pesoInicial: 38,
   });
 
+  function refrescarVentasGordos() {
+    const data = getVentasGordos();
+    setVentasGordos((prev) => {
+      if (prev.length === data.length && JSON.stringify(prev) === JSON.stringify(data)) {
+        return prev;
+      }
+      return data;
+    });
+  }
+
+  function handleVentaGordoActualizada(actualizada: VentaGordoExpediente) {
+    refrescarVentasGordos();
+    if (expedienteSeleccionado?.id === actualizada.id) {
+      setExpedienteSeleccionado(actualizada);
+    }
+  }
+
+  function handleEliminarRapidoGordo(venta: VentaGordoExpediente) {
+    const motivo = prompt(`¿Confirma eliminar la Venta N° ${venta.numeroVenta}? Ingrese el motivo de la baja:`);
+    if (!motivo) return;
+    eliminarVentaGordoLogico({
+      ventaId: venta.id,
+      motivo,
+      usuario: "Operador",
+    });
+    refrescarVentasGordos();
+  }
+
+  const badgeEstado: Record<string, { bg: string; text: string; label: string }> = {
+    PROYECCION: { bg: "#eff6ff", text: "#1d4ed8", label: "PROYECCIÓN" },
+    TEMPORAL: { bg: "#fef3c7", text: "#b45309", label: "TEMPORAL" },
+    DEFINITIVO: { bg: "#f0fdf4", text: "#15803d", label: "DEFINITIVO" },
+    CANCELADO: { bg: "#f1f5f9", text: "#64748b", label: "CANCELADO" },
+  };
+
   function cargarTodoGanaderia() {
     setCorrales(getCorrales());
     setTropas(getTropas());
@@ -195,18 +255,69 @@ export default function GanaderiaPage() {
 
   useEffect(() => {
     cargarTodoGanaderia();
+    refrescarVentasGordos();
 
     function onSync() {
       cargarTodoGanaderia();
+      refrescarVentasGordos();
     }
+
+    const unsubVentasGordos = initVentasGordosFirestoreSync();
+    initDelProFirestoreSync();
 
     window.addEventListener(HJB_GANADERIA_SYNC_EVENT, onSync);
     window.addEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
+    window.addEventListener(HJB_VENTAS_GORDOS_SYNC_EVENT, onSync);
+
     return () => {
+      unsubVentasGordos();
       window.removeEventListener(HJB_GANADERIA_SYNC_EVENT, onSync);
       window.removeEventListener(HJB_DELPRO_SYNC_EVENT, onSync);
+      window.removeEventListener(HJB_VENTAS_GORDOS_SYNC_EVENT, onSync);
     };
   }, []);
+
+  // Solo Machos en Recría y Engorde (100% trazables por caravana)
+  const soloMachosRecria = useMemo(() => {
+    return animalesRecria.filter(
+      (a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho" || (a as any).Sex === 1 || !(a.sexo === "Hembra" || (a as any).Sex === 2 || esHembraPorCaravana(a.rp))
+    );
+  }, [animalesRecria]);
+
+  // Filtrado de expedientes de ventas de gordos
+  const ventasGordosActivas = useMemo(() => {
+    return ventasGordos.filter((v) => !v.eliminadoLogico);
+  }, [ventasGordos]);
+
+  const ventasGordosFiltradas = useMemo(() => {
+    return ventasGordosActivas.filter((v) => {
+      const texto = filtroVentasTexto.trim().toLowerCase();
+      const cumpleTexto =
+        texto === "" ||
+        `venta n° ${v.numeroVenta}`.includes(texto) ||
+        `v-${v.numeroVenta}`.includes(texto) ||
+        (v.clienteNombre || "").toLowerCase().includes(texto) ||
+        (v.frigorificoDestino || "").toLowerCase().includes(texto);
+
+      const cumpleEstado = filtroVentasEstado === "TODOS" || v.estado === filtroVentasEstado;
+      const cumpleMetodo = filtroVentasMetodo === "TODOS" || v.metodoElegido === filtroVentasMetodo;
+
+      return cumpleTexto && cumpleEstado && cumpleMetodo;
+    });
+  }, [ventasGordosActivas, filtroVentasTexto, filtroVentasEstado, filtroVentasMetodo]);
+
+  const countTotalGordos = ventasGordosActivas.length;
+  const countProyeccionGordos = ventasGordosActivas.filter((v) => v.estado === "PROYECCION").length;
+  const countTemporalGordos = ventasGordosActivas.filter((v) => v.estado === "TEMPORAL").length;
+  const countDefinitivoGordos = ventasGordosActivas.filter((v) => v.estado === "DEFINITIVO").length;
+
+  const margenPromedioDefinitivoGordos = useMemo(() => {
+    const cerradas = ventasGordosActivas.filter((v) => v.estado === "DEFINITIVO" && v.liquidacionReal);
+    if (cerradas.length === 0) return 0;
+    const totalMargen = cerradas.reduce((acc, v) => acc + (v.liquidacionReal?.margenOperativoRealArs || 0), 0);
+    const totalCab = cerradas.reduce((acc, v) => acc + (v.cantidadReal || v.cantidadEstimada || 0), 0);
+    return totalCab > 0 ? Math.round(totalMargen / totalCab) : 0;
+  }, [ventasGordosActivas]);
 
   const resumen = getResumenGanaderia(corrales, tropas);
 
@@ -537,9 +648,15 @@ export default function GanaderiaPage() {
   // Cálculos para la Ficha Técnica de Corral (Modal)
   const corralModalSeleccionado = corrales.find((c) => c.id === modalFichaCorralId);
   const tropasModal = tropas.filter((t) => t.corralId === modalFichaCorralId);
-  const cabezasModal = tropasModal.reduce((acc, t) => acc + t.cabezas, 0);
+  const animalesCorralModal = soloMachosRecria.filter((a) => a.corralId === modalFichaCorralId);
+  const cabezasModal =
+    animalesCorralModal.length > 0
+      ? animalesCorralModal.length
+      : tropasModal.reduce((acc, t) => acc + t.cabezas, 0);
   const pesoPromModal =
-    cabezasModal > 0
+    animalesCorralModal.length > 0
+      ? Math.round(animalesCorralModal.reduce((acc, a) => acc + a.pesoActualKg, 0) / animalesCorralModal.length)
+      : cabezasModal > 0
       ? Math.round(tropasModal.reduce((acc, t) => acc + t.cabezas * t.pesoActualKg, 0) / cabezasModal)
       : (corralModalSeleccionado?.pesoEntradaKg || 0);
   const gdpvPromModal =
@@ -782,7 +899,7 @@ export default function GanaderiaPage() {
           className={activeTab === "ventas" ? "tab active" : "tab"}
           onClick={() => setActiveTab("ventas")}
         >
-          🚛 Ventas a Frigorífico & Fichas ({ventas.length})
+          🥩 Ventas a Frigorífico (Venta de Gordos) ({ventasGordosActivas.length})
         </button>
         <button
           type="button"
@@ -795,22 +912,6 @@ export default function GanaderiaPage() {
             : delproConfig.datosSincronizados.partosRecientes?.length || 0}
           )
         </button>
-        <Link
-          href="/ganaderia/ventas-gordos"
-          className="tab"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            textDecoration: "none",
-            backgroundColor: "#eff6ff",
-            color: "#1d4ed8",
-            fontWeight: 800,
-            border: "1px solid #bfdbfe",
-          }}
-        >
-          🥩 Ventas de Gordos (Expedientes) ↗
-        </Link>
       </div>
 
       {/* ========================================================================= */}
@@ -840,10 +941,16 @@ export default function GanaderiaPage() {
           {/* Grid interactivo de los 5 corrales (Clickables) */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
             {corrales.map((c) => {
+              const animalesCorral = soloMachosRecria.filter((a) => a.corralId === c.id);
               const tropasCorral = tropas.filter((t) => t.corralId === c.id);
-              const cabezasCorral = tropasCorral.reduce((acc, t) => acc + t.cabezas, 0);
+              const cabezasCorral =
+                animalesCorral.length > 0
+                  ? animalesCorral.length
+                  : tropasCorral.reduce((acc, t) => acc + t.cabezas, 0);
               const pesoPromCorral =
-                cabezasCorral > 0
+                animalesCorral.length > 0
+                  ? Math.round(animalesCorral.reduce((acc, a) => acc + a.pesoActualKg, 0) / animalesCorral.length)
+                  : cabezasCorral > 0
                   ? Math.round(tropasCorral.reduce((acc, t) => acc + t.cabezas * t.pesoActualKg, 0) / cabezasCorral)
                   : c.pesoEntradaKg;
               const progresoPct = Math.min(
@@ -1585,71 +1692,53 @@ export default function GanaderiaPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 4: VENTAS A FRIGORÍFICO & FICHAS DE LIQUIDACIÓN                       */}
+      {/* TAB 4: VENTAS A FRIGORÍFICO & VENTAS DE GORDOS (EXPEDIENTE ÚNICO)        */}
       {/* ========================================================================= */}
       {activeTab === "ventas" && (
         <section className="panel" style={{ padding: "20px" }}>
-          {/* Banner destacado Nuevo Módulo Ventas de Gordos */}
+          {/* Encabezado y Acciones */}
           <div
             style={{
-              backgroundColor: "#f0fdf4",
-              border: "1.5px solid #86efac",
-              borderRadius: "10px",
-              padding: "14px 18px",
-              marginBottom: "18px",
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center",
+              alignItems: "flex-start",
+              marginBottom: "18px",
               flexWrap: "wrap",
               gap: "12px",
             }}
           >
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "20px" }}>🥩</span>
-                <strong style={{ fontSize: "14px", color: "#14532d" }}>
-                  Nuevo Módulo HJB Carne: Ventas de Gordos (Expediente Único)
-                </strong>
-                <span className="pill badgeGreen" style={{ fontSize: "10px" }}>OFICIAL</span>
+              <div className="badgeRow" style={{ marginBottom: "6px" }}>
+                <span className="pill badgeAmber">HJB Carne</span>
+                <span className="pill badgeGreen">Gestión por Expediente Único</span>
               </div>
-              <p style={{ margin: "4px 0 0 0", fontSize: "12.5px", color: "#166534" }}>
-                Gestione cada venta desde su primera proyección económica, compare Kilo Vivo vs. Rendimiento al Gancho, adjunte DT-e y romaneos, y analice los desvíos reales de frigorífico.
+              <h2 style={{ fontSize: "19px", margin: 0, display: "flex", alignItems: "center", gap: "8px", fontWeight: 800 }}>
+                <span>🥩</span> Ventas a Frigorífico (Ventas de Gordos)
+              </h2>
+              <p className="muted" style={{ fontSize: "13px", margin: "4px 0 0 0" }}>
+                Gestión integral de venta de novillos desde la primera proyección económica (Kilo Vivo vs. Rendimiento al Gancho), control documental (DT-e y Romaneo) y cierre con análisis de desvíos reales de frigorífico.
               </p>
             </div>
-            <Link
-              href="/ganaderia/ventas-gordos"
-              className="primaryButton"
-              style={{
-                textDecoration: "none",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                backgroundColor: "#16a34a",
-                fontSize: "12.5px",
-                padding: "8px 14px",
-              }}
-            >
-              Abrir Módulo Ventas de Gordos ➔
-            </Link>
-          </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <div>
-              <h2 style={{ fontSize: "17px", margin: 0 }}>Historial de Ventas a Frigorífico</h2>
-              <p className="muted" style={{ fontSize: "12.5px", margin: "4px 0 0 0" }}>
-                Registro comercial con aplicación de desbaste (7%), liquidación de kilos netos y cálculo de ganancia neta.
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
               <button
                 type="button"
-                className="primaryButton"
+                className="ghostButton"
+                onClick={() => setModalHistoricoOpen(true)}
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                📊 Ver Histórico Consolidado
+              </button>
+              <button
+                type="button"
+                className="secondaryBtn"
                 onClick={() => setModalVentaRemitoOpen(true)}
                 style={{
-                  display: "inline-flex",
+                  display: "flex",
                   alignItems: "center",
                   gap: "6px",
                   background: "#166534",
+                  color: "#ffffff",
                   borderColor: "#166534",
                 }}
               >
@@ -1657,135 +1746,522 @@ export default function GanaderiaPage() {
               </button>
               <button
                 type="button"
-                className="secondaryBtn"
-                onClick={() => {
-                  const tropaGordos = tropas.find((t) => t.corralId === "terminacion") || tropas[0];
-                  if (tropaGordos) {
-                    setFormVenta({
-                      tropaId: tropaGordos.id,
-                      frigorifico: "Frigorífico Logros S.A.",
-                      remitoDte: "",
-                      cabezas: tropaGordos.cabezas,
-                      pesoBrutoTotal: Math.round(tropaGordos.cabezas * tropaGordos.pesoActualKg),
-                      precioKg: 4200,
-                      otrosGastos: 950000,
-                    });
-                  }
-                  setModalNuevaVentaOpen(true);
-                }}
+                className="primaryButton"
+                onClick={() => setModalProyeccionOpen(true)}
+                style={{ display: "flex", alignItems: "center", gap: "6px", background: "#16a34a" }}
               >
-                ➕ Venta Manual
+                <span>+</span> Nueva Venta / Proyector
               </button>
             </div>
           </div>
 
-          <div className="tableWrap">
+          {/* Tarjetas de Métricas de Operaciones */}
+          <div className="metricsGrid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", marginBottom: "20px" }}>
+            <div className="metricCard">
+              <div className="metricCardHeader">
+                <span className="metricLabel">EXPEDIENTES ACTIVOS</span>
+                <span>📁</span>
+              </div>
+              <div className="metricValue">{countTotalGordos}</div>
+              <div className="metricSubtext">En todas las etapas</div>
+            </div>
+
+            <div className="metricCard">
+              <div className="metricCardHeader">
+                <span className="metricLabel">EN PROYECCIÓN</span>
+                <span style={{ color: "#2563eb" }}>📝</span>
+              </div>
+              <div className="metricValue" style={{ color: "#2563eb" }}>{countProyeccionGordos}</div>
+              <div className="metricSubtext">Presupuestos / Comparativas</div>
+            </div>
+
+            <div className="metricCard">
+              <div className="metricCardHeader">
+                <span className="metricLabel">VENTAS TEMPORALES</span>
+                <span style={{ color: "#d97706" }}>⏱️</span>
+              </div>
+              <div className="metricValue" style={{ color: "#d97706" }}>{countTemporalGordos}</div>
+              <div className="metricSubtext">Decididas, en tránsito o faena</div>
+            </div>
+
+            <div className="metricCard">
+              <div className="metricCardHeader">
+                <span className="metricLabel">VENTAS DEFINITIVAS</span>
+                <span style={{ color: "#16a34a" }}>🏁</span>
+              </div>
+              <div className="metricValue" style={{ color: "#16a34a" }}>{countDefinitivoGordos}</div>
+              <div className="metricSubtext">Cerradas con liquidación real</div>
+            </div>
+
+            <div className="metricCard" style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac" }}>
+              <div className="metricCardHeader">
+                <span className="metricLabel" style={{ color: "#166534" }}>MARGEN REAL PROMEDIO</span>
+                <span>💰</span>
+              </div>
+              <div className="metricValue" style={{ color: "#15803d" }}>
+                ${margenPromedioDefinitivoGordos.toLocaleString("es-AR")}
+              </div>
+              <div className="metricSubtext" style={{ color: "#166534" }}>Por animal terminado</div>
+            </div>
+          </div>
+
+          {/* Barra de Filtros y Búsqueda */}
+          <div
+            style={{
+              padding: "14px 18px",
+              marginBottom: "16px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "12px",
+              background: "#f8fafc",
+              border: "1px solid var(--line)",
+              borderRadius: "10px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              {/* Input Buscador */}
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar N° venta, cliente, frigorífico..."
+                  value={filtroVentasTexto}
+                  onChange={(e) => setFiltroVentasTexto(e.target.value)}
+                  style={{
+                    padding: "7px 12px",
+                    fontSize: "13px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--line)",
+                    minWidth: "260px",
+                  }}
+                />
+                {filtroVentasTexto && (
+                  <button
+                    type="button"
+                    className="ghostButton"
+                    onClick={() => setFiltroVentasTexto("")}
+                    style={{ padding: "6px 10px", fontSize: "12px" }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Filtros de Estado */}
+              <div style={{ display: "flex", gap: "4px" }}>
+                {(["TODOS", "PROYECCION", "TEMPORAL", "DEFINITIVO"] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setFiltroVentasEstado(st)}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      backgroundColor: filtroVentasEstado === st ? "#0f172a" : "#ffffff",
+                      color: filtroVentasEstado === st ? "#ffffff" : "#475569",
+                      boxShadow: "var(--shadow-sm)",
+                    }}
+                  >
+                    {st === "TODOS"
+                      ? "Todos"
+                      : st === "PROYECCION"
+                      ? "Proyección"
+                      : st === "TEMPORAL"
+                      ? "Temporal"
+                      : "Definitivo"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filtro por Método */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "12px", color: "var(--slate-500)", fontWeight: 600 }}>Método:</span>
+              <select
+                value={filtroVentasMetodo}
+                onChange={(e) => setFiltroVentasMetodo(e.target.value as any)}
+                style={{
+                  padding: "6px 10px",
+                  fontSize: "12.5px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--line)",
+                  background: "#ffffff",
+                }}
+              >
+                <option value="TODOS">Todos los métodos</option>
+                <option value="RENDIMIENTO">A Rendimiento</option>
+                <option value="KILO_VIVO">Por Kilo Vivo</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Tabla Principal de Expedientes */}
+          <div className="tableWrap" style={{ border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden" }}>
             <table className="dataTable">
               <thead>
                 <tr>
+                  <th>N° Venta</th>
+                  <th>Estado</th>
                   <th>Fecha</th>
-                  <th>Frigorífico / Comprador</th>
-                  <th>Tropa / DTe</th>
-                  <th style={{ textAlign: "right" }}>Cabezas</th>
-                  <th style={{ textAlign: "right" }}>Peso Bruto</th>
-                  <th style={{ textAlign: "right" }}>Desbaste</th>
-                  <th style={{ textAlign: "right" }}>Peso Neto Facturado</th>
-                  <th style={{ textAlign: "right" }}>Precio/kg</th>
-                  <th style={{ textAlign: "right" }}>Facturación Total</th>
-                  <th style={{ textAlign: "right" }}>Ganancia Neta</th>
-                  <th style={{ textAlign: "center", minWidth: "180px" }}>Acciones</th>
+                  <th>Cliente / Comprador</th>
+                  <th>Cantidad</th>
+                  <th>Peso Lote</th>
+                  <th>Método</th>
+                  <th style={{ textAlign: "right" }}>Ingreso (Est. / Real)</th>
+                  <th style={{ textAlign: "right" }}>Margen Operativo</th>
+                  <th>Documentos</th>
+                  <th>Última Actividad</th>
+                  <th style={{ textAlign: "center" }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {ventas.map((v) => (
-                  <tr key={v.id}>
-                    <td>
-                      <strong>{v.fecha}</strong>
-                    </td>
-                    <td>
-                      <strong>{v.frigorifico}</strong>
-                    </td>
-                    <td>
-                      <div>{v.tropaCodigo}</div>
-                      <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{v.remitoDte}</div>
-                    </td>
-                    <td style={{ textAlign: "right" }}>{v.cabezas}</td>
-                    <td style={{ textAlign: "right" }}>
-                      {v.pesoBrutoTotalKg.toLocaleString("es-AR")} kg
-                      <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>({v.pesoBrutoPromedioKg} kg/cab)</div>
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <span className="pill badgeSlate">-{v.desbastePct}%</span>
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <strong>{v.pesoNetoTotalKg.toLocaleString("es-AR")} kg</strong>
-                      <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>({v.pesoNetoPromedioKg} kg/cab)</div>
-                    </td>
-                    <td style={{ textAlign: "right" }}>${v.precioKgVivoArs.toLocaleString("es-AR")}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <strong>${v.facturacionTotalArs.toLocaleString("es-AR")}</strong>
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      <strong style={{ color: "#166534" }}>
-                        +${v.gananciaNetaTotalArs.toLocaleString("es-AR")}
-                      </strong>
-                      <div style={{ fontSize: "11px", color: "#15803d" }}>
-                        (+${v.gananciaNetaPorCabezaArs.toLocaleString("es-AR")}/cab)
-                      </div>
-                    </td>
-                    <td style={{ textAlign: "center" }}>
-                      <div style={{ display: "inline-flex", gap: "5px", alignItems: "center", justifyContent: "center" }}>
-                        <button
-                          type="button"
-                          className="primaryButton"
-                          onClick={() => setModalFichaVenta(v)}
-                          title="Ver Ficha Oficial de Liquidación"
-                          style={{ padding: "4px 8px", fontSize: "11.5px", background: "#0f172a", whiteSpace: "nowrap" }}
-                        >
-                          📄 Ficha
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAbrirEditarVenta(v)}
-                          title="Editar Venta y Liquidación"
-                          style={{
-                            padding: "4px 8px",
-                            fontSize: "11.5px",
-                            background: "#2563eb",
-                            color: "#ffffff",
-                            border: "none",
-                            borderRadius: "6px",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          ✏️ Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleEliminarVenta(v)}
-                          title="Eliminar Registro de Venta"
-                          style={{
-                            padding: "4px 8px",
-                            fontSize: "11.5px",
-                            background: "#fee2e2",
-                            color: "#b91c1c",
-                            border: "1px solid #fecaca",
-                            borderRadius: "6px",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          🗑️
-                        </button>
-                      </div>
+                {ventasGordosFiltradas.length === 0 ? (
+                  <tr>
+                    <td colSpan={12} style={{ textAlign: "center", padding: "40px", color: "var(--slate-500)" }}>
+                      No se encontraron operaciones de venta de gordos con los filtros seleccionados.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  ventasGordosFiltradas.map((v) => {
+                    const stBadge = badgeEstado[v.estado] || badgeEstado.PROYECCION;
+                    const docSt = getEstadoDocumentacion(v.documentos || []);
+                    const esDef = v.estado === "DEFINITIVO" && v.liquidacionReal;
+
+                    const ingresoMostrar = esDef
+                      ? v.liquidacionReal!.ingresoBrutoRealArs
+                      : v.metodoElegido === "RENDIMIENTO"
+                      ? v.proyeccion.altRendimiento.ingresoBrutoEstimadoArs
+                      : v.proyeccion.altKiloVivo.ingresoBrutoEstimadoArs;
+
+                    const margenMostrar = esDef
+                      ? v.liquidacionReal!.margenOperativoRealArs
+                      : v.metodoElegido === "RENDIMIENTO"
+                      ? v.proyeccion.altRendimiento.margenOperativoEstimadoArs
+                      : v.proyeccion.altKiloVivo.margenOperativoEstimadoArs;
+
+                    const margenCabMostrar = esDef
+                      ? v.liquidacionReal!.margenRealPorAnimalArs
+                      : v.metodoElegido === "RENDIMIENTO"
+                      ? v.proyeccion.altRendimiento.margenPorAnimalArs
+                      : v.proyeccion.altKiloVivo.margenPorAnimalArs;
+
+                    return (
+                      <tr key={v.id} style={{ transition: "background 0.15s" }}>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => setExpedienteSeleccionado(v)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              padding: 0,
+                              color: "#2563eb",
+                              fontFamily: "monospace",
+                              fontSize: "14px",
+                              fontWeight: 800,
+                              textAlign: "left",
+                            }}
+                          >
+                            Venta N° {v.numeroVenta}
+                          </button>
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              backgroundColor: stBadge.bg,
+                              color: stBadge.text,
+                              padding: "3px 8px",
+                              borderRadius: "999px",
+                              fontSize: "11px",
+                              fontWeight: 800,
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            {stBadge.label}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: "12.5px" }}>{v.fechaReal || v.fechaEstimada}</td>
+                        <td>
+                          <strong style={{ fontSize: "13px", color: "var(--slate-800)" }}>{v.clienteNombre}</strong>
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{v.frigorificoDestino}</div>
+                        </td>
+                        <td>
+                          <strong>{v.cantidadReal || v.cantidadEstimada}</strong> cab.
+                        </td>
+                        <td>
+                          {(v.pesoCampoRealKg || v.pesoCampoEstimadoKg).toLocaleString("es-AR")} kg
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>
+                            {(
+                              (v.pesoCampoRealKg || v.pesoCampoEstimadoKg) /
+                              (v.cantidadReal || v.cantidadEstimada || 1)
+                            ).toFixed(1)}{" "}
+                            kg/cab
+                          </div>
+                        </td>
+                        <td>
+                          {v.metodoElegido ? (
+                            <span
+                              className={`pill ${v.metodoElegido === "RENDIMIENTO" ? "badgeGreen" : "badgeBlue"}`}
+                              style={{ fontSize: "10.5px" }}
+                            >
+                              {v.metodoElegido === "RENDIMIENTO" ? "Rendimiento" : "Kilo Vivo"}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: "11px", color: "var(--slate-400)" }}>En evaluación</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <strong style={{ fontSize: "13.5px", color: esDef ? "#166534" : "#0f172a" }}>
+                            ${ingresoMostrar.toLocaleString("es-AR")}
+                          </strong>
+                          <div style={{ fontSize: "10.5px", color: esDef ? "#16a34a" : "var(--slate-400)" }}>
+                            {esDef ? "Liquidado Real" : "Estimado s/ método"}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <strong
+                            style={{
+                              fontSize: "13.5px",
+                              color: margenMostrar >= 0 ? "#15803d" : "#dc2626",
+                            }}
+                          >
+                            ${margenMostrar.toLocaleString("es-AR")}
+                          </strong>
+                          <div style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>
+                            ${margenCabMostrar.toLocaleString("es-AR")} / cab
+                          </div>
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              color: docSt.color,
+                              backgroundColor: "#f8fafc",
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              border: `1px solid ${docSt.color}33`,
+                            }}
+                          >
+                            {docSt.label}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
+                          {v.auditoria?.modificadoPor || "N/A"}
+                          <div style={{ fontSize: "10.5px", color: "var(--slate-400)" }}>
+                            {new Date(v.auditoria?.modificadoEn || v.auditoria?.creadoEn).toLocaleDateString("es-AR")}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                            <button
+                              type="button"
+                              className="ghostButton"
+                              onClick={() => setExpedienteSeleccionado(v)}
+                              style={{ padding: "4px 8px", fontSize: "11.5px", fontWeight: 700 }}
+                              title="Abrir expediente completo 360°"
+                            >
+                              📂 Abrir
+                            </button>
+
+                            {v.estado === "TEMPORAL" && (
+                              <button
+                                type="button"
+                                className="primaryButton"
+                                onClick={() => setVentaParaCerrar(v)}
+                                style={{ padding: "4px 8px", fontSize: "11.5px", background: "#16a34a" }}
+                                title="Cargar romaneo y liquidación para pasar a DEFINITIVO"
+                              >
+                                🏁 Cerrar
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              className="ghostButton"
+                              onClick={() => handleEliminarRapidoGordo(v)}
+                              style={{ padding: "4px 6px", fontSize: "11px", color: "#dc2626" }}
+                              title="Baja lógica de la venta"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
+          </div>
+
+          {/* Sección Plegable: Historial de Remitos y Ventas Manuales */}
+          <div style={{ marginTop: "24px", borderTop: "1px solid var(--line)", paddingTop: "18px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                cursor: "pointer",
+                padding: "10px 14px",
+                background: "#f8fafc",
+                borderRadius: "8px",
+                border: "1px solid var(--line)",
+              }}
+              onClick={() => setMostrarHistoricoRemitosVentas(!mostrarHistoricoRemitosVentas)}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "16px" }}>🧾</span>
+                <strong style={{ fontSize: "13.5px", color: "var(--slate-800)" }}>
+                  Historial de Remitos Rápidos / Liquidaciones Anteriores ({ventas.length} registros)
+                </strong>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="secondaryBtn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const tropaGordos = tropas.find((t) => t.corralId === "terminacion") || tropas[0];
+                    if (tropaGordos) {
+                      setFormVenta({
+                        tropaId: tropaGordos.id,
+                        frigorifico: "Frigorífico Logros S.A.",
+                        remitoDte: "",
+                        cabezas: tropaGordos.cabezas,
+                        pesoBrutoTotal: Math.round(tropaGordos.cabezas * tropaGordos.pesoActualKg),
+                        precioKg: 4200,
+                        otrosGastos: 950000,
+                      });
+                    }
+                    setModalNuevaVentaOpen(true);
+                  }}
+                  style={{ fontSize: "12px", padding: "4px 8px" }}
+                >
+                  ➕ Venta Manual Directa
+                </button>
+                <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#2563eb" }}>
+                  {mostrarHistoricoRemitosVentas ? "▲ Ocultar" : "▼ Desplegar"}
+                </span>
+              </div>
+            </div>
+
+            {mostrarHistoricoRemitosVentas && (
+              <div className="tableWrap" style={{ marginTop: "14px" }}>
+                <table className="dataTable">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Frigorífico / Comprador</th>
+                      <th>Tropa / DTe</th>
+                      <th style={{ textAlign: "right" }}>Cabezas</th>
+                      <th style={{ textAlign: "right" }}>Peso Bruto</th>
+                      <th style={{ textAlign: "right" }}>Desbaste</th>
+                      <th style={{ textAlign: "right" }}>Peso Neto Facturado</th>
+                      <th style={{ textAlign: "right" }}>Precio/kg</th>
+                      <th style={{ textAlign: "right" }}>Facturación Total</th>
+                      <th style={{ textAlign: "right" }}>Ganancia Neta</th>
+                      <th style={{ textAlign: "center", minWidth: "180px" }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ventas.map((v) => (
+                      <tr key={v.id}>
+                        <td>
+                          <strong>{v.fecha}</strong>
+                        </td>
+                        <td>
+                          <strong>{v.frigorifico}</strong>
+                        </td>
+                        <td>
+                          <div>{v.tropaCodigo}</div>
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{v.remitoDte}</div>
+                        </td>
+                        <td style={{ textAlign: "right" }}>{v.cabezas}</td>
+                        <td style={{ textAlign: "right" }}>
+                          {v.pesoBrutoTotalKg.toLocaleString("es-AR")} kg
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>({v.pesoBrutoPromedioKg} kg/cab)</div>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <span className="pill badgeSlate">-{v.desbastePct}%</span>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <strong>{v.pesoNetoTotalKg.toLocaleString("es-AR")} kg</strong>
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>({v.pesoNetoPromedioKg} kg/cab)</div>
+                        </td>
+                        <td style={{ textAlign: "right" }}>${v.precioKgVivoArs.toLocaleString("es-AR")}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <strong>${v.facturacionTotalArs.toLocaleString("es-AR")}</strong>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <strong style={{ color: "#166534" }}>
+                            +${v.gananciaNetaTotalArs.toLocaleString("es-AR")}
+                          </strong>
+                          <div style={{ fontSize: "11px", color: "#15803d" }}>
+                            (+${v.gananciaNetaPorCabezaArs.toLocaleString("es-AR")}/cab)
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <div style={{ display: "inline-flex", gap: "5px", alignItems: "center", justifyContent: "center" }}>
+                            <button
+                              type="button"
+                              className="primaryButton"
+                              onClick={() => setModalFichaVenta(v)}
+                              title="Ver Ficha Oficial de Liquidación"
+                              style={{ padding: "4px 8px", fontSize: "11.5px", background: "#0f172a", whiteSpace: "nowrap" }}
+                            >
+                              📄 Ficha
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAbrirEditarVenta(v)}
+                              title="Editar Venta y Liquidación"
+                              style={{
+                                padding: "4px 8px",
+                                fontSize: "11.5px",
+                                background: "#2563eb",
+                                color: "#ffffff",
+                                border: "none",
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEliminarVenta(v)}
+                              title="Eliminar Registro de Venta"
+                              style={{
+                                padding: "4px 8px",
+                                fontSize: "11.5px",
+                                background: "#fee2e2",
+                                color: "#b91c1c",
+                                border: "1px solid #fecaca",
+                                borderRadius: "6px",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -3530,6 +4006,57 @@ export default function GanaderiaPage() {
         onVentaCompletada={handleVentaRemitoCompletada}
         seccionInicial="ganaderia"
       />
+
+      {/* Modales del Módulo Ventas de Gordos (Expediente Único) */}
+      {modalProyeccionOpen && (
+        <ModalProyeccionVenta
+          isOpen={modalProyeccionOpen}
+          onClose={() => setModalProyeccionOpen(false)}
+          onVentaGuardada={(nueva) => {
+            refrescarVentasGordos();
+            setExpedienteSeleccionado(nueva);
+          }}
+          usuarioActual="Operador"
+        />
+      )}
+
+      {expedienteSeleccionado && (
+        <ModalExpedienteCompleto
+          isOpen={!!expedienteSeleccionado}
+          venta={expedienteSeleccionado}
+          onClose={() => setExpedienteSeleccionado(null)}
+          onVentaActualizada={(actualizada) => {
+            handleVentaGordoActualizada(actualizada);
+          }}
+          onAbrirCierreDefinitivo={(v) => {
+            setVentaParaCerrar(v);
+          }}
+          usuarioActual="Operador"
+        />
+      )}
+
+      {ventaParaCerrar && (
+        <ModalCierreVentaDefinitivo
+          isOpen={!!ventaParaCerrar}
+          venta={ventaParaCerrar}
+          onClose={() => setVentaParaCerrar(null)}
+          onVentaCerrada={(cerrada) => {
+            handleVentaGordoActualizada(cerrada);
+          }}
+          usuarioActual="Operador"
+        />
+      )}
+
+      {modalHistoricoOpen && (
+        <ModalHistoricoComparativo
+          isOpen={modalHistoricoOpen}
+          onClose={() => setModalHistoricoOpen(false)}
+          ventas={ventasGordosActivas}
+          onSeleccionarVenta={(v) => {
+            setExpedienteSeleccionado(v);
+          }}
+        />
+      )}
     </AppShell>
   );
 }

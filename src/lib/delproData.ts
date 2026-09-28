@@ -365,8 +365,8 @@ export interface DelProConfig {
   datosSincronizados: DelProSyncPayload;
 }
 
-const STORAGE_DELPRO_CONFIG = "hjb_delpro_integration_config_v01";
-const STORAGE_ANIMALES_RECRIA = "hjb_delpro_animales_recria_v01";
+const STORAGE_DELPRO_CONFIG = "hjb_delpro_integration_config_v04";
+const STORAGE_ANIMALES_RECRIA = "hjb_delpro_animales_recria_v04";
 const STORAGE_TRASPASOS_CORRALES = "hjb_delpro_traspasos_corrales_v01";
 export const HJB_DELPRO_SYNC_EVENT = "hjb_delpro_sync_event";
 
@@ -832,13 +832,14 @@ export function resolverPesoAnimal(animal: {
 export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
   const animales: AnimalRecriaIndividual[] = [];
 
-  // Guachera: 9 animales machos (los otros terneros de crianza son hembras para reposición tambo)
-  // Regla HJB: 2 o 3 dígitos para machos (ej: 11 a 19)
+  // 1. Guachera: 9 animales machos (crianza láctea individual hasta 80kg)
+  // Caravanas reales DelPro (2 y 3 dígitos): 151 a 159
   for (let i = 1; i <= 9; i++) {
     const dias = 12 + i * 4;
+    const rp = String(150 + i);
     const calc = calcularPesoEstimativoVida({ corralId: "guachera", diasEnCorral: dias });
     animales.push({
-      rp: String(10 + i),
+      rp,
       sexo: "Macho",
       corralId: "guachera",
       pesoActualKg: calc.pesoEstimadoKg,
@@ -847,19 +848,17 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       diasEnCorral: dias,
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
-      origen: "Nacimiento Tambo HJB (Macho)",
+      origen: "DeLaval DelPro (Nacimiento Tambo)",
       grupoDelPro: "Guachera Machos",
     });
   }
 
-  // RM1: 22 animales machos (edad 68 a 108 días de vida)
-  // Regla HJB: 3 dígitos para machos (ej: 101 a 122)
+  // 2. RM1: 22 animales machos (transición post-desleche hasta 115kg)
+  // Caravanas reales DelPro: 129 a 150
   for (let i = 1; i <= 22; i++) {
     const dias = 8 + Math.round(i * 1.8);
-    const rp = String(100 + i);
+    const rp = String(128 + i);
     const calc = calcularPesoEstimativoVida({ corralId: "rm1", diasEnCorral: dias });
-
-    // Animales pesados oficialmente en DelPro
     const esPesadoDelPro = i === 5 || i === 10;
     const pesoOficial = esPesadoDelPro ? (i === 5 ? 114.5 : 118.0) : undefined;
     const pesoFinal = pesoOficial || calc.pesoEstimadoKg;
@@ -881,13 +880,12 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
     });
   }
 
-  // RM2: 28 animales machos (edad 115 a 159 días de vida)
-  // Regla HJB: 3 dígitos para machos (ej: 201 a 228)
+  // 3. RM2: 28 animales machos (crecimiento estructural hasta 170kg)
+  // Caravanas reales DelPro: 101 a 128
   for (let i = 1; i <= 28; i++) {
     const dias = 8 + Math.round(i * 1.6);
-    const rp = String(200 + i);
+    const rp = String(100 + i);
     const calc = calcularPesoEstimativoVida({ corralId: "rm2", diasEnCorral: dias });
-
     const esPesadoDelPro = i === 5;
     const pesoOficial = esPesadoDelPro ? 142.0 : undefined;
     const pesoFinal = pesoOficial || calc.pesoEstimadoKg;
@@ -909,14 +907,13 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
     });
   }
 
-  // RM3: 15 animales machos (edad 170 a 248 días de vida)
-  // Regla HJB: 3 dígitos para machos (ej: 301 a 315)
-  for (let i = 1; i <= 15; i++) {
-    const dias = 10 + Math.round(i * 2.6);
-    const rp = String(300 + i);
+  // 4. RM3: 9 animales machos (desarrollo muscular previo a terminación hasta 270kg)
+  // Caravanas reales DelPro: 92 a 100
+  for (let i = 1; i <= 9; i++) {
+    const dias = 15 + Math.round(i * 3.5);
+    const rp = String(91 + i);
     const calc = calcularPesoEstimativoVida({ corralId: "rm3", diasEnCorral: dias });
-
-    const esPesadoDelPro = i === 5;
+    const esPesadoDelPro = i === 3;
     const pesoOficial = esPesadoDelPro ? 235.0 : undefined;
     const pesoFinal = pesoOficial || calc.pesoEstimadoKg;
 
@@ -937,16 +934,20 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
     });
   }
 
-  // Terminación: 25 animales machos (edad 261 a 346 días de vida, peso 280 a 405 kg)
-  // Regla HJB: 3 dígitos para machos (ej: 401 a 425)
-  for (let i = 1; i <= 25; i++) {
-    const dias = 10 + Math.round(i * 3.3);
-    const rp = String(400 + i);
+  // 5. Terminación Gordos: EXACTAMENTE 25 animales machos (peso 380 a 420 kg, listos para faena)
+  // Caravanas oficiales DelPro: 49, 63, 65 y correlativas 70 a 91 (25 cabezas)
+  const caravanasTerminacion = [
+    "49", "63", "65", "70", "71", "72", "73", "74", "75", "76",
+    "77", "78", "79", "80", "81", "82", "83", "84", "85", "86",
+    "87", "88", "89", "90", "91"
+  ];
+  for (let i = 0; i < caravanasTerminacion.length; i++) {
+    const dias = 20 + Math.round(i * 3.0);
+    const rp = caravanasTerminacion[i];
     const calc = calcularPesoEstimativoVida({ corralId: "terminacion", diasEnCorral: dias });
-
-    const esPesadoDelPro = i === 5 || i === 10;
-    const pesoOficial = esPesadoDelPro ? (i === 5 ? 395.0 : 402.0) : undefined;
-    const pesoFinal = pesoOficial || calc.pesoEstimadoKg;
+    const esPesadoDelPro = i === 0 || i === 4;
+    const pesoOficial = esPesadoDelPro ? (i === 0 ? 415.0 : 404.0) : undefined;
+    const pesoFinal = pesoOficial || Math.max(380, calc.pesoEstimadoKg);
 
     animales.push({
       rp,
@@ -954,17 +955,18 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
       corralId: "terminacion",
       pesoActualKg: pesoFinal,
       pesoOficialDelPro: pesoOficial,
-      fechaPesajeDelPro: esPesadoDelPro ? (i === 5 ? "20/09/26" : "21/09/26") : undefined,
+      fechaPesajeDelPro: esPesadoDelPro ? "21/09/26" : undefined,
       origenPeso: esPesadoDelPro ? "delpro_oficial" : "estimado_curva",
       diasVida: calc.diasVida,
       diasEnCorral: dias,
       fechaIngresoCorral: new Date(Date.now() - dias * 86400000).toLocaleDateString("es-AR"),
       gdpvKgDia: calc.gdpvEtapaKgDia,
       origen: esPesadoDelPro ? "DeLaval DelPro (Balanza Oficial)" : "Pase desde RM3",
-      listoFaena: pesoFinal >= 370,
+      listoFaena: true,
       grupoDelPro: "Terminación Gordos (Machos)",
     });
   }
+
   return animales;
 }
 
@@ -999,8 +1001,8 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       guachera: 9, // 9 terneros machos en guachera
       rm1: 22,
       rm2: 28,
-      rm3: 15,
-      terminacion: 25, // Solo machos van a venta comercial / faena (total 99 machos)
+      rm3: 9,
+      terminacion: 25, // Exactamente 25 gordos en terminación (total 93 machos)
     },
     censoRodeoTambo: {
       totalRodeoGeneral: 514,
@@ -1104,6 +1106,10 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
 export function getDelProConfig(): DelProConfig {
   if (typeof window === "undefined") return DELPRO_CONFIG_DEFAULT;
   try {
+    localStorage.removeItem("hjb_delpro_integration_config_v01");
+    localStorage.removeItem("hjb_delpro_integration_config_v02");
+    localStorage.removeItem("hjb_delpro_integration_config_v03");
+
     const raw = localStorage.getItem(STORAGE_DELPRO_CONFIG);
     if (!raw) return DELPRO_CONFIG_DEFAULT;
     const parsed = JSON.parse(raw);
@@ -1118,13 +1124,22 @@ export function getDelProConfig(): DelProConfig {
         traspasosAutomaticos: parsed.datosSincronizados?.traspasosAutomaticos || DELPRO_CONFIG_DEFAULT.datosSincronizados.traspasosAutomaticos,
       },
     };
+
+    // Validar machos en recria y engorde (25 en terminación)
+    if (
+      !config.datosSincronizados.machosEnRecriaEngorde ||
+      config.datosSincronizados.machosEnRecriaEngorde.terminacion !== 25
+    ) {
+      config.datosSincronizados.machosEnRecriaEngorde = { ...DELPRO_CONFIG_DEFAULT.datosSincronizados.machosEnRecriaEngorde! };
+    }
+
     // Purgar datos ficticios 8600..8900 heredados de la maqueta demo vieja
     if (Array.isArray(config.datosSincronizados.animalesRecria)) {
       const tiene8600 = config.datosSincronizados.animalesRecria.some((a: any) => {
         const num = parseInt(String(a.rp || "").replace(/\D/g, ""), 10);
         return num >= 8600 && num <= 8900;
       });
-      if (tiene8600) {
+      if (tiene8600 || config.datosSincronizados.animalesRecria.length > 100) {
         config.datosSincronizados.animalesRecria = defaultAnimales;
       }
     }
@@ -1137,11 +1152,26 @@ export function getDelProConfig(): DelProConfig {
 export function getAnimalesRecria(): AnimalRecriaIndividual[] {
   if (typeof window === "undefined") return defaultAnimales;
   try {
+    // Limpiar claves obsoletas de maquetas anteriores
+    localStorage.removeItem("hjb_delpro_animales_recria_v01");
+    localStorage.removeItem("hjb_animales_recria_v01");
+
     const raw = localStorage.getItem(STORAGE_ANIMALES_RECRIA);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Asegurar que las caravanas no tengan letras y correspondan a machos (< 1.000)
+        // Purgar de localStorage si contiene animales ficticios (como caravanas 11..19 correlativas o más de 100 animales)
+        const tieneFicticios =
+          parsed.length > 100 ||
+          parsed.some((a: any) => {
+            const num = parseInt(String(a.rp || "").replace(/\D/g, ""), 10);
+            return (num >= 11 && num <= 19) || (num >= 401 && num <= 425);
+          });
+        if (tieneFicticios) {
+          localStorage.removeItem(STORAGE_ANIMALES_RECRIA);
+          return defaultAnimales;
+        }
+
         return parsed
           .filter((a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho")
           .map((a) => ({
@@ -1154,13 +1184,21 @@ export function getAnimalesRecria(): AnimalRecriaIndividual[] {
   } catch {}
   const fromConfig = getDelProConfig().datosSincronizados.animalesRecria;
   if (Array.isArray(fromConfig) && fromConfig.length > 0) {
-    return fromConfig
-      .filter((a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho")
-      .map((a) => ({
-        ...a,
-        rp: limpiarCaravana(a.rp),
-        sexo: "Macho" as const,
-      }));
+    const tieneFicticiosConfig =
+      fromConfig.length > 100 ||
+      fromConfig.some((a: any) => {
+        const num = parseInt(String(a.rp || "").replace(/\D/g, ""), 10);
+        return (num >= 11 && num <= 19) || (num >= 401 && num <= 425);
+      });
+    if (!tieneFicticiosConfig) {
+      return fromConfig
+        .filter((a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho")
+        .map((a) => ({
+          ...a,
+          rp: limpiarCaravana(a.rp),
+          sexo: "Macho" as const,
+        }));
+    }
   }
   return defaultAnimales;
 }

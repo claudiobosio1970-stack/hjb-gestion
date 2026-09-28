@@ -226,7 +226,7 @@ export const TROPAS_DEFAULT: TropaGanadera[] = [
     codigo: "TR-26-R3",
     nombre: "Lote Desarrollo RM3 (Machos)",
     corralId: "rm3",
-    cabezas: 15,
+    cabezas: 9,
     fechaIngreso: "10/05/26",
     diasEnCorral: 108,
     pesoInicialKg: 172,
@@ -365,7 +365,7 @@ export const FICHAS_VENTAS_DEFAULT: FichaVentaFrigorifico[] = [
 // 3. PERSISTENCIA EN LOCAL STORAGE
 // =========================================================================
 const STORAGE_CORRALES = "hjb_ganaderia_corrales_v02";
-const STORAGE_TROPAS = "hjb_ganaderia_tropas_v02";
+const STORAGE_TROPAS = "hjb_ganaderia_tropas_v04";
 const STORAGE_PESAJES = "hjb_ganaderia_pesajes_v02";
 const STORAGE_VENTAS = "hjb_ganaderia_ventas_v02";
 
@@ -397,8 +397,26 @@ export function resetCorralesToDefault(): DefinicionCorral[] {
 export function getTropas(): TropaGanadera[] {
   if (typeof window === "undefined") return TROPAS_DEFAULT;
   try {
+    // Purgar claves viejas de maquetas demo
+    localStorage.removeItem("hjb_ganaderia_tropas_v01");
+    localStorage.removeItem("hjb_ganaderia_tropas_v02");
+    localStorage.removeItem("hjb_ganaderia_tropas_v03");
+
     const raw = localStorage.getItem(STORAGE_TROPAS);
-    return raw ? JSON.parse(raw) : TROPAS_DEFAULT;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const total = parsed.reduce((acc: number, t: any) => acc + (t.cabezas || 0), 0);
+        const termGordos = parsed.find((t: any) => t.corralId === "terminacion")?.cabezas;
+        // Si tiene más de 100 cabezas o terminación no es 25, resetear a los 93 reales
+        if (total > 100 || termGordos !== 25) {
+          localStorage.removeItem(STORAGE_TROPAS);
+          return TROPAS_DEFAULT;
+        }
+        return parsed;
+      }
+    }
+    return TROPAS_DEFAULT;
   } catch {
     return TROPAS_DEFAULT;
   }
@@ -639,49 +657,51 @@ export interface NovilloTerminacion {
 }
 
 export const HJB_NOVILLOS_CONFIRMADOS_EVENT = "hjb_novillos_confirmados_event";
-const STORAGE_NOVILLOS_TERMINACION = "hjb_novillos_terminacion_v01";
+const STORAGE_NOVILLOS_TERMINACION = "hjb_novillos_terminacion_v04";
 
 export const NOVILLOS_TERMINACION_DEFAULT: NovilloTerminacion[] = [
-  // Lote 1: Punta de Tropa (84 a 92 días en corral - Listos para faena) - 10 novillos (Machos: 3 dígitos < 1.000)
-  { id: "nov-01", caravana: "401", rpMadre: "3890", fechaIngreso: "15/06/26", diasEnCorral: 92, pesoIngresoKg: 278, pesoActualEstimadoKg: 415.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-02", caravana: "402", rpMadre: "4102", fechaIngreso: "16/06/26", diasEnCorral: 91, pesoIngresoKg: 280, pesoActualEstimadoKg: 415.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-03", caravana: "403", rpMadre: "3750", fechaIngreso: "18/06/26", diasEnCorral: 89, pesoIngresoKg: 275, pesoActualEstimadoKg: 407.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-04", caravana: "404", rpMadre: "4215", fechaIngreso: "18/06/26", diasEnCorral: 89, pesoIngresoKg: 282, pesoActualEstimadoKg: 414.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-05", caravana: "405", rpMadre: "3990", fechaIngreso: "20/06/26", diasEnCorral: 87, pesoIngresoKg: 274, pesoActualEstimadoKg: 403.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-06", caravana: "406", rpMadre: "4050", fechaIngreso: "20/06/26", diasEnCorral: 87, pesoIngresoKg: 279, pesoActualEstimadoKg: 408.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-07", caravana: "407", rpMadre: "3820", fechaIngreso: "21/06/26", diasEnCorral: 86, pesoIngresoKg: 276, pesoActualEstimadoKg: 404.1, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-08", caravana: "408", rpMadre: "4110", fechaIngreso: "22/06/26", diasEnCorral: 85, pesoIngresoKg: 281, pesoActualEstimadoKg: 407.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-09", caravana: "409", rpMadre: "3920", fechaIngreso: "22/06/26", diasEnCorral: 85, pesoIngresoKg: 277, pesoActualEstimadoKg: 403.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-10", caravana: "410", rpMadre: "4300", fechaIngreso: "23/06/26", diasEnCorral: 84, pesoIngresoKg: 283, pesoActualEstimadoKg: 408.1, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-
-  // Lote 2: En Engorde Medio (40 a 52 días en corral) - 10 novillos (Machos: 3 dígitos < 1.000)
-  { id: "nov-11", caravana: "411", rpMadre: "3650", fechaIngreso: "25/07/26", diasEnCorral: 52, pesoIngresoKg: 270, pesoActualEstimadoKg: 347.5, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-  { id: "nov-12", caravana: "412", rpMadre: "4020", fechaIngreso: "25/07/26", diasEnCorral: 52, pesoIngresoKg: 274, pesoActualEstimadoKg: 351.5, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-  { id: "nov-13", caravana: "413", rpMadre: "4150", fechaIngreso: "28/07/26", diasEnCorral: 49, pesoIngresoKg: 272, pesoActualEstimadoKg: 345.0, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-  { id: "nov-14", caravana: "414", rpMadre: "3780", fechaIngreso: "30/07/26", diasEnCorral: 47, pesoIngresoKg: 268, pesoActualEstimadoKg: 338.0, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-  { id: "nov-15", caravana: "415", rpMadre: "4220", fechaIngreso: "01/08/26", diasEnCorral: 45, pesoIngresoKg: 275, pesoActualEstimadoKg: 342.0, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-  { id: "nov-16", caravana: "416", rpMadre: "3910", fechaIngreso: "02/08/26", diasEnCorral: 44, pesoIngresoKg: 273, pesoActualEstimadoKg: 338.5, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-  { id: "nov-17", caravana: "417", rpMadre: "4080", fechaIngreso: "04/08/26", diasEnCorral: 42, pesoIngresoKg: 276, pesoActualEstimadoKg: 338.5, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-  { id: "nov-18", caravana: "418", rpMadre: "3850", fechaIngreso: "04/08/26", diasEnCorral: 42, pesoIngresoKg: 270, pesoActualEstimadoKg: 332.5, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-  { id: "nov-19", caravana: "419", rpMadre: "4310", fechaIngreso: "05/08/26", diasEnCorral: 41, pesoIngresoKg: 274, pesoActualEstimadoKg: 335.0, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-  { id: "nov-20", caravana: "420", rpMadre: "3720", fechaIngreso: "06/08/26", diasEnCorral: 40, pesoIngresoKg: 278, pesoActualEstimadoKg: 337.5, gdpvKgDia: 1.49, categoriaFaena: "engorde_medio", confirmadoVenta: false },
-
-  // Lote 3: Recién Ingresados a Terminación (11 a 21 días en corral) - 6 novillos (Machos: 3 dígitos < 1.000)
-  { id: "nov-21", caravana: "421", rpMadre: "4400", fechaIngreso: "25/08/26", diasEnCorral: 21, pesoIngresoKg: 268, pesoActualEstimadoKg: 299.3, gdpvKgDia: 1.49, categoriaFaena: "recien_ingresado", confirmadoVenta: false },
-  { id: "nov-22", caravana: "422", rpMadre: "4180", fechaIngreso: "27/08/26", diasEnCorral: 19, pesoIngresoKg: 272, pesoActualEstimadoKg: 300.3, gdpvKgDia: 1.49, categoriaFaena: "recien_ingresado", confirmadoVenta: false },
-  { id: "nov-23", caravana: "423", rpMadre: "3995", fechaIngreso: "28/08/26", diasEnCorral: 18, pesoIngresoKg: 270, pesoActualEstimadoKg: 296.8, gdpvKgDia: 1.49, categoriaFaena: "recien_ingresado", confirmadoVenta: false },
-  { id: "nov-24", caravana: "424", rpMadre: "4250", fechaIngreso: "30/08/26", diasEnCorral: 16, pesoIngresoKg: 275, pesoActualEstimadoKg: 298.8, gdpvKgDia: 1.49, categoriaFaena: "recien_ingresado", confirmadoVenta: false },
-  { id: "nov-25", caravana: "425", rpMadre: "4090", fechaIngreso: "02/09/26", diasEnCorral: 13, pesoIngresoKg: 271, pesoActualEstimadoKg: 290.4, gdpvKgDia: 1.49, categoriaFaena: "recien_ingresado", confirmadoVenta: false },
-  { id: "nov-26", caravana: "426", rpMadre: "3880", fechaIngreso: "04/09/26", diasEnCorral: 11, pesoIngresoKg: 274, pesoActualEstimadoKg: 290.4, gdpvKgDia: 1.49, categoriaFaena: "recien_ingresado", confirmadoVenta: false },
+  // Exactamente 25 novillos gordos en terminación con caravanas oficiales DelPro
+  { id: "nov-01", caravana: "49", rpMadre: "3890", fechaIngreso: "15/06/26", diasEnCorral: 92, pesoIngresoKg: 278, pesoActualEstimadoKg: 415.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-02", caravana: "63", rpMadre: "4102", fechaIngreso: "16/06/26", diasEnCorral: 91, pesoIngresoKg: 280, pesoActualEstimadoKg: 415.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-03", caravana: "65", rpMadre: "3750", fechaIngreso: "18/06/26", diasEnCorral: 89, pesoIngresoKg: 275, pesoActualEstimadoKg: 407.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-04", caravana: "70", rpMadre: "4215", fechaIngreso: "18/06/26", diasEnCorral: 89, pesoIngresoKg: 282, pesoActualEstimadoKg: 414.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-05", caravana: "71", rpMadre: "3990", fechaIngreso: "20/06/26", diasEnCorral: 87, pesoIngresoKg: 274, pesoActualEstimadoKg: 403.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-06", caravana: "72", rpMadre: "4050", fechaIngreso: "20/06/26", diasEnCorral: 87, pesoIngresoKg: 279, pesoActualEstimadoKg: 408.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-07", caravana: "73", rpMadre: "3820", fechaIngreso: "21/06/26", diasEnCorral: 86, pesoIngresoKg: 276, pesoActualEstimadoKg: 404.1, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-08", caravana: "74", rpMadre: "4110", fechaIngreso: "22/06/26", diasEnCorral: 85, pesoIngresoKg: 281, pesoActualEstimadoKg: 407.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-09", caravana: "75", rpMadre: "3920", fechaIngreso: "22/06/26", diasEnCorral: 85, pesoIngresoKg: 277, pesoActualEstimadoKg: 403.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-10", caravana: "76", rpMadre: "4300", fechaIngreso: "23/06/26", diasEnCorral: 84, pesoIngresoKg: 283, pesoActualEstimadoKg: 408.1, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  { id: "nov-11", caravana: "77", rpMadre: "3650", fechaIngreso: "25/07/26", diasEnCorral: 52, pesoIngresoKg: 270, pesoActualEstimadoKg: 387.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-12", caravana: "78", rpMadre: "4020", fechaIngreso: "25/07/26", diasEnCorral: 52, pesoIngresoKg: 274, pesoActualEstimadoKg: 391.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-13", caravana: "79", rpMadre: "4150", fechaIngreso: "28/07/26", diasEnCorral: 49, pesoIngresoKg: 272, pesoActualEstimadoKg: 385.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-14", caravana: "80", rpMadre: "3780", fechaIngreso: "30/07/26", diasEnCorral: 47, pesoIngresoKg: 268, pesoActualEstimadoKg: 388.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-15", caravana: "81", rpMadre: "4220", fechaIngreso: "01/08/26", diasEnCorral: 45, pesoIngresoKg: 275, pesoActualEstimadoKg: 392.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-16", caravana: "82", rpMadre: "3910", fechaIngreso: "02/08/26", diasEnCorral: 44, pesoIngresoKg: 273, pesoActualEstimadoKg: 388.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-17", caravana: "83", rpMadre: "4080", fechaIngreso: "04/08/26", diasEnCorral: 42, pesoIngresoKg: 276, pesoActualEstimadoKg: 388.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-18", caravana: "84", rpMadre: "3850", fechaIngreso: "04/08/26", diasEnCorral: 42, pesoIngresoKg: 270, pesoActualEstimadoKg: 382.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-19", caravana: "85", rpMadre: "4310", fechaIngreso: "05/08/26", diasEnCorral: 41, pesoIngresoKg: 274, pesoActualEstimadoKg: 385.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-20", caravana: "86", rpMadre: "3720", fechaIngreso: "06/08/26", diasEnCorral: 40, pesoIngresoKg: 278, pesoActualEstimadoKg: 387.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-21", caravana: "87", rpMadre: "4400", fechaIngreso: "25/08/26", diasEnCorral: 21, pesoIngresoKg: 268, pesoActualEstimadoKg: 380.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-22", caravana: "88", rpMadre: "4180", fechaIngreso: "27/08/26", diasEnCorral: 19, pesoIngresoKg: 272, pesoActualEstimadoKg: 382.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-23", caravana: "89", rpMadre: "3995", fechaIngreso: "28/08/26", diasEnCorral: 18, pesoIngresoKg: 270, pesoActualEstimadoKg: 381.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-24", caravana: "90", rpMadre: "4250", fechaIngreso: "30/08/26", diasEnCorral: 16, pesoIngresoKg: 275, pesoActualEstimadoKg: 383.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
+  { id: "nov-25", caravana: "91", rpMadre: "4090", fechaIngreso: "02/09/26", diasEnCorral: 13, pesoIngresoKg: 271, pesoActualEstimadoKg: 380.4, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
 ];
 
 export function getNovillosTerminacion(): NovilloTerminacion[] {
   if (typeof window === "undefined") return NOVILLOS_TERMINACION_DEFAULT;
   try {
+    localStorage.removeItem("hjb_novillos_terminacion_v01");
+    localStorage.removeItem("hjb_novillos_terminacion_v02");
     const raw = localStorage.getItem(STORAGE_NOVILLOS_TERMINACION);
     if (!raw) return NOVILLOS_TERMINACION_DEFAULT;
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed) && parsed.length === 25) {
+      const tieneFalsos = parsed.some((n: any) => parseInt(String(n.caravana || "")) > 200);
+      if (tieneFalsos) {
+        localStorage.removeItem(STORAGE_NOVILLOS_TERMINACION);
+        return NOVILLOS_TERMINACION_DEFAULT;
+      }
       return parsed.map((n: NovilloTerminacion) => ({
         ...n,
         caravana: String(n.caravana || "").replace(/\D/g, ""),
@@ -693,6 +713,7 @@ export function getNovillosTerminacion(): NovilloTerminacion[] {
     return NOVILLOS_TERMINACION_DEFAULT;
   }
 }
+
 
 export function saveNovillosTerminacion(novillos: NovilloTerminacion[]): void {
   if (typeof window === "undefined") return;
