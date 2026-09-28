@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { VacaTamboIndividual, limpiarCaravana } from "@/lib/delproData";
+import { VacaTamboIndividual, limpiarCaravana, calcularInfoSecado } from "@/lib/delproData";
 
 interface Props {
   isOpen: boolean;
@@ -10,6 +10,12 @@ interface Props {
 }
 
 export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
+  // Cálculo de información precisa de secado oficial DelPro
+  const infoSecado = useMemo(() => {
+    if (!vaca) return null;
+    return calcularInfoSecado(vaca);
+  }, [vaca]);
+
   // Cálculo de edad exacta en años y meses
   const edadFormateada = useMemo(() => {
     if (!vaca) return "—";
@@ -69,14 +75,10 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
     badgeCurva = "badgeAmber";
   }
 
-  // Litros histórico con fallback al promedio 7d o ayer
+  // Litros histórico oficial extraído de DelPro (CERO datos inventados ni multiplicadores)
   const litrosHistorico =
     vaca.promedioHistorico !== undefined && vaca.promedioHistorico > 0
       ? vaca.promedioHistorico
-      : vaca.promedio7d !== undefined && vaca.promedio7d > 0
-      ? vaca.promedio7d
-      : vaca.litrosAyer > 0
-      ? Number((vaca.litrosAyer * 0.96).toFixed(1))
       : undefined;
 
   return (
@@ -250,12 +252,14 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
                   boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
                 }}
               >
-                <div style={{ fontSize: "11.5px", color: "#6b21a8", fontWeight: 800 }}>PROMEDIO HISTÓRICO</div>
+                <div style={{ fontSize: "11.5px", color: "#6b21a8", fontWeight: 800 }}>PROMEDIO HISTÓRICO (DELPRO)</div>
                 <div style={{ fontSize: "28px", fontWeight: 900, color: "#581c87", marginTop: "4px" }}>
                   {litrosHistorico ? `${litrosHistorico} lts/d` : "—"}
                 </div>
                 <div style={{ fontSize: "11px", color: "#7e22ce", marginTop: "4px" }}>
-                  Rendimiento medio histórico en el tambo
+                  {litrosHistorico
+                    ? "Rendimiento medio de lactancia registrado en DelPro"
+                    : "No registrado en informe actual de DelPro"}
                 </div>
               </div>
             </div>
@@ -384,16 +388,41 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
                   </div>
 
                   <div>
-                    <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Fecha Prevista de Secado</div>
-                    <div style={{ fontSize: "15px", fontWeight: 700, color: "#334155", marginTop: "2px" }}>
-                      {vaca.fechaSecadoEstimada || "60 días preparto"}
+                    <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Día Exacto para Secarla</div>
+                    <div style={{ fontSize: "15.5px", fontWeight: 800, color: "#b45309", marginTop: "2px" }}>
+                      🍂 {infoSecado?.fechaSecado || vaca.fechaSecadoEstimada || "60 días preparto"}
                     </div>
+                    {infoSecado?.fechaSecadoLarga && (
+                      <div style={{ fontSize: "11px", color: "#78350f", fontWeight: 700, marginTop: "2px" }}>
+                        {infoSecado.fechaSecadoLarga}
+                      </div>
+                    )}
                   </div>
 
                   <div>
                     <div style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>Días para el Secado</div>
-                    <div style={{ fontSize: "15px", fontWeight: 700, color: "#334155", marginTop: "2px" }}>
-                      {vaca.diasParaSecado !== undefined ? `En ${vaca.diasParaSecado} días` : "—"}
+                    <div
+                      style={{
+                        fontSize: "15px",
+                        fontWeight: 800,
+                        color:
+                          infoSecado?.estadoSecado === "hoy" || infoSecado?.estadoSecado === "vencido"
+                            ? "#dc2626"
+                            : infoSecado?.estadoSecado === "inminente"
+                            ? "#b45309"
+                            : "#0f172a",
+                        marginTop: "2px",
+                      }}
+                    >
+                      {infoSecado?.estadoSecado === "ya_seca"
+                        ? "✅ Ya secada (en descanso)"
+                        : infoSecado?.estadoSecado === "hoy"
+                        ? "🚨 ¡HOY ES EL DÍA!"
+                        : infoSecado && infoSecado.diasParaSecado > 0
+                        ? `⏳ Faltan ${infoSecado.diasParaSecado} días`
+                        : infoSecado && infoSecado.diasParaSecado < 0
+                        ? `🚨 Atrasado por ${Math.abs(infoSecado.diasParaSecado)} días`
+                        : "—"}
                     </div>
                   </div>
                 </>
@@ -417,6 +446,85 @@ export default function ModalFichaVaca({ isOpen, vaca, onClose }: Props) {
                 </div>
               )}
             </div>
+
+            {/* Panel Destacado de Instrucción de Secado para el Tambero */}
+            {infoSecado && infoSecado.aplica && (
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "12px 16px",
+                  borderRadius: "10px",
+                  background:
+                    infoSecado.estadoSecado === "hoy" || infoSecado.estadoSecado === "vencido"
+                      ? "#fef2f2"
+                      : infoSecado.estadoSecado === "inminente"
+                      ? "#fffbeb"
+                      : infoSecado.estadoSecado === "ya_seca"
+                      ? "#f1f5f9"
+                      : "#f0fdf4",
+                  border: `1.5px solid ${
+                    infoSecado.estadoSecado === "hoy" || infoSecado.estadoSecado === "vencido"
+                      ? "#f87171"
+                      : infoSecado.estadoSecado === "inminente"
+                      ? "#fcd34d"
+                      : infoSecado.estadoSecado === "ya_seca"
+                      ? "#cbd5e1"
+                      : "#86efac"
+                  }`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span style={{ fontSize: "24px" }}>
+                    {infoSecado.estadoSecado === "ya_seca"
+                      ? "🍂"
+                      : infoSecado.estadoSecado === "hoy" || infoSecado.estadoSecado === "vencido"
+                      ? "🚨"
+                      : infoSecado.estadoSecado === "inminente"
+                      ? "⚠️"
+                      : "🗓️"}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "#475569" }}>
+                      Instrucción Operativa de Secado (60 días preparto / día 222 gestación)
+                    </div>
+                    <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#0f172a", marginTop: "2px" }}>
+                      {infoSecado.mensaje}
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    background:
+                      infoSecado.estadoSecado === "hoy" || infoSecado.estadoSecado === "vencido"
+                        ? "#dc2626"
+                        : infoSecado.estadoSecado === "inminente"
+                        ? "#d97706"
+                        : infoSecado.estadoSecado === "ya_seca"
+                        ? "#64748b"
+                        : "#16a34a",
+                    color: "#ffffff",
+                  }}
+                >
+                  {infoSecado.estadoSecado === "ya_seca"
+                    ? "Período Seco Activo"
+                    : infoSecado.estadoSecado === "hoy"
+                    ? "Secar Hoy"
+                    : infoSecado.diasParaSecado > 0
+                    ? `Secado en ${infoSecado.diasParaSecado} días`
+                    : "Secado Vencido"}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* SECCIÓN 4: UBICACIÓN Y GRUPO EN EL TAMBO */}

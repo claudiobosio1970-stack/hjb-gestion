@@ -29,6 +29,7 @@ import {
   esMachoPorCaravana,
   esHembraPorCaravana,
   limpiarCaravana,
+  calcularInfoSecado,
 } from "@/lib/delproData";
 import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
 import ModalFichaVaca from "@/components/tambo/ModalFichaVaca";
@@ -1359,10 +1360,10 @@ export default function TamboPage() {
                     </div>
                   </th>
 
-                  <th style={{ minWidth: "135px" }}>
+                  <th style={{ minWidth: "165px" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <span style={{ fontWeight: 800, fontSize: "11px", letterSpacing: "0.03em", color: "var(--slate-800)" }}>
-                        FECHA ESTIMADA PARTO
+                        PARTO & DÍA DE SECADO
                       </span>
                       <select
                         value={filtroPartoCol}
@@ -1593,27 +1594,50 @@ export default function TamboPage() {
                         )}
                       </td>
                       <td>
-                        {v.fechaProbableParto ? (
-                          <div>
-                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#166534" }}>
-                              📅 {v.fechaProbableParto}
-                            </span>
-                            {v.diasParaParto !== undefined && (
-                              <div style={{ fontSize: "10.5px", color: v.diasParaParto <= 21 ? "#b45309" : "#15803d", fontWeight: 700, marginTop: "1px" }}>
-                                {v.diasParaParto <= 0 ? "⚡ En fecha" : `⏳ En ${v.diasParaParto} días`}
+                        {(() => {
+                          const secInfo = calcularInfoSecado(v);
+                          if (v.fechaProbableParto) {
+                            return (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                  <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#166534" }}>
+                                    📅 Parto: {v.fechaProbableParto}
+                                  </span>
+                                  {v.diasParaParto !== undefined && (
+                                    <span style={{ fontSize: "10.5px", color: v.diasParaParto <= 21 ? "#b45309" : "#15803d", fontWeight: 700 }}>
+                                      ({v.diasParaParto <= 0 ? "⚡ en fecha" : `${v.diasParaParto}d`})
+                                    </span>
+                                  )}
+                                </div>
+                                {secInfo.aplica && (
+                                  <div style={{ fontSize: "11px", fontWeight: 600 }}>
+                                    {secInfo.estadoSecado === "ya_seca" ? (
+                                      <span style={{ color: "#059669" }}>🍂 Ya secada (en descanso)</span>
+                                    ) : (
+                                      <span style={{ color: secInfo.diasParaSecado <= 7 ? "#b45309" : "#475569" }}>
+                                        🍂 Secar el: <strong style={{ color: "#0f172a" }}>{secInfo.fechaSecado}</strong>{" "}
+                                        <span style={{ fontSize: "10.5px", fontWeight: 700, color: secInfo.diasParaSecado <= 7 ? "#dc2626" : "#2563eb" }}>
+                                          ({secInfo.estadoSecado === "hoy" ? "¡HOY!" : secInfo.diasParaSecado > 0 ? `en ${secInfo.diasParaSecado}d` : `${Math.abs(secInfo.diasParaSecado)}d atrasado`})
+                                        </span>
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        ) : v.fechaSecadoEstimada ? (
-                          <div>
-                            <span style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Secado sugerido:</span>
-                            <div style={{ fontSize: "11px", fontWeight: 600, color: "#b45309" }}>
-                              🍂 {v.fechaSecadoEstimada}
-                            </div>
-                          </div>
-                        ) : (
-                          <span style={{ color: "var(--slate-400)", fontSize: "11px" }}>Sin preñez</span>
-                        )}
+                            );
+                          }
+                          if (secInfo.aplica && secInfo.fechaSecado !== "—") {
+                            return (
+                              <div>
+                                <span style={{ fontSize: "10.5px", color: "var(--slate-500)" }}>Día sugerido secado:</span>
+                                <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#b45309" }}>
+                                  🍂 {secInfo.fechaSecado} ({secInfo.diasParaSecado > 0 ? `en ${secInfo.diasParaSecado}d` : "Vencido"})
+                                </div>
+                              </div>
+                            );
+                          }
+                          return <span style={{ color: "var(--slate-400)", fontSize: "11px" }}>Sin preñez</span>;
+                        })()}
                       </td>
                       <td style={{ textAlign: "right" }}>
                         {v.litrosAyer > 0 ? (
@@ -1621,10 +1645,9 @@ export default function TamboPage() {
                             <strong style={{ color: "#15803d", fontSize: "13.5px" }}>
                               {v.litrosAyer} lts/d
                             </strong>
-                            {(v.scc || v.grasaPct || v.promedio7d) && (
-                              <div style={{ fontSize: "10px", color: "var(--slate-500)", marginTop: "1px" }} title={`Prom 7d: ${v.promedio7d || "—"} lts | Grasa: ${v.grasaPct || "—"}% | Proteína: ${v.proteinaPct || "—"}% | Células Somáticas: ${v.scc || "—"}`}>
-                                {v.scc ? `🧪 SCC: ${v.scc}` : v.promedio7d ? `📊 7d: ${v.promedio7d} l` : ""}
-                                {v.grasaPct ? ` · ${v.grasaPct}% G` : ""}
+                            {v.promedio7d !== undefined && v.promedio7d > 0 && (
+                              <div style={{ fontSize: "10.5px", color: "var(--slate-500)", marginTop: "1px" }}>
+                                📊 7d: {v.promedio7d} lts/d
                               </div>
                             )}
                           </div>

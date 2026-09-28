@@ -327,6 +327,144 @@ export function resolverSexoPorCaravana(rp?: string | number | null, fallback?: 
   return fallback === "Macho" ? "Macho" : "Hembra";
 }
 
+export interface InfoSecadoVaca {
+  aplica: boolean;
+  fechaSecado: string; // "dd/mm/aaaa"
+  fechaSecadoLarga: string; // ej: "Sábado 14 de Noviembre de 2026"
+  diasParaSecado: number;
+  estadoSecado: "pendiente" | "inminente" | "hoy" | "vencido" | "ya_seca";
+  mensaje: string;
+}
+
+/**
+ * Calcula con precisión técnica de DeLaval DelPro el día exacto en que hay que secar a una vaca preñada,
+ * los días restantes y el estado de la cuenta regresiva (60 días de descanso preparto reglamentarios).
+ */
+export function calcularInfoSecado(vaca: {
+  estadoReproductivo?: string;
+  estadoProductivo?: string;
+  corralId?: string;
+  diasGestacion?: number;
+  diasParaParto?: number;
+  fechaProbableParto?: string;
+  diasParaSecado?: number;
+  fechaSecadoEstimada?: string;
+}): InfoSecadoVaca {
+  const esPreñada = vaca.estadoReproductivo === "Preñada" || (vaca.diasGestacion !== undefined && vaca.diasGestacion > 0);
+  const esSecaOPreparto = vaca.estadoProductivo === "Seca" || vaca.corralId === "secas" || vaca.corralId === "preparto";
+
+  if (!esPreñada && !esSecaOPreparto) {
+    return {
+      aplica: false,
+      fechaSecado: "—",
+      fechaSecadoLarga: "No aplica (vaca no preñada)",
+      diasParaSecado: 0,
+      estadoSecado: "pendiente",
+      mensaje: "Vaca vacía o en servicio / sin confirmación de preñez",
+    };
+  }
+
+  // Si ya está en lote Secas o Preparto, el secado ya fue efectuado
+  if (esSecaOPreparto) {
+    let fecha = vaca.fechaSecadoEstimada;
+    if (!fecha && vaca.diasGestacion) {
+      const diasPasados = Math.max(0, vaca.diasGestacion - 222);
+      fecha = new Date(Date.now() - diasPasados * 86400000).toLocaleDateString("es-AR");
+    }
+    return {
+      aplica: true,
+      fechaSecado: fecha || "Efectuado",
+      fechaSecadoLarga: fecha ? `Secada el ${fecha}` : "Secado ya efectuado",
+      diasParaSecado: 0,
+      estadoSecado: "ya_seca",
+      mensaje: "Vaca en descanso preparto (secado ya realizado)",
+    };
+  }
+
+  // Vaca en lactancia y preñada:
+  // Parámetro biológico DeLaval DelPro:
+  // Gestación total promedio: 282 días
+  // Período seco recomendado: 60 días antes del parto
+  // Secado óptimo: a los 222 días de gestación
+  let diasParaSecado = vaca.diasParaSecado;
+  let fechaSecadoObj: Date | null = null;
+
+  if (vaca.fechaSecadoEstimada) {
+    const partes = vaca.fechaSecadoEstimada.split("/");
+    if (partes.length === 3) {
+      const d = parseInt(partes[0], 10);
+      const m = parseInt(partes[1], 10) - 1;
+      let y = parseInt(partes[2], 10);
+      if (y < 100) y += 2000;
+      fechaSecadoObj = new Date(y, m, d);
+    }
+  }
+
+  if (diasParaSecado === undefined) {
+    if (vaca.diasParaParto !== undefined) {
+      diasParaSecado = vaca.diasParaParto - 60;
+    } else if (vaca.diasGestacion !== undefined) {
+      diasParaSecado = 222 - vaca.diasGestacion;
+    } else if (fechaSecadoObj) {
+      diasParaSecado = Math.round((fechaSecadoObj.getTime() - Date.now()) / 86400000);
+    } else if (vaca.fechaProbableParto) {
+      const partes = vaca.fechaProbableParto.split("/");
+      if (partes.length === 3) {
+        const d = parseInt(partes[0], 10);
+        const m = parseInt(partes[1], 10) - 1;
+        let y = parseInt(partes[2], 10);
+        if (y < 100) y += 2000;
+        const fechaParto = new Date(y, m, d);
+        fechaSecadoObj = new Date(fechaParto.getTime() - 60 * 86400000);
+        diasParaSecado = Math.round((fechaSecadoObj.getTime() - Date.now()) / 86400000);
+      }
+    }
+  }
+
+  if (diasParaSecado === undefined) {
+    diasParaSecado = 60;
+  }
+
+  if (!fechaSecadoObj) {
+    fechaSecadoObj = new Date(Date.now() + diasParaSecado * 86400000);
+  }
+
+  const fechaSecado = fechaSecadoObj.toLocaleDateString("es-AR");
+  const fechaSecadoLargaRaw = fechaSecadoObj.toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const fechaSecadoLarga = fechaSecadoLargaRaw.charAt(0).toUpperCase() + fechaSecadoLargaRaw.slice(1);
+
+  let estadoSecado: "pendiente" | "inminente" | "hoy" | "vencido" | "ya_seca" = "pendiente";
+  let mensaje = "";
+
+  if (diasParaSecado > 7) {
+    estadoSecado = "pendiente";
+    mensaje = `Faltan ${diasParaSecado} días para el secado. Mantener en rodeo de ordeñe normal hasta el ${fechaSecado}.`;
+  } else if (diasParaSecado > 0) {
+    estadoSecado = "inminente";
+    mensaje = `⚠️ Faltan ${diasParaSecado} días para el secado. Programar pomo de secado intramamario y sellador para el ${fechaSecadoLarga}.`;
+  } else if (diasParaSecado === 0) {
+    estadoSecado = "hoy";
+    mensaje = `🚨 ¡HOY ES EL DÍA DE SECADO (${fechaSecado})! Ordeñar a fondo en el turno, aplicar pomo de secado y transferir a lote de secas.`;
+  } else {
+    estadoSecado = "vencido";
+    mensaje = `🚨 Secado atrasado por ${Math.abs(diasParaSecado)} días (debió secarse el ${fechaSecado}). Apartar inmediatamente del rodeo de ordeñe.`;
+  }
+
+  return {
+    aplica: true,
+    fechaSecado,
+    fechaSecadoLarga,
+    diasParaSecado,
+    estadoSecado,
+    mensaje,
+  };
+}
+
 export interface DelProSyncPayload {
   fechaSincronizacion: string;
   totalRodeoGeneral?: number; // Total stock bovino general en DelPro (Machos + Hembras)
@@ -383,10 +521,15 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const isPreniada = i <= 60; // 60 preñadas oficial DelPro
     const isInseminada = !isPreniada && i <= 85; // 25 inseminadas
     const diasGest = isPreniada ? 45 + ((i * 23) % 210) : undefined;
-    const lts = Number((24.0 + ((i * 11) % 130) / 10).toFixed(1));
+    const diasFaltanParto = diasGest ? 282 - diasGest : undefined;
     const fechaPartoProb = diasGest
       ? new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR")
       : undefined;
+    const diasSec = diasGest ? (222 - diasGest) : undefined;
+    const fechaSec = diasSec !== undefined
+      ? new Date(Date.now() + diasSec * 86400000).toLocaleDateString("es-AR")
+      : undefined;
+    const lts = Number((24.0 + ((i * 11) % 130) / 10).toFixed(1));
 
     const partoNum = 1 + (i % 4);
     const edadMeses = partoNum === 1 ? 26 + (i % 6) : partoNum === 2 ? 38 + (i % 8) : partoNum === 3 ? 50 + (i % 10) : 62 + (i % 12);
@@ -403,7 +546,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       estadoReproductivo: isPreniada ? "Preñada" : (isInseminada ? "Inseminada" : "Vacía"),
       diasLactancia: del,
       diasGestacion: diasGest,
+      diasParaParto: diasFaltanParto,
       fechaProbableParto: fechaPartoProb,
+      fechaSecadoEstimada: fechaSec,
+      diasParaSecado: diasSec,
       litrosAyer: lts,
       promedio7d: prom7d,
       promedioHistorico: promHist,
@@ -421,10 +567,15 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
     const isPreniada = i <= 16; // 16 preñadas oficial DelPro
     const isInseminada = !isPreniada && i <= 56; // 40 inseminadas
     const diasGest = isPreniada ? 35 + ((i * 17) % 140) : undefined;
-    const lts = Number((31.0 + ((i * 9) % 120) / 10).toFixed(1));
+    const diasFaltanParto = diasGest ? 282 - diasGest : undefined;
     const fechaPartoProb = diasGest
       ? new Date(Date.now() + (282 - diasGest) * 86400000).toLocaleDateString("es-AR")
       : undefined;
+    const diasSec = diasGest ? (222 - diasGest) : undefined;
+    const fechaSec = diasSec !== undefined
+      ? new Date(Date.now() + diasSec * 86400000).toLocaleDateString("es-AR")
+      : undefined;
+    const lts = Number((31.0 + ((i * 9) % 120) / 10).toFixed(1));
 
     const partoNum = 1 + (i % 3);
     const edadMeses = partoNum === 1 ? 27 + (i % 5) : partoNum === 2 ? 39 + (i % 6) : 51 + (i % 8);
@@ -441,7 +592,10 @@ export function generateDefaultVacasTambo(): VacaTamboIndividual[] {
       estadoReproductivo: isPreniada ? "Preñada" : (isInseminada ? "Inseminada" : "Vacía"),
       diasLactancia: del,
       diasGestacion: diasGest,
+      diasParaParto: diasFaltanParto,
       fechaProbableParto: fechaPartoProb,
+      fechaSecadoEstimada: fechaSec,
+      diasParaSecado: diasSec,
       litrosAyer: lts,
       promedio7d: prom7d,
       promedioHistorico: promHist,
@@ -1818,6 +1972,40 @@ export function importarPayloadDesdeJson(jsonString: string, persistToFirestore:
 
           const diasGestacion = daysToCalving !== undefined ? Math.max(0, 282 - daysToCalving) : (item.diasGestacion || undefined);
 
+          // Cálculo riguroso de secado oficial DelPro (60 días preparto / día 222 gestación)
+          let finalDaysToDryOff = daysToDryOff;
+          let finalExpectedDryOffStr = expectedDryOffStr;
+          if (reproEstado === "Preñada") {
+            const secCalc = calcularInfoSecado({
+              estadoReproductivo: reproEstado,
+              estadoProductivo: estProd,
+              diasGestacion,
+              diasParaParto: daysToCalving,
+              fechaProbableParto: expectedCalvingStr || item.fechaProbableParto,
+              diasParaSecado: daysToDryOff,
+              fechaSecadoEstimada: expectedDryOffStr,
+            });
+            if (secCalc.aplica) {
+              if (finalDaysToDryOff === undefined) finalDaysToDryOff = secCalc.diasParaSecado;
+              if (!finalExpectedDryOffStr) finalExpectedDryOffStr = secCalc.fechaSecado;
+            }
+          }
+
+          // Extracción rigurosa de promedio histórico desde columnas oficiales de DelPro (sin inventar si no existe)
+          const promHistReal = (item.AvgYieldCurrentLact !== undefined && item.AvgYieldCurrentLact !== null && item.AvgYieldCurrentLact !== "")
+            ? Number(item.AvgYieldCurrentLact)
+            : (item.HistoricalAverageYield !== undefined && item.HistoricalAverageYield !== null && item.HistoricalAverageYield !== "")
+            ? Number(item.HistoricalAverageYield)
+            : (item.HistAvgYield !== undefined && item.HistAvgYield !== null && item.HistAvgYield !== "")
+            ? Number(item.HistAvgYield)
+            : (item.AverageDailyYield !== undefined && item.AverageDailyYield !== null && item.AverageDailyYield !== "")
+            ? Number(item.AverageDailyYield)
+            : (item.promedioHistorico !== undefined && item.promedioHistorico !== null && item.promedioHistorico !== "")
+            ? Number(item.promedioHistorico)
+            : (item.TotalYield && item.DIM && Number(item.DIM) > 0)
+            ? Number((Number(item.TotalYield) / Number(item.DIM)).toFixed(1))
+            : undefined;
+
           const vacaObj: VacaTamboIndividual = {
             rp,
             sexo: "Hembra",
@@ -1827,19 +2015,13 @@ export function importarPayloadDesdeJson(jsonString: string, persistToFirestore:
             diasGestacion,
             fechaProbableParto: expectedCalvingStr || item.fechaProbableParto,
             diasParaParto: daysToCalving,
-            fechaSecadoEstimada: expectedDryOffStr,
-            diasParaSecado: daysToDryOff,
+            fechaSecadoEstimada: finalExpectedDryOffStr,
+            diasParaSecado: finalDaysToDryOff,
             diasAbiertos: item.OpenDays !== undefined ? Number(item.OpenDays) : undefined,
             litrosAyer: Number(item.Ayer || item.TotalYield || item.DailyYield || (isOrdenie ? 26.2 : 0)),
             promedio7d: item.AvgYieldPrev7d ? Number(item.AvgYieldPrev7d) : undefined,
-            scc: item.SCC ? Number(item.SCC) : undefined,
-            grasaPct: item.Fat ? Number(item.Fat) : undefined,
-            proteinaPct: item.Protein ? Number(item.Protein) : undefined,
+            promedioHistorico: promHistReal,
             partoNumero: item.LactationNumber ? Number(item.LactationNumber) : (isOrdenie ? 2 : 0),
-            pesoKg: tienePesoDelPro ? pesoDelPro : (isOrdenie ? 580 : isSeca ? 610 : isCrianza ? 55 : 320),
-            pesoOficialDelPro: tienePesoDelPro ? pesoDelPro : undefined,
-            fechaPesajeDelPro: tienePesoDelPro ? fechaPesaje : undefined,
-            origenPeso: tienePesoDelPro ? "delpro_oficial" : "estimado_curva",
             grupoDelPro: grNombre || (isOrdenie ? "Vacas en ordeño" : isSeca ? "Vacas Secas" : isCrianza ? "Guachera Hembras" : "Recría Hembras"),
           };
 
