@@ -18,6 +18,10 @@ interface ModalRegistrarVentaRemitoProps {
   onClose: () => void;
   onVentaCompletada: (resultado: ResultadoVentaHacienda) => void;
   seccionInicial?: "ganaderia" | "tambo";
+  cabezasInicialesNovillos?: number;
+  pesoInicialKg?: number;
+  precioInicialArs?: number;
+  novillosSeleccionadosIds?: string[];
 }
 
 export function ModalRegistrarVentaRemito({
@@ -25,6 +29,10 @@ export function ModalRegistrarVentaRemito({
   onClose,
   onVentaCompletada,
   seccionInicial = "ganaderia",
+  cabezasInicialesNovillos,
+  pesoInicialKg,
+  precioInicialArs,
+  novillosSeleccionadosIds,
 }: ModalRegistrarVentaRemitoProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -37,10 +45,16 @@ export function ModalRegistrarVentaRemito({
   const [datosDetectados, setDatosDetectados] = useState<DatosDetectadosRemito | null>(null);
 
   // Formulario de Venta
-  const [cabezasNovillos, setCabezasNovillos] = useState<number>(seccionInicial === "ganaderia" ? 15 : 0);
+  const [cabezasNovillos, setCabezasNovillos] = useState<number>(
+    cabezasInicialesNovillos !== undefined ? cabezasInicialesNovillos : (seccionInicial === "ganaderia" ? 15 : 0)
+  );
   const [cabezasVacas, setCabezasVacas] = useState<number>(seccionInicial === "tambo" ? 5 : 0);
-  const [pesoTotalKg, setPesoTotalKg] = useState<number>(seccionInicial === "ganaderia" ? 6150 : 2850);
-  const [precioTotalArs, setPrecioTotalArs] = useState<number>(seccionInicial === "ganaderia" ? 15067500 : 6840000);
+  const [pesoTotalKg, setPesoTotalKg] = useState<number>(
+    pesoInicialKg !== undefined ? pesoInicialKg : (seccionInicial === "ganaderia" ? 6150 : 2850)
+  );
+  const [precioTotalArs, setPrecioTotalArs] = useState<number>(
+    precioInicialArs !== undefined ? precioInicialArs : (seccionInicial === "ganaderia" ? 15067500 : 6840000)
+  );
   const [remitoDte, setRemitoDte] = useState<string>(`DTe 0048-${Math.floor(200000 + Math.random() * 800000)}`);
   const [frigorifico, setFrigorifico] = useState<string>("Rafaela Alimentos S.A.");
   const [fecha, setFecha] = useState<string>(
@@ -49,6 +63,20 @@ export function ModalRegistrarVentaRemito({
   const [desbastePct, setDesbastePct] = useState<number>(7.0);
   const [otrosGastosArs, setOtrosGastosArs] = useState<number>(250000);
   const [observaciones, setObservaciones] = useState<string>("");
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (cabezasInicialesNovillos !== undefined) {
+        setCabezasNovillos(cabezasInicialesNovillos);
+      }
+      if (pesoInicialKg !== undefined) {
+        setPesoTotalKg(pesoInicialKg);
+      }
+      if (precioInicialArs !== undefined) {
+        setPrecioTotalArs(precioInicialArs);
+      }
+    }
+  }, [isOpen, cabezasInicialesNovillos, pesoInicialKg, precioInicialArs]);
 
   const [procesandoVenta, setProcesandoVenta] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -245,6 +273,7 @@ export function ModalRegistrarVentaRemito({
         desbastePct,
         otrosGastosArs,
         observaciones: observaciones || (datosDetectados?.textoDetectado ? `OCR: ${datosDetectados.textoDetectado}` : undefined),
+        novillosSeleccionadosIds,
       });
 
       onVentaCompletada(resultado);

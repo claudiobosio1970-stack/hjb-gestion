@@ -696,7 +696,7 @@ export function getNovillosTerminacion(): NovilloTerminacion[] {
     const raw = localStorage.getItem(STORAGE_NOVILLOS_TERMINACION);
     if (!raw) return NOVILLOS_TERMINACION_DEFAULT;
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length === 25) {
+    if (Array.isArray(parsed)) {
       const tieneFalsos = parsed.some((n: any) => parseInt(String(n.caravana || "")) > 200);
       if (tieneFalsos) {
         localStorage.removeItem(STORAGE_NOVILLOS_TERMINACION);

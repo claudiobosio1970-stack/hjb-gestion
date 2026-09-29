@@ -52,6 +52,7 @@ import {
   saveVentasHacienda,
   eliminarVentaHacienda,
   actualizarVentaHacienda,
+  ejecutarVentaHacienda,
 } from "@/lib/ventasHaciendaData";
 import {
   VentaGordoExpediente,
@@ -572,60 +573,32 @@ export default function GanaderiaPage() {
     const today = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
     const cabezas = formVenta.cabezas || tropa.cabezas;
     const pesoBrutoTotal = formVenta.pesoBrutoTotal;
-    const pesoBrutoPromedio = Number((pesoBrutoTotal / cabezas).toFixed(1));
     const desbastePct = 7.0;
     const pesoNetoTotal = Number((pesoBrutoTotal * (1 - desbastePct / 100)).toFixed(1));
-    const pesoNetoPromedio = Number((pesoNetoTotal / cabezas).toFixed(1));
     const facturacionTotal = Math.round(pesoNetoTotal * formVenta.precioKg);
+    const remitoDte = formVenta.remitoDte || `DTe 0048-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    const costoUnitAlim = 721058;
-    const costoAlimTotal = Math.round(costoUnitAlim * cabezas);
-    const otrosGastos = Number(formVenta.otrosGastos || 0);
-    const costoTotal = costoAlimTotal + otrosGastos;
-    const gananciaNetaTotal = facturacionTotal - costoTotal;
-    const gananciaNetaPorCabeza = Math.round(gananciaNetaTotal / cabezas);
-    const margenPct = Number(((gananciaNetaTotal / costoTotal) * 100).toFixed(1));
-
-    const nuevaFicha: FichaVentaFrigorifico = {
-      id: "venta-" + Date.now(),
+    const res = ejecutarVentaHacienda({
+      cabezasNovillos: cabezas,
+      cabezasVacas: 0,
+      pesoTotalKg: pesoBrutoTotal,
+      precioTotalArs: facturacionTotal,
+      remitoDte,
+      frigorifico: formVenta.frigorifico || "Frigorífico Comercial",
       fecha: today,
-      tropaId: tropa.id,
-      tropaCodigo: tropa.codigo,
-      frigorifico: formVenta.frigorifico,
-      remitoDte: formVenta.remitoDte || `DTe 0048-${Math.floor(100000 + Math.random() * 900000)}`,
-      cabezas,
-      pesoBrutoTotalKg: pesoBrutoTotal,
-      pesoBrutoPromedioKg: pesoBrutoPromedio,
       desbastePct,
-      pesoNetoTotalKg: pesoNetoTotal,
-      pesoNetoPromedioKg: pesoNetoPromedio,
-      precioKgVivoArs: formVenta.precioKg,
-      facturacionTotalArs: facturacionTotal,
-      costoAlimentacionTotalArs: costoAlimTotal,
-      otrosGastosArs: otrosGastos,
-      costoTotalArs: costoTotal,
-      gananciaNetaTotalArs: gananciaNetaTotal,
-      gananciaNetaPorCabezaArs: gananciaNetaPorCabeza,
-      margenSobreCostoPct: margenPct,
-      diasCicloTotal: 360,
-    };
+      otrosGastosArs: Number(formVenta.otrosGastos || 0),
+    });
 
-    const nuevasVentas = [nuevaFicha, ...ventas];
-    setVentas(nuevasVentas);
-    saveVentas(nuevasVentas);
-
-    let updatedTropas = tropas;
-    if (cabezas >= tropa.cabezas) {
-      updatedTropas = tropas.filter((t) => t.id !== tropa.id);
-    } else {
-      updatedTropas = tropas.map((t) => (t.id === tropa.id ? { ...t, cabezas: t.cabezas - cabezas } : t));
-    }
-    setTropas(updatedTropas);
-    saveTropas(updatedTropas);
+    setTropas(getTropas());
+    setVentas(getVentas());
+    setAnimalesRecria(getAnimalesRecria());
+    setDelproConfig(getDelProConfig());
 
     setModalNuevaVentaOpen(false);
-    setModalFichaVenta(nuevaFicha);
-    triggerFeedback(`¡Venta registrada con éxito! Despachadas ${cabezas} cabezas.`);
+    const ficha = getVentas().find((v) => v.remitoDte === remitoDte) || getVentas()[0];
+    if (ficha) setModalFichaVenta(ficha);
+    triggerFeedback(`¡Venta registrada con éxito! Despachadas ${cabezas} cabezas. Stock descontado en todos los corrales.`);
   }
 
   // Handler Venta con Foto de Remito (Inteligente / Multisección)

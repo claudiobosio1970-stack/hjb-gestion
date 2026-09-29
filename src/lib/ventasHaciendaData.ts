@@ -1,5 +1,22 @@
-import { getTropas, saveTropas, getVentas, saveVentas, FichaVentaFrigorifico, HJB_GANADERIA_SYNC_EVENT } from "./ganaderiaData";
-import { getDelProConfig, saveDelProConfig, HJB_DELPRO_SYNC_EVENT, VacaTamboIndividual } from "./delproData";
+import {
+  getTropas,
+  saveTropas,
+  getVentas,
+  saveVentas,
+  FichaVentaFrigorifico,
+  HJB_GANADERIA_SYNC_EVENT,
+  getNovillosTerminacion,
+  saveNovillosTerminacion,
+  HJB_NOVILLOS_CONFIRMADOS_EVENT,
+} from "./ganaderiaData";
+import {
+  getDelProConfig,
+  saveDelProConfig,
+  HJB_DELPRO_SYNC_EVENT,
+  VacaTamboIndividual,
+  getAnimalesRecria,
+  saveAnimalesRecria,
+} from "./delproData";
 
 export interface VentaHaciendaRemito {
   id: string;
@@ -48,6 +65,7 @@ export interface InputRegistroVentaRemito {
   desbastePct?: number;
   otrosGastosArs?: number;
   observaciones?: string;
+  novillosSeleccionadosIds?: string[];
 }
 
 export interface ResultadoVentaHacienda {
@@ -533,37 +551,84 @@ export function ejecutarVentaHacienda(input: InputRegistroVentaRemito): Resultad
     saveTropas(updatedTropas);
     ganaderiaStockRestante = updatedTropas.reduce((acc, t) => acc + t.cabezas, 0);
 
-    // Descontar también en la lista individual de animalesRecria de DelPro
-    const delproConfig = getDelProConfig();
-    if (delproConfig?.datosSincronizados?.animalesRecria) {
-      const recria = [...delproConfig.datosSincronizados.animalesRecria];
-      let eliminados = 0;
-      // Eliminar de los de terminación primero
-      const nuevaRecria = recria.filter((a) => {
-        if (eliminados < input.cabezasNovillos && a.corralId === "terminacion") {
-          eliminados++;
+    // 1. Descontar en lista individual de animalesRecria de Ganadería
+    const recriaActual = getAnimalesRecria();
+    let eliminadosRecria = 0;
+    const idsSeleccionados = input.novillosSeleccionadosIds || [];
+
+    const nuevaRecria = recriaActual.filter((a) => {
+      if (idsSeleccionados.length > 0) {
+        const rpLimpio = String(a.rp || "").replace(/\D/g, "");
+        const coincide = idsSeleccionados.some((sel) => {
+          const s = String(sel).replace(/\D/g, "");
+          return s === rpLimpio || sel === a.rp;
+        });
+        if (coincide && eliminadosRecria < input.cabezasNovillos) {
+          eliminadosRecria++;
           return false;
         }
-        return true;
-      });
+      }
+      if (eliminadosRecria < input.cabezasNovillos && a.corralId === "terminacion") {
+        eliminadosRecria++;
+        return false;
+      }
+      return true;
+    });
+    saveAnimalesRecria(nuevaRecria);
 
-      // Actualizar conteos en censo de DelPro
-      const censo = delproConfig.datosSincronizados.censoRodeoTambo;
-      const nuevoTotalGeneral = Math.max(0, (delproConfig.datosSincronizados.totalRodeoGeneral || 514) - input.cabezasNovillos);
-      const nuevosNovillos = Math.max(0, (censo?.novillosRecriaEngorde || 99) - input.cabezasNovillos);
+    // 2. Descontar en novillosTerminacion (usado en Dashboard Inicio)
+    const novillosTermActuales = getNovillosTerminacion();
+    let eliminadosTerm = 0;
+    const nuevosNovillosTerm = novillosTermActuales.filter((n) => {
+      if (idsSeleccionados.length > 0) {
+        const nId = n.id;
+        const nCaravana = String(n.caravana || "").replace(/\D/g, "");
+        const coincide = idsSeleccionados.some((sel) => {
+          const s = String(sel).replace(/\D/g, "");
+          return s === nCaravana || sel === nId;
+        });
+        if (coincide && eliminadosTerm < input.cabezasNovillos) {
+          eliminadosTerm++;
+          return false;
+        }
+      }
+      if (n.confirmadoVenta && eliminadosTerm < input.cabezasNovillos) {
+        eliminadosTerm++;
+        return false;
+      }
+      return true;
+    }).filter((n) => {
+      if (eliminadosTerm < input.cabezasNovillos) {
+        eliminadosTerm++;
+        return false;
+      }
+      return true;
+    });
+    saveNovillosTerminacion(nuevosNovillosTerm);
 
-      saveDelProConfig({
-        datosSincronizados: {
-          ...delproConfig.datosSincronizados,
+    // 3. Actualizar conteos en censo de DelPro y persistir en Firestore
+    const delproConfig = getDelProConfig();
+    const censo = delproConfig?.datosSincronizados?.censoRodeoTambo;
+    const nuevoTotalGeneral = Math.max(0, (delproConfig?.datosSincronizados?.totalRodeoGeneral || 514) - input.cabezasNovillos);
+    const nuevosNovillos = Math.max(0, (censo?.novillosRecriaEngorde || 99) - input.cabezasNovillos);
+
+    saveDelProConfig({
+      datosSincronizados: {
+        ...delproConfig.datosSincronizados,
+        totalRodeoGeneral: nuevoTotalGeneral,
+        animalesRecria: nuevaRecria,
+        censoRodeoTambo: censo ? {
+          ...censo,
           totalRodeoGeneral: nuevoTotalGeneral,
-          animalesRecria: nuevaRecria,
-          censoRodeoTambo: censo ? {
-            ...censo,
-            totalRodeoGeneral: nuevoTotalGeneral,
-            novillosRecriaEngorde: nuevosNovillos,
-          } : undefined,
-        },
-      }, true);
+          novillosRecriaEngorde: nuevosNovillos,
+        } : undefined,
+      },
+    }, true);
+
+    // 4. Disparar eventos para sincronizar pestañas abiertas en tiempo real
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(HJB_GANADERIA_SYNC_EVENT, { detail: { animalesRecria: nuevaRecria } }));
+      window.dispatchEvent(new CustomEvent(HJB_NOVILLOS_CONFIRMADOS_EVENT, { detail: nuevosNovillosTerm }));
     }
 
     // Generar Ficha de Venta de Frigorífico en Ganadería
@@ -665,6 +730,10 @@ export function ejecutarVentaHacienda(input: InputRegistroVentaRemito): Resultad
       }, true);
 
       descontadoTambo = true;
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(HJB_DELPRO_SYNC_EVENT, { detail: delproConfig }));
+      }
     }
   }
 

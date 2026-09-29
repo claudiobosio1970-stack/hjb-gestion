@@ -40,6 +40,11 @@ import {
   initDelProFirestoreSync,
   limpiarCaravana,
 } from "@/lib/delproData";
+import {
+  ejecutarVentaHacienda,
+  ResultadoVentaHacienda,
+} from "@/lib/ventasHaciendaData";
+import { ModalRegistrarVentaRemito } from "@/components/ModalRegistrarVentaRemito";
 
 type TabDelProModal = "sql_extractor" | "resumen" | "queries";
 
@@ -116,6 +121,20 @@ export default function InicioPage() {
   const [modalParametrosOpen, setModalParametrosOpen] = useState(false);
   const [modalDelProOpen, setModalDelProOpen] = useState(false);
   const [modalConfirmarFaenaOpen, setModalConfirmarFaenaOpen] = useState(false);
+  const [pasoFaena, setPasoFaena] = useState<"seleccion" | "formulario_venta">("seleccion");
+  const [modalVentaRemitoOpen, setModalVentaRemitoOpen] = useState(false);
+  const [formVentaInicio, setFormVentaInicio] = useState({
+    tropaId: "",
+    frigorifico: "Rafaela Alimentos S.A.",
+    remitoDte: "",
+    fecha: "",
+    cabezas: 0,
+    pesoBrutoTotal: 0,
+    precioKg: 4200,
+    otrosGastos: 0,
+  });
+  const [feedbackVentaInicio, setFeedbackVentaInicio] = useState<string | null>(null);
+  const [guardandoVentaInicio, setGuardandoVentaInicio] = useState(false);
   const [tabDelProModal, setTabDelProModal] = useState<TabDelProModal>("sql_extractor");
   const [feedbackDelPro, setFeedbackDelPro] = useState<string | null>(null);
   const [copiadoSql, setCopiadoSql] = useState(false);
@@ -332,7 +351,7 @@ export default function InicioPage() {
   // =========================================================================
   // 3. CÁLCULOS GANADERÍA — NOVILLOS ESCALONADOS Y CONFIRMACIÓN DE FAENA
   // =========================================================================
-  const totalMachosEngorde = 130;
+  const totalMachosEngorde = tropas.length > 0 ? tropas.reduce((sum, t) => sum + t.cabezas, 0) : 130;
   const novillosConfirmados = useMemo(() => {
     return novillosTerminacion.filter((n) => n.confirmadoVenta);
   }, [novillosTerminacion]);
@@ -360,14 +379,90 @@ export default function InicioPage() {
     };
   }, [novillosConfirmados, dieta.precioNovilloGordoVivoArs]);
 
+  // Handlers para el proceso de confirmación de faena y venta
+  function handleAbrirConfirmarFaena() {
+    setPasoFaena("seleccion");
+    setFeedbackVentaInicio(null);
+    setModalConfirmarFaenaOpen(true);
+  }
+
+  function handleContinuarAVenta() {
+    const cab = proyeccionVentaConfirmada.cabezas;
+    if (cab <= 0) return;
+    const hoy = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+    const dteGenerado = `DTe 0048-${Math.floor(100000 + Math.random() * 900000)}`;
+    const tropaTerm = tropas.find((t) => t.corralId === "terminacion");
+    setFormVentaInicio({
+      tropaId: tropaTerm?.id || "tropa-terminacion",
+      frigorifico: "Rafaela Alimentos S.A.",
+      remitoDte: dteGenerado,
+      fecha: hoy,
+      cabezas: cab,
+      pesoBrutoTotal: proyeccionVentaConfirmada.pesoBrutoTotal,
+      precioKg: dieta.precioNovilloGordoVivoArs || 4200,
+      otrosGastos: 0,
+    });
+    setPasoFaena("formulario_venta");
+  }
+
+  function handleConfirmarVentaFaenaInicio(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    setGuardandoVentaInicio(true);
+    try {
+      const selectedIds = novillosTerminacion.filter((n) => n.confirmadoVenta).map((n) => n.id);
+      const desbastePct = 7.0;
+      const pesoBrutoTotal = Number(formVentaInicio.pesoBrutoTotal) || 0;
+      const pesoNeto = Number((pesoBrutoTotal * (1 - desbastePct / 100)).toFixed(1));
+      const facturacionTotal = Math.round(pesoNeto * Number(formVentaInicio.precioKg || 4200));
+
+      const res = ejecutarVentaHacienda({
+        cabezasNovillos: Number(formVentaInicio.cabezas) || 1,
+        cabezasVacas: 0,
+        pesoTotalKg: pesoBrutoTotal,
+        precioTotalArs: facturacionTotal,
+        remitoDte: formVentaInicio.remitoDte || `DTe 0048-${Math.floor(100000 + Math.random() * 900000)}`,
+        frigorifico: formVentaInicio.frigorifico || "Rafaela Alimentos S.A.",
+        fecha: formVentaInicio.fecha || new Date().toLocaleDateString("es-AR"),
+        desbastePct,
+        otrosGastosArs: Number(formVentaInicio.otrosGastos || 0),
+        novillosSeleccionadosIds: selectedIds,
+      });
+
+      cargarTodo();
+      setFeedbackVentaInicio(`✓ ¡Venta a frigorífico registrada con éxito! Se despacharon ${formVentaInicio.cabezas} novillos y se descontó el stock de todo el establecimiento.`);
+      setTimeout(() => {
+        setFeedbackVentaInicio(null);
+        setPasoFaena("seleccion");
+        setModalConfirmarFaenaOpen(false);
+        setGuardandoVentaInicio(false);
+      }, 1800);
+    } catch (err: any) {
+      setFeedbackVentaInicio(`❌ Error al registrar venta: ${err.message || err}`);
+      setGuardandoVentaInicio(false);
+    }
+  }
+
+  function handleVentaRemitoCompletadaInicio(res: ResultadoVentaHacienda) {
+    cargarTodo();
+    setModalVentaRemitoOpen(false);
+    setModalConfirmarFaenaOpen(false);
+    setPasoFaena("seleccion");
+  }
+
   const precioNovilloKg = dieta.precioNovilloGordoVivoArs ?? 4200;
 
   const tablaCorralesMachos = useMemo(() => {
+    const tropaTerm = tropas.find((t) => t.corralId === "terminacion");
+    const tropaRm3 = tropas.find((t) => t.corralId === "rm3");
+    const tropaRm2 = tropas.find((t) => t.corralId === "rm2");
+    const tropaRm1 = tropas.find((t) => t.corralId === "rm1");
+    const tropaGuachera = tropas.find((t) => t.corralId === "guachera");
+
     const etapas = [
       {
         id: "terminacion" as const,
         etapa: "5. Terminación (Gordos)",
-        cabezasTotal: 26,
+        cabezasTotal: novillosTerminacion.length || tropaTerm?.cabezas || 0,
         cabezasConfirmadas: proyeccionVentaConfirmada.cabezas,
         cabezasContinuo: novillosEnEngordeContinuo.length,
         peso: `${proyeccionVentaConfirmada.pesoPromedioActual} kg`,
@@ -379,9 +474,9 @@ export default function InicioPage() {
       {
         id: "rm3" as const,
         etapa: "4. Recría Mixta 3 (RM3)",
-        cabezasTotal: 30,
+        cabezasTotal: tropaRm3?.cabezas ?? 30,
         cabezasConfirmadas: 0,
-        cabezasContinuo: 30,
+        cabezasContinuo: tropaRm3?.cabezas ?? 30,
         peso: "262 kg",
         objetivo: "270 kg",
         gdpvNum: 0.83,
@@ -391,9 +486,9 @@ export default function InicioPage() {
       {
         id: "rm2" as const,
         etapa: "3. Recría Mixta 2 (RM2)",
-        cabezasTotal: 28,
+        cabezasTotal: tropaRm2?.cabezas ?? 28,
         cabezasConfirmadas: 0,
-        cabezasContinuo: 28,
+        cabezasContinuo: tropaRm2?.cabezas ?? 28,
         peso: "165 kg",
         objetivo: "170 kg",
         gdpvNum: 0.93,
@@ -403,9 +498,9 @@ export default function InicioPage() {
       {
         id: "rm1" as const,
         etapa: "2. Recría Mixta 1 (RM1)",
-        cabezasTotal: 22,
+        cabezasTotal: tropaRm1?.cabezas ?? 22,
         cabezasConfirmadas: 0,
-        cabezasContinuo: 22,
+        cabezasContinuo: tropaRm1?.cabezas ?? 22,
         peso: "106 kg",
         objetivo: "115 kg",
         gdpvNum: 1.29,
@@ -415,9 +510,9 @@ export default function InicioPage() {
       {
         id: "guachera" as const,
         etapa: "1. Guachera / Estaca",
-        cabezasTotal: 24,
+        cabezasTotal: tropaGuachera?.cabezas ?? 24,
         cabezasConfirmadas: 0,
-        cabezasContinuo: 24,
+        cabezasContinuo: tropaGuachera?.cabezas ?? 24,
         peso: "74 kg",
         objetivo: "80 kg",
         gdpvNum: 0.62,
@@ -445,7 +540,7 @@ export default function InicioPage() {
         valorProducidoCorralDia,
       };
     });
-  }, [corrales, precioNovilloKg, proyeccionVentaConfirmada, novillosEnEngordeContinuo]);
+  }, [corrales, precioNovilloKg, proyeccionVentaConfirmada, novillosEnEngordeContinuo, novillosTerminacion, tropas]);
 
   const totalesGanaderiaDia = useMemo(() => {
     let valorProducidoTotal = 0;
@@ -584,7 +679,7 @@ export default function InicioPage() {
             </span>
             <button
               type="button"
-              onClick={() => setModalConfirmarFaenaOpen(true)}
+              onClick={handleAbrirConfirmarFaena}
               style={{
                 background: "#eff6ff",
                 border: "1px solid #bfdbfe",
@@ -606,7 +701,7 @@ export default function InicioPage() {
             Salida en <strong>~{proyeccionVentaConfirmada.diasSalida} días</strong> · Facturación est.: <strong>${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M</strong>
           </div>
           <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
-            {novillosEnEngordeContinuo.length} novillos en engorde continuo · Total corral: 26 novillos (130 machos en total)
+            {novillosEnEngordeContinuo.length} novillos en engorde continuo · Total corral: {novillosTerminacion.length} novillos ({tropas.reduce((acc, t) => acc + t.cabezas, 0) || totalMachosEngorde} machos en total)
           </div>
         </div>
       </div>
@@ -1079,193 +1174,510 @@ export default function InicioPage() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "22px" }}>📋</span>
-                <div>
-                  <h2 style={{ fontSize: "18px", margin: 0 }}>Confirmación de Novillos para Frigorífico</h2>
-                  <div style={{ fontSize: "12px", color: "var(--slate-500)" }}>
-                    Cálculo predictivo DelPro según días acumulados en el corral de terminación.
+            {pasoFaena === "seleccion" ? (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "22px" }}>📋</span>
+                    <div>
+                      <h2 style={{ fontSize: "18px", margin: 0 }}>Confirmación de Novillos para Frigorífico</h2>
+                      <div style={{ fontSize: "12px", color: "var(--slate-500)" }}>
+                        Cálculo predictivo DelPro según días acumulados en el corral de terminación.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalConfirmarFaenaOpen(false)}
+                    style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--slate-400)" }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Barra de resumen de selección */}
+                <div
+                  style={{
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: "8px",
+                    padding: "12px 16px",
+                    marginBottom: "16px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "10px",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: "12px", color: "#166534", fontWeight: 700, textTransform: "uppercase" }}>
+                      Tropa Seleccionada para el Camión:
+                    </span>
+                    <div style={{ fontSize: "18px", fontWeight: 900, color: "#15803d" }}>
+                      {proyeccionVentaConfirmada.cabezas} Novillos Confirmados
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "13px", color: "var(--slate-700)" }}>
+                      Peso neto est. (7% desbaste): <strong>{proyeccionVentaConfirmada.pesoNeto.toLocaleString("es-AR")} kg</strong>
+                    </div>
+                    <div style={{ fontSize: "15px", fontWeight: 900, color: "#15803d" }}>
+                      Facturación est.: ~${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M (${dieta.precioNovilloGordoVivoArs || 4200}/kg)
+                    </div>
                   </div>
                 </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalConfirmarFaenaOpen(false)}
-                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--slate-400)" }}
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Barra de resumen de selección */}
-            <div
-              style={{
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                borderRadius: "8px",
-                padding: "12px 16px",
-                marginBottom: "16px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "10px",
-              }}
-            >
-              <div>
-                <span style={{ fontSize: "12px", color: "#166534", fontWeight: 700, textTransform: "uppercase" }}>
-                  Tropa Seleccionada para el Camión:
-                </span>
-                <div style={{ fontSize: "18px", fontWeight: 900, color: "#15803d" }}>
-                  {proyeccionVentaConfirmada.cabezas} Novillos Confirmados
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "13px", color: "var(--slate-700)" }}>
-                  Peso neto est. (7% desbaste): <strong>{proyeccionVentaConfirmada.pesoNeto.toLocaleString("es-AR")} kg</strong>
-                </div>
-                <div style={{ fontSize: "15px", fontWeight: 900, color: "#15803d" }}>
-                  Facturación est.: ~${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M (${dieta.precioNovilloGordoVivoArs || 4200}/kg)
-                </div>
-              </div>
-            </div>
-
-            {/* Acciones rápidas de selección */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-              <div style={{ fontSize: "12.5px", color: "var(--slate-600)" }}>
-                Marca con el tilde los novillos que se cargarán al camión:
-              </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const listosIds = novillosTerminacion
-                      .filter((n) => n.categoriaFaena === "listo_para_venta")
-                      .map((n) => n.id);
-                    setNovillosTerminacion(confirmarListaNovillos(listosIds));
-                  }}
-                  className="secondaryBtn"
-                  style={{ fontSize: "11.5px", padding: "4px 8px" }}
-                >
-                  Tildar solo Punta de Tropa (10)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const todosIds = novillosTerminacion.map((n) => n.id);
-                    setNovillosTerminacion(confirmarListaNovillos(todosIds));
-                  }}
-                  className="secondaryBtn"
-                  style={{ fontSize: "11.5px", padding: "4px 8px" }}
-                >
-                  Tildar todos (26)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNovillosTerminacion(confirmarListaNovillos([]))}
-                  className="secondaryBtn"
-                  style={{ fontSize: "11.5px", padding: "4px 8px" }}
-                >
-                  Limpiar
-                </button>
-              </div>
-            </div>
-
-            {/* Tabla de novillos individuales */}
-            <div className="tableWrap" style={{ maxHeight: "320px", overflowY: "auto", marginBottom: "16px" }}>
-              <table className="dataTable" style={{ fontSize: "12px" }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: "40px", textAlign: "center" }}>Cargar</th>
-                    <th style={{ minWidth: "100px" }}>Caravana</th>
-                    <th style={{ minWidth: "90px" }}>Madre</th>
-                    <th style={{ minWidth: "90px" }}>Ingreso</th>
-                    <th style={{ width: "100px", textAlign: "right" }}>Días Corral</th>
-                    <th style={{ width: "90px", textAlign: "right" }}>Peso Ingreso</th>
-                    <th style={{ width: "110px", textAlign: "right" }}>Peso DelPro</th>
-                    <th style={{ minWidth: "150px" }}>Estado Faena</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {novillosTerminacion.map((novillo) => (
-                    <tr
-                      key={novillo.id}
-                      style={{
-                        background: novillo.confirmadoVenta ? "#f0fdf4" : "transparent",
+                {/* Acciones rápidas de selección */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <div style={{ fontSize: "12.5px", color: "var(--slate-600)" }}>
+                    Marca con el tilde los novillos que se cargarán al camión:
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const listosIds = novillosTerminacion
+                          .filter((n) => n.categoriaFaena === "listo_para_venta")
+                          .map((n) => n.id);
+                        setNovillosTerminacion(confirmarListaNovillos(listosIds));
                       }}
+                      className="secondaryBtn"
+                      style={{ fontSize: "11.5px", padding: "4px 8px" }}
                     >
-                      <td style={{ textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={novillo.confirmadoVenta}
-                          onChange={() => setNovillosTerminacion(toggleConfirmacionNovillo(novillo.id))}
-                          style={{ cursor: "pointer", width: "16px", height: "16px" }}
-                        />
-                      </td>
-                      <td>
-                        <strong>{limpiarCaravana(novillo.caravana)}</strong>
-                      </td>
-                      <td style={{ color: "var(--slate-500)" }}>
-                        {limpiarCaravana(novillo.rpMadre) || "-"}
-                      </td>
-                      <td style={{ color: "var(--slate-600)" }}>
-                        {novillo.fechaIngreso}
-                      </td>
-                      <td style={{ textAlign: "right", fontWeight: 700 }}>
-                        {novillo.diasEnCorral} d
-                      </td>
-                      <td style={{ textAlign: "right", color: "var(--slate-600)" }}>
-                        {novillo.pesoIngresoKg} kg
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <strong
+                      Tildar solo Punta de Tropa ({novillosTerminacion.filter((n) => n.categoriaFaena === "listo_para_venta").length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const todosIds = novillosTerminacion.map((n) => n.id);
+                        setNovillosTerminacion(confirmarListaNovillos(todosIds));
+                      }}
+                      className="secondaryBtn"
+                      style={{ fontSize: "11.5px", padding: "4px 8px" }}
+                    >
+                      Tildar todos ({novillosTerminacion.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNovillosTerminacion(confirmarListaNovillos([]))}
+                      className="secondaryBtn"
+                      style={{ fontSize: "11.5px", padding: "4px 8px" }}
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tabla de novillos individuales */}
+                <div className="tableWrap" style={{ maxHeight: "320px", overflowY: "auto", marginBottom: "16px" }}>
+                  <table className="dataTable" style={{ fontSize: "12px" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: "40px", textAlign: "center" }}>Cargar</th>
+                        <th style={{ minWidth: "100px" }}>Caravana</th>
+                        <th style={{ minWidth: "90px" }}>Madre</th>
+                        <th style={{ minWidth: "90px" }}>Ingreso</th>
+                        <th style={{ width: "100px", textAlign: "right" }}>Días Corral</th>
+                        <th style={{ width: "90px", textAlign: "right" }}>Peso Ingreso</th>
+                        <th style={{ width: "110px", textAlign: "right" }}>Peso DelPro</th>
+                        <th style={{ minWidth: "150px" }}>Estado Faena</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {novillosTerminacion.map((novillo) => (
+                        <tr
+                          key={novillo.id}
                           style={{
-                            color: novillo.pesoActualEstimadoKg >= 400 ? "#15803d" : "var(--slate-900)",
+                            background: novillo.confirmadoVenta ? "#f0fdf4" : "transparent",
                           }}
                         >
-                          {novillo.pesoActualEstimadoKg} kg
-                        </strong>
-                      </td>
-                      <td>
-                        {novillo.categoriaFaena === "listo_para_venta" && (
-                          <span className="pill badgeGreen" style={{ fontSize: "10.5px", fontWeight: 700 }}>
-                            🥩 Listo para Faena (Punta)
-                          </span>
-                        )}
-                        {novillo.categoriaFaena === "engorde_medio" && (
-                          <span className="pill badgeSlate" style={{ fontSize: "10.5px" }}>
-                            🌾 Engorde medio (~35d)
-                          </span>
-                        )}
-                        {novillo.categoriaFaena === "recien_ingresado" && (
-                          <span className="pill badgeSlate" style={{ fontSize: "10.5px", color: "#64748b" }}>
-                            ⏳ Recién ingresado (~70d)
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={novillo.confirmadoVenta}
+                              onChange={() => setNovillosTerminacion(toggleConfirmacionNovillo(novillo.id))}
+                              style={{ cursor: "pointer", width: "16px", height: "16px" }}
+                            />
+                          </td>
+                          <td>
+                            <strong>{limpiarCaravana(novillo.caravana)}</strong>
+                          </td>
+                          <td style={{ color: "var(--slate-500)" }}>
+                            {limpiarCaravana(novillo.rpMadre) || "-"}
+                          </td>
+                          <td style={{ color: "var(--slate-600)" }}>
+                            {novillo.fechaIngreso}
+                          </td>
+                          <td style={{ textAlign: "right", fontWeight: 700 }}>
+                            {novillo.diasEnCorral} d
+                          </td>
+                          <td style={{ textAlign: "right", color: "var(--slate-600)" }}>
+                            {novillo.pesoIngresoKg} kg
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            <strong
+                              style={{
+                                color: novillo.pesoActualEstimadoKg >= 400 ? "#15803d" : "var(--slate-900)",
+                              }}
+                            >
+                              {novillo.pesoActualEstimadoKg} kg
+                            </strong>
+                          </td>
+                          <td>
+                            {novillo.categoriaFaena === "listo_para_venta" && (
+                              <span className="pill badgeGreen" style={{ fontSize: "10.5px", fontWeight: 700 }}>
+                                🥩 Listo para Faena (Punta)
+                              </span>
+                            )}
+                            {novillo.categoriaFaena === "engorde_medio" && (
+                              <span className="pill badgeSlate" style={{ fontSize: "10.5px" }}>
+                                🌾 Engorde medio (~35d)
+                              </span>
+                            )}
+                            {novillo.categoriaFaena === "recien_ingresado" && (
+                              <span className="pill badgeSlate" style={{ fontSize: "10.5px", color: "#64748b" }}>
+                                ⏳ Recién ingresado (~70d)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
-                * Los cambios se guardan y recalculan el tablero en tiempo real.
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                  <div style={{ fontSize: "11.5px", color: "var(--slate-500)" }}>
+                    * Los cambios se guardan y recalculan el tablero en tiempo real.
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setModalConfirmarFaenaOpen(false)}
+                      className="secondaryBtn"
+                      style={{ padding: "8px 16px" }}
+                    >
+                      Guardar Selección
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleContinuarAVenta}
+                      disabled={proyeccionVentaConfirmada.cabezas === 0}
+                      className="primaryBtn"
+                      style={{
+                        padding: "8px 20px",
+                        background: proyeccionVentaConfirmada.cabezas > 0 ? "#16a34a" : "#94a3b8",
+                        cursor: proyeccionVentaConfirmada.cabezas > 0 ? "pointer" : "not-allowed",
+                      }}
+                      title={proyeccionVentaConfirmada.cabezas === 0 ? "Seleccioná al menos 1 novillo con el tilde para continuar a la venta" : "Continuar con los datos de venta"}
+                    >
+                      🚛 Continuar a Venta / Despacho ({proyeccionVentaConfirmada.cabezas} novillos) →
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* PASO 2: FORMULARIO DE VENTA A FRIGORÍFICO (EXACTO A GANADERÍA) */
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "22px" }}>🚛</span>
+                    <div>
+                      <h2 style={{ fontSize: "18px", margin: 0 }}>Registrar Venta a Frigorífico — Despacho de Novillos</h2>
+                      <div style={{ fontSize: "12px", color: "var(--slate-500)" }}>
+                        Completá los datos del remito comercial. Al confirmar se descontará automáticamente el stock del rodeo.
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setModalVentaRemitoOpen(true)}
+                      style={{
+                        fontSize: "11.5px",
+                        fontWeight: 700,
+                        color: "#166534",
+                        background: "#dcfce7",
+                        border: "1px solid #86efac",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      📸 Cargar con Foto Remito / OCR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalConfirmarFaenaOpen(false)}
+                      style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--slate-400)" }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: "#fef3c7",
+                    border: "1px solid #fde68a",
+                    color: "#92400e",
+                    padding: "9px 12px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    marginBottom: "14px",
+                  }}
+                >
+                  ⚠️ <strong>Aviso de stock:</strong> Al confirmar esta venta se generará el comprobante comercial y se descontarán inmediatamente <strong>{formVentaInicio.cabezas} novillos</strong> de terminación del corral, de recría y del censo general.
+                </div>
+
+                {feedbackVentaInicio && (
+                  <div
+                    style={{
+                      background: feedbackVentaInicio.startsWith("❌") ? "#fef2f2" : "#f0fdf4",
+                      border: `1px solid ${feedbackVentaInicio.startsWith("❌") ? "#fecaca" : "#bbf7d0"}`,
+                      color: feedbackVentaInicio.startsWith("❌") ? "#991b1b" : "#166534",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      marginBottom: "14px",
+                    }}
+                  >
+                    {feedbackVentaInicio}
+                  </div>
+                )}
+
+                <form onSubmit={handleConfirmarVentaFaenaInicio}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
+                    {/* Fila 1: Tropa y Frigorífico */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                          Tropa / Lote de Origen:
+                        </label>
+                        <div
+                          style={{
+                            background: "#f8fafc",
+                            border: "1px solid var(--line)",
+                            padding: "8px 10px",
+                            borderRadius: "6px",
+                            fontSize: "12.5px",
+                          }}
+                        >
+                          <strong>🥩 Corral de Terminación HJB ({formVentaInicio.cabezas} novillos)</strong>
+                          <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                            Caravanas: {novillosTerminacion.filter((n) => n.confirmadoVenta).map((n) => limpiarCaravana(n.caravana)).join(", ") || "Seleccionadas"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                          Frigorífico / Comprador:
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formVentaInicio.frigorifico}
+                          onChange={(e) => setFormVentaInicio({ ...formVentaInicio, frigorifico: e.target.value })}
+                          style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--line)", fontSize: "12.5px" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Fila 2: Nº Remito/DTe, Fecha y Cabezas */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                          Nº Remito / DTe Oficial:
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="DTe 0048-..."
+                          value={formVentaInicio.remitoDte}
+                          onChange={(e) => setFormVentaInicio({ ...formVentaInicio, remitoDte: e.target.value })}
+                          style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--line)", fontSize: "12.5px" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                          Fecha de Venta:
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formVentaInicio.fecha}
+                          onChange={(e) => setFormVentaInicio({ ...formVentaInicio, fecha: e.target.value })}
+                          style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--line)", fontSize: "12.5px" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                          Cabezas Vendidas:
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={formVentaInicio.cabezas}
+                          onChange={(e) => setFormVentaInicio({ ...formVentaInicio, cabezas: parseInt(e.target.value, 10) || 0 })}
+                          style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--line)", fontSize: "12.5px" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Fila 3: Peso Bruto Balanza y Precio $/kg */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                          Peso Bruto Balanza Total (kg):
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="1"
+                          required
+                          value={formVentaInicio.pesoBrutoTotal}
+                          onChange={(e) => setFormVentaInicio({ ...formVentaInicio, pesoBrutoTotal: parseFloat(e.target.value) || 0 })}
+                          style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--line)", fontSize: "12.5px" }}
+                        />
+                        <div style={{ fontSize: "11px", color: "var(--slate-500)", marginTop: "2px" }}>
+                          Desbaste comercial automático: 7%
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                          Precio pactado $/kg vivo neto:
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          required
+                          value={formVentaInicio.precioKg}
+                          onChange={(e) => setFormVentaInicio({ ...formVentaInicio, precioKg: parseFloat(e.target.value) || 0 })}
+                          style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--line)", fontSize: "12.5px" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Fila 4: Gastos y Flete */}
+                    <div>
+                      <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                        Gastos Comerciales y Flete ($):
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formVentaInicio.otrosGastos}
+                        onChange={(e) => setFormVentaInicio({ ...formVentaInicio, otrosGastos: parseFloat(e.target.value) || 0 })}
+                        style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--line)", fontSize: "12.5px" }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Resumen Calculado en Vivo */}
+                  {(() => {
+                    const cab = Math.max(1, formVentaInicio.cabezas || 1);
+                    const pBruto = Math.max(0, formVentaInicio.pesoBrutoTotal || 0);
+                    const desb = 7.0;
+                    const pNeto = Number((pBruto * (1 - desb / 100)).toFixed(1));
+                    const facturacion = Math.round(pNeto * (formVentaInicio.precioKg || 4200));
+                    const costoAlim = Math.round(721058 * cab);
+                    const costoTotal = costoAlim + (Number(formVentaInicio.otrosGastos) || 0);
+                    const ganancia = facturacion - costoTotal;
+                    const margen = costoTotal > 0 ? Number(((ganancia / costoTotal) * 100).toFixed(1)) : 0;
+
+                    return (
+                      <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "12px 14px", marginBottom: "16px" }}>
+                        <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#475569", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          📊 Resumen de Liquidación Calculado:
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px", textAlign: "center" }}>
+                          <div>
+                            <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Peso Neto Liquidado</div>
+                            <strong style={{ fontSize: "13.5px", color: "#1e293b" }}>{pNeto.toLocaleString("es-AR")} kg</strong>
+                            <div style={{ fontSize: "10.5px", color: "#64748b" }}>({(pNeto / cab).toFixed(1)} kg/cab)</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Facturación Bruta</div>
+                            <strong style={{ fontSize: "13.5px", color: "#0f172a" }}>${facturacion.toLocaleString("es-AR")}</strong>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Costo Total Est.</div>
+                            <strong style={{ fontSize: "13.5px", color: "#991b1b" }}>${costoTotal.toLocaleString("es-AR")}</strong>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>Margen Neto Est.</div>
+                            <strong style={{ fontSize: "13.5px", color: ganancia >= 0 ? "#166534" : "#991b1b" }}>
+                              {ganancia >= 0 ? "+" : ""}${ganancia.toLocaleString("es-AR")}
+                            </strong>
+                            <div style={{ fontSize: "10.5px", color: ganancia >= 0 ? "#15803d" : "#b91c1c" }}>
+                              ({ganancia >= 0 ? "+" : ""}{margen}%)
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={() => setPasoFaena("seleccion")}
+                      className="secondaryBtn"
+                      style={{ padding: "8px 16px" }}
+                    >
+                      ← Volver a Selección
+                    </button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        type="button"
+                        onClick={() => setModalConfirmarFaenaOpen(false)}
+                        className="secondaryBtn"
+                        style={{ padding: "8px 16px" }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={guardandoVentaInicio || formVentaInicio.cabezas <= 0}
+                        className="primaryBtn"
+                        style={{
+                          padding: "8px 20px",
+                          background: "#16a34a",
+                          color: "#ffffff",
+                          fontWeight: 800,
+                          cursor: guardandoVentaInicio ? "wait" : "pointer",
+                        }}
+                      >
+                        {guardandoVentaInicio ? "⏳ Guardando y Descontando Stock..." : "✓ Confirmar Venta y Descontar Stock"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
               </div>
-              <button
-                type="button"
-                onClick={() => setModalConfirmarFaenaOpen(false)}
-                className="primaryBtn"
-                style={{ padding: "8px 20px" }}
-              >
-                Guardar y Cerrar
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* Modal de Carga Asistida con Foto Remito / OCR en Inicio */}
+      <ModalRegistrarVentaRemito
+        isOpen={modalVentaRemitoOpen}
+        onClose={() => setModalVentaRemitoOpen(false)}
+        onVentaCompletada={handleVentaRemitoCompletadaInicio}
+        seccionInicial="ganaderia"
+        cabezasInicialesNovillos={formVentaInicio.cabezas || proyeccionVentaConfirmada.cabezas}
+        pesoInicialKg={formVentaInicio.pesoBrutoTotal || proyeccionVentaConfirmada.pesoBrutoTotal}
+        precioInicialArs={Math.round(((formVentaInicio.pesoBrutoTotal || proyeccionVentaConfirmada.pesoBrutoTotal) * 0.93) * (formVentaInicio.precioKg || 4200))}
+        novillosSeleccionadosIds={novillosTerminacion.filter((n) => n.confirmadoVenta).map((n) => n.id)}
+      />
 
       {/* ========================================================================= */}
       {/* MODAL: PARÁMETROS REALES HJB                                              */}
