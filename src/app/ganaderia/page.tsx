@@ -135,8 +135,8 @@ export default function GanaderiaPage() {
     tropaId: "",
     frigorifico: "Frigorífico Logros S.A.",
     remitoDte: "",
-    cabezas: 25,
-    pesoBrutoTotal: 10250,
+    cabezas: 15,
+    pesoBrutoTotal: 6060,
     precioKg: 4200,
     otrosGastos: 950000,
   });

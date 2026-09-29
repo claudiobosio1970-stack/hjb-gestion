@@ -929,10 +929,19 @@ export function verificarYSincronizarStockVentasTemporales(ventas: VentaGordoExp
       if (!v.categoriaAnimal) {
         v.categoriaAnimal = inferirCategoriaAnimal(v);
       }
-      descontarStockDeVentaGordo(v);
-      v.stockDescontado = true;
-      v.fechaDescuentoStock = new Date().toISOString();
-      hubocambios = true;
+      if (v.numeroVenta === 2 || v.numeroVenta === 3) {
+        // Venta N° 2 (10 novillos) y Venta N° 3 (1 vaquillona) corresponden a los animales que
+        // ya se cargaron en el camión y cuyo stock activo remanente (15 novillos en terminación, 503 en total tambo)
+        // ya fue consolidado en la base del sistema. Se marcan como descontados sin restar doble.
+        v.stockDescontado = true;
+        v.fechaDescuentoStock = v.fechaDescuentoStock || new Date().toISOString();
+        hubocambios = true;
+      } else {
+        descontarStockDeVentaGordo(v);
+        v.stockDescontado = true;
+        v.fechaDescuentoStock = new Date().toISOString();
+        hubocambios = true;
+      }
       console.log(
         `[HJB] Stock bajado automáticamente para Venta N° ${v.numeroVenta} (${v.categoriaAnimal}): ${
           v.cantidadReal || v.cantidadEstimada

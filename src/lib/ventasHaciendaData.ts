@@ -609,13 +609,21 @@ export function ejecutarVentaHacienda(input: InputRegistroVentaRemito): Resultad
     // 3. Actualizar conteos en censo de DelPro y persistir en Firestore
     const delproConfig = getDelProConfig();
     const censo = delproConfig?.datosSincronizados?.censoRodeoTambo;
-    const nuevoTotalGeneral = Math.max(0, (delproConfig?.datosSincronizados?.totalRodeoGeneral || 514) - input.cabezasNovillos);
-    const nuevosNovillos = Math.max(0, (censo?.novillosRecriaEngorde || 99) - input.cabezasNovillos);
+    const nuevoTotalGeneral = Math.max(0, (delproConfig?.datosSincronizados?.totalRodeoGeneral || 503) - input.cabezasNovillos);
+    const nuevosNovillos = Math.max(0, (censo?.novillosRecriaEngorde || 74) - input.cabezasNovillos);
+    const terminacionRestante = updatedTropas.find((t) => t.corralId === "terminacion")?.cabezas ?? 15;
 
     saveDelProConfig({
       datosSincronizados: {
         ...delproConfig.datosSincronizados,
         totalRodeoGeneral: nuevoTotalGeneral,
+        machosEnRecriaEngorde: {
+          guachera: delproConfig.datosSincronizados?.machosEnRecriaEngorde?.guachera ?? 9,
+          rm1: delproConfig.datosSincronizados?.machosEnRecriaEngorde?.rm1 ?? 22,
+          rm2: delproConfig.datosSincronizados?.machosEnRecriaEngorde?.rm2 ?? 28,
+          rm3: delproConfig.datosSincronizados?.machosEnRecriaEngorde?.rm3 ?? 9,
+          terminacion: terminacionRestante,
+        },
         animalesRecria: nuevaRecria,
         censoRodeoTambo: censo ? {
           ...censo,

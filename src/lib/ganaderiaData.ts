@@ -239,7 +239,7 @@ export const TROPAS_DEFAULT: TropaGanadera[] = [
     codigo: "TR-26-GORDOS",
     nombre: "Lote Terminación Frigorífico (Machos)",
     corralId: "terminacion",
-    cabezas: 25,
+    cabezas: 15,
     fechaIngreso: "20/06/26",
     diasEnCorral: 87,
     pesoInicialKg: 274,
@@ -256,9 +256,9 @@ export const PESAJES_DEFAULT: PesajeRegistro[] = [
     tropaNombre: "Lote Terminación Frigorífico",
     corralId: "terminacion",
     fecha: "12/09/26",
-    cabezas: 26,
+    cabezas: 15,
     pesoPromedioKg: 404.0,
-    pesoTotalKg: 10504,
+    pesoTotalKg: 6060,
     gdpvCalculada: 1.49,
     observaciones: "Pesaje previo a despacho a frigorífico. Lote homogéneo terminado.",
   },
@@ -404,14 +404,26 @@ export function getTropas(): TropaGanadera[] {
 
     const raw = localStorage.getItem(STORAGE_TROPAS);
     if (raw) {
-      const parsed = JSON.parse(raw);
+      let parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        let modificado = false;
+        parsed = parsed.map((t: any) => {
+          // Si en localStorage viejo figuraban 25 cabezas de terminación (previo a la venta de 10 novillos), actualizar a 15
+          if (t.corralId === "terminacion" && t.cabezas > 15) {
+            modificado = true;
+            return { ...t, cabezas: 15 };
+          }
+          return t;
+        });
+
         const total = parsed.reduce((acc: number, t: any) => acc + (t.cabezas || 0), 0);
-        const termGordos = parsed.find((t: any) => t.corralId === "terminacion")?.cabezas;
-        // Si tiene más de 100 cabezas o terminación no es 25, resetear a los 93 reales
-        if (total > 100 || termGordos !== 25) {
+        if (total > 150) {
           localStorage.removeItem(STORAGE_TROPAS);
           return TROPAS_DEFAULT;
+        }
+
+        if (modificado) {
+          localStorage.setItem(STORAGE_TROPAS, JSON.stringify(parsed));
         }
         return parsed;
       }
@@ -659,18 +671,10 @@ export interface NovilloTerminacion {
 export const HJB_NOVILLOS_CONFIRMADOS_EVENT = "hjb_novillos_confirmados_event";
 const STORAGE_NOVILLOS_TERMINACION = "hjb_novillos_terminacion_v04";
 
+const CARAVANAS_VENDIDAS_TANDA_1 = new Set(["49", "63", "65", "70", "71", "72", "73", "74", "75", "76"]);
+
 export const NOVILLOS_TERMINACION_DEFAULT: NovilloTerminacion[] = [
-  // Exactamente 25 novillos gordos en terminación con caravanas oficiales DelPro
-  { id: "nov-01", caravana: "49", rpMadre: "3890", fechaIngreso: "15/06/26", diasEnCorral: 92, pesoIngresoKg: 278, pesoActualEstimadoKg: 415.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-02", caravana: "63", rpMadre: "4102", fechaIngreso: "16/06/26", diasEnCorral: 91, pesoIngresoKg: 280, pesoActualEstimadoKg: 415.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-03", caravana: "65", rpMadre: "3750", fechaIngreso: "18/06/26", diasEnCorral: 89, pesoIngresoKg: 275, pesoActualEstimadoKg: 407.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-04", caravana: "70", rpMadre: "4215", fechaIngreso: "18/06/26", diasEnCorral: 89, pesoIngresoKg: 282, pesoActualEstimadoKg: 414.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-05", caravana: "71", rpMadre: "3990", fechaIngreso: "20/06/26", diasEnCorral: 87, pesoIngresoKg: 274, pesoActualEstimadoKg: 403.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-06", caravana: "72", rpMadre: "4050", fechaIngreso: "20/06/26", diasEnCorral: 87, pesoIngresoKg: 279, pesoActualEstimadoKg: 408.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-07", caravana: "73", rpMadre: "3820", fechaIngreso: "21/06/26", diasEnCorral: 86, pesoIngresoKg: 276, pesoActualEstimadoKg: 404.1, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-08", caravana: "74", rpMadre: "4110", fechaIngreso: "22/06/26", diasEnCorral: 85, pesoIngresoKg: 281, pesoActualEstimadoKg: 407.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-09", caravana: "75", rpMadre: "3920", fechaIngreso: "22/06/26", diasEnCorral: 85, pesoIngresoKg: 277, pesoActualEstimadoKg: 403.6, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
-  { id: "nov-10", caravana: "76", rpMadre: "4300", fechaIngreso: "23/06/26", diasEnCorral: 84, pesoIngresoKg: 283, pesoActualEstimadoKg: 408.1, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: true },
+  // 15 novillos gordos en terminación (los primeros 10 con caravanas 49..76 ya fueron cargados en camión y vendidos en Venta N° 2)
   { id: "nov-11", caravana: "77", rpMadre: "3650", fechaIngreso: "25/07/26", diasEnCorral: 52, pesoIngresoKg: 270, pesoActualEstimadoKg: 387.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
   { id: "nov-12", caravana: "78", rpMadre: "4020", fechaIngreso: "25/07/26", diasEnCorral: 52, pesoIngresoKg: 274, pesoActualEstimadoKg: 391.5, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
   { id: "nov-13", caravana: "79", rpMadre: "4150", fechaIngreso: "28/07/26", diasEnCorral: 49, pesoIngresoKg: 272, pesoActualEstimadoKg: 385.0, gdpvKgDia: 1.49, categoriaFaena: "listo_para_venta", confirmadoVenta: false },
@@ -702,11 +706,25 @@ export function getNovillosTerminacion(): NovilloTerminacion[] {
         localStorage.removeItem(STORAGE_NOVILLOS_TERMINACION);
         return NOVILLOS_TERMINACION_DEFAULT;
       }
-      return parsed.map((n: NovilloTerminacion) => ({
-        ...n,
-        caravana: String(n.caravana || "").replace(/\D/g, ""),
-        rpMadre: n.rpMadre ? String(n.rpMadre).replace(/\D/g, "") : "",
-      }));
+
+      // Purgar novillos ya vendidos (caravanas 49..76) si existían en localStorage viejo
+      const filtrados = parsed
+        .filter((n: any) => !CARAVANAS_VENDIDAS_TANDA_1.has(String(n.caravana || "").replace(/\D/g, "")))
+        .map((n: NovilloTerminacion) => ({
+          ...n,
+          caravana: String(n.caravana || "").replace(/\D/g, ""),
+          rpMadre: n.rpMadre ? String(n.rpMadre).replace(/\D/g, "") : "",
+        }));
+
+      if (filtrados.length === 0) {
+        localStorage.setItem(STORAGE_NOVILLOS_TERMINACION, JSON.stringify(NOVILLOS_TERMINACION_DEFAULT));
+        return NOVILLOS_TERMINACION_DEFAULT;
+      }
+
+      if (filtrados.length !== parsed.length) {
+        localStorage.setItem(STORAGE_NOVILLOS_TERMINACION, JSON.stringify(filtrados));
+      }
+      return filtrados;
     }
     return NOVILLOS_TERMINACION_DEFAULT;
   } catch {

@@ -1225,10 +1225,10 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
     });
   }
 
-  // 5. Terminación Gordos: EXACTAMENTE 25 animales machos (peso 380 a 420 kg, listos para faena)
-  // Caravanas oficiales DelPro: 49, 63, 65 y correlativas 70 a 91 (25 cabezas)
+  // 5. Terminación Gordos: EXACTAMENTE 15 animales machos (peso 380 a 420 kg, listos para faena)
+  // Caravanas oficiales DelPro activas: 77 a 91 (15 cabezas)
+  // (Las caravanas 49, 63, 65, 70 a 76 fueron vendidas a frigorífico en Venta N° 2)
   const caravanasTerminacion = [
-    "49", "63", "65", "70", "71", "72", "73", "74", "75", "76",
     "77", "78", "79", "80", "81", "82", "83", "84", "85", "86",
     "87", "88", "89", "90", "91"
   ];
@@ -1237,7 +1237,7 @@ export function generateDefaultAnimalesRecria(): AnimalRecriaIndividual[] {
     const rp = caravanasTerminacion[i];
     const calc = calcularPesoEstimativoVida({ corralId: "terminacion", diasEnCorral: dias });
     const esPesadoDelPro = i === 0 || i === 4;
-    const pesoOficial = esPesadoDelPro ? (i === 0 ? 415.0 : 404.0) : undefined;
+    const pesoOficial = esPesadoDelPro ? (i === 0 ? 391.5 : 388.5) : undefined;
     const pesoFinal = pesoOficial || Math.max(380, calc.pesoEstimadoKg);
 
     animales.push({
@@ -1287,27 +1287,27 @@ export const DELPRO_CONFIG_DEFAULT: DelProConfig = {
       rolloAlfalfaKg: 3.0,
       salMineralGramos: 150,
     },
-    hembrasEnReposicionTambo: 195, // 178 vaquillonas + 17 terneras crianza van a reposición del tambo
+    hembrasEnReposicionTambo: 194, // 177 vaquillonas + 17 terneras crianza van a reposición del tambo (1 vaquillona vendida en Venta N° 3)
     machosEnRecriaEngorde: {
       guachera: 9, // 9 terneros machos en guachera
       rm1: 22,
       rm2: 28,
       rm3: 9,
-      terminacion: 25, // Exactamente 25 gordos en terminación (total 93 machos)
+      terminacion: 15, // Exactamente 15 gordos en terminación (25 originales - 10 vendidos en Venta N° 2)
     },
     censoRodeoTambo: {
-      totalRodeoGeneral: 514,
+      totalRodeoGeneral: 503, // 514 originales - 10 novillos - 1 vaquillona
       totalVacasAdultas: 226,
       vacasEnOrdenie: 192,
       vacasSecas: 34,
       vacasPreniadas: 142,
       vacasVacias: 45,
-      vaquillonasReposicion: 178,
+      vaquillonasReposicion: 177, // 178 - 1 vaquillona vendida
       vaquillonasPreniadas: 31,
       ternerosCrianza: 26,
       ternerasCrianzaHembras: 17,
       ternerosCrianzaMachos: 9,
-      novillosRecriaEngorde: 84,
+      novillosRecriaEngorde: 74, // 84 - 10 novillos vendidos
       detalleVacas: defaultVacas,
     },
     animalesRecria: defaultAnimales,
@@ -1416,12 +1416,11 @@ export function getDelProConfig(): DelProConfig {
       },
     };
 
-    // Validar machos en recria y engorde (25 en terminación)
-    if (
-      !config.datosSincronizados.machosEnRecriaEngorde ||
-      config.datosSincronizados.machosEnRecriaEngorde.terminacion !== 25
-    ) {
+    // Validar machos en recria y engorde (15 en terminación post-venta de 10 novillos)
+    if (!config.datosSincronizados.machosEnRecriaEngorde) {
       config.datosSincronizados.machosEnRecriaEngorde = { ...DELPRO_CONFIG_DEFAULT.datosSincronizados.machosEnRecriaEngorde! };
+    } else if (config.datosSincronizados.machosEnRecriaEngorde.terminacion > 15) {
+      config.datosSincronizados.machosEnRecriaEngorde.terminacion = 15;
     }
 
     // Purgar datos ficticios 8600..8900 heredados de la maqueta demo vieja
@@ -1439,6 +1438,8 @@ export function getDelProConfig(): DelProConfig {
     return DELPRO_CONFIG_DEFAULT;
   }
 }
+
+const CARAVANAS_MACHOS_VENDIDOS_DELPRO = new Set(["49", "63", "65", "70", "71", "72", "73", "74", "75", "76"]);
 
 export function getAnimalesRecria(): AnimalRecriaIndividual[] {
   if (typeof window === "undefined") return defaultAnimales;
@@ -1463,13 +1464,18 @@ export function getAnimalesRecria(): AnimalRecriaIndividual[] {
           return defaultAnimales;
         }
 
-        return parsed
-          .filter((a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho")
+        const filtrados = parsed
+          .filter((a) => (esMachoPorCaravana(a.rp) || a.sexo === "Macho") && !CARAVANAS_MACHOS_VENDIDOS_DELPRO.has(String(a.rp || "").replace(/\D/g, "")))
           .map((a) => ({
             ...a,
             rp: limpiarCaravana(a.rp),
             sexo: "Macho" as const,
           }));
+
+        if (filtrados.length !== parsed.length) {
+          localStorage.setItem(STORAGE_ANIMALES_RECRIA, JSON.stringify(filtrados));
+        }
+        return filtrados;
       }
     }
   } catch {}
@@ -1483,7 +1489,7 @@ export function getAnimalesRecria(): AnimalRecriaIndividual[] {
       });
     if (!tieneFicticiosConfig) {
       return fromConfig
-        .filter((a) => esMachoPorCaravana(a.rp) || a.sexo === "Macho")
+        .filter((a) => (esMachoPorCaravana(a.rp) || a.sexo === "Macho") && !CARAVANAS_MACHOS_VENDIDOS_DELPRO.has(String(a.rp || "").replace(/\D/g, "")))
         .map((a) => ({
           ...a,
           rp: limpiarCaravana(a.rp),

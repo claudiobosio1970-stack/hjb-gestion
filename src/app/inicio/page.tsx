@@ -698,7 +698,11 @@ export default function InicioPage() {
             {proyeccionVentaConfirmada.cabezas} Novillos Confirmados
           </div>
           <div style={{ fontSize: "12px", color: "var(--slate-600)", marginTop: "4px" }}>
-            Salida en <strong>~{proyeccionVentaConfirmada.diasSalida} días</strong> · Facturación est.: <strong>${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M</strong>
+            {proyeccionVentaConfirmada.cabezas > 0 ? (
+              <>Salida en <strong>~{proyeccionVentaConfirmada.diasSalida} días</strong> · Facturación est.: <strong>${(proyeccionVentaConfirmada.facturacion / 1000000).toFixed(2)}M</strong></>
+            ) : (
+              <span>Corral de terminación disponible para armar nueva tanda de faena</span>
+            )}
           </div>
           <div style={{ fontSize: "11px", color: "var(--slate-400)", marginTop: "2px" }}>
             {novillosEnEngordeContinuo.length} novillos en engorde continuo · Total corral: {novillosTerminacion.length} novillos ({tropas.reduce((acc, t) => acc + t.cabezas, 0) || totalMachosEngorde} machos en total)
