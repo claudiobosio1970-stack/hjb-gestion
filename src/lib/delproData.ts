@@ -1534,15 +1534,15 @@ export function getCensoRodeoTambo(): CensoRodeoTambo {
 
     return {
       ...censo,
-      totalRodeoGeneral: censo.totalRodeoGeneral && censo.totalRodeoGeneral >= 500 ? censo.totalRodeoGeneral : 515,
-      totalVacasAdultas: (censo.vacasEnOrdenie || 191) + ((censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 35),
-      vacasEnOrdenie: censo.vacasEnOrdenie || 191,
-      vacasSecas: (censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 35,
-      vaquillonasReposicion: censo.vaquillonasReposicion && censo.vaquillonasReposicion >= 100 ? censo.vaquillonasReposicion : 178,
-      ternerosCrianza: censo.ternerosCrianza || 27,
-      ternerasCrianzaHembras: censo.ternerasCrianzaHembras || 18,
+      totalRodeoGeneral: censo.totalRodeoGeneral !== undefined && censo.totalRodeoGeneral > 0 ? censo.totalRodeoGeneral : 514,
+      totalVacasAdultas: (censo.vacasEnOrdenie || 191) + ((censo.vacasSecas !== undefined && censo.vacasSecas >= 0) ? censo.vacasSecas : 34),
+      vacasEnOrdenie: censo.vacasEnOrdenie !== undefined ? censo.vacasEnOrdenie : 191,
+      vacasSecas: (censo.vacasSecas !== undefined && censo.vacasSecas >= 0) ? censo.vacasSecas : 34,
+      vaquillonasReposicion: censo.vaquillonasReposicion !== undefined ? censo.vaquillonasReposicion : 178,
+      ternerosCrianza: censo.ternerosCrianza || 26,
+      ternerasCrianzaHembras: censo.ternerasCrianzaHembras || 17,
       ternerosCrianzaMachos: censo.ternerosCrianzaMachos || 9,
-      novillosRecriaEngorde: censo.novillosRecriaEngorde || 84,
+      novillosRecriaEngorde: censo.novillosRecriaEngorde !== undefined ? censo.novillosRecriaEngorde : 84,
       detalleVacas: tieneDetalleCompleto ? hembrasLimpias : defaultVacas.map((v) => normalizarDatosReproductivosVaca(v)),
     };
   }
@@ -1702,25 +1702,25 @@ export function initDelProFirestoreSync(onUpdate?: (config: DelProConfig) => voi
         let censo = data.censoRodeoTambo || payload?.censoRodeoTambo || current.datosSincronizados.censoRodeoTambo;
         const totalGeneral = Number(data.totalRodeoGeneral || payload?.totalRodeoGeneral || censo?.totalRodeoGeneral || 514);
         if (censo) {
-          const secasNormalizadas = (censo.vacasSecas && censo.vacasSecas >= 25) ? censo.vacasSecas : 34;
+          const secasNormalizadas = (censo.vacasSecas !== undefined && censo.vacasSecas >= 0) ? censo.vacasSecas : 34;
           const voNormalizadas = vacasVO > 0 ? vacasVO : (censo.vacasEnOrdenie || 192);
           const tieneDetalleCompleto = Array.isArray(censo.detalleVacas) && censo.detalleVacas.length >= 400;
           censo = {
             ...censo,
-            totalRodeoGeneral: totalGeneral >= 500 ? totalGeneral : 514,
+            totalRodeoGeneral: totalGeneral > 0 ? totalGeneral : 514,
             vacasEnOrdenie: voNormalizadas,
             vacasSecas: secasNormalizadas,
             totalVacasAdultas: voNormalizadas + secasNormalizadas,
-            vaquillonasReposicion: censo.vaquillonasReposicion && censo.vaquillonasReposicion >= 100 ? censo.vaquillonasReposicion : 178,
+            vaquillonasReposicion: censo.vaquillonasReposicion !== undefined ? censo.vaquillonasReposicion : 178,
             ternerosCrianza: censo.ternerosCrianza || 26,
-            novillosRecriaEngorde: censo.novillosRecriaEngorde || 84,
+            novillosRecriaEngorde: censo.novillosRecriaEngorde !== undefined ? censo.novillosRecriaEngorde : 84,
             detalleVacas: (tieneDetalleCompleto && censo.detalleVacas) ? censo.detalleVacas.map((v: any) => normalizarDatosReproductivosVaca(v)) : defaultVacas.map((v) => normalizarDatosReproductivosVaca(v)),
           };
         }
 
         const payloadData: Partial<DelProSyncPayload> = {
           ...(payload || {}),
-          totalRodeoGeneral: totalGeneral >= 500 ? totalGeneral : 514,
+          totalRodeoGeneral: totalGeneral > 0 ? totalGeneral : 514,
           litrosTotalesDia: litros,
           vacasEnOrdeñe: vacasVO,
           litrosPromedioVO: prom,
@@ -1816,16 +1816,16 @@ export function propagarDatosDelProATodoElSistema(
   // Asegurar consistencia absoluta entre vacasEnOrdeñe y el censo del rodeo
   if (mergedDatos.censoRodeoTambo) {
     const totalG = Number(mergedDatos.totalRodeoGeneral || mergedDatos.censoRodeoTambo.totalRodeoGeneral || 514);
-    const secasG = (mergedDatos.censoRodeoTambo.vacasSecas && mergedDatos.censoRodeoTambo.vacasSecas >= 25) ? mergedDatos.censoRodeoTambo.vacasSecas : 34;
+    const secasG = (mergedDatos.censoRodeoTambo.vacasSecas !== undefined && mergedDatos.censoRodeoTambo.vacasSecas >= 0) ? mergedDatos.censoRodeoTambo.vacasSecas : 34;
     const voG = mergedDatos.vacasEnOrdeñe > 0 ? mergedDatos.vacasEnOrdeñe : 192;
     const tieneDetalleCompleto = Array.isArray(mergedDatos.censoRodeoTambo.detalleVacas) && mergedDatos.censoRodeoTambo.detalleVacas.length >= 400;
     mergedDatos.censoRodeoTambo = {
       ...mergedDatos.censoRodeoTambo,
-      totalRodeoGeneral: totalG >= 500 ? totalG : 514,
+      totalRodeoGeneral: totalG > 0 ? totalG : 514,
       vacasEnOrdenie: voG,
       vacasSecas: secasG,
       totalVacasAdultas: voG + secasG,
-      vaquillonasReposicion: mergedDatos.censoRodeoTambo.vaquillonasReposicion && mergedDatos.censoRodeoTambo.vaquillonasReposicion >= 100 ? mergedDatos.censoRodeoTambo.vaquillonasReposicion : 178,
+      vaquillonasReposicion: mergedDatos.censoRodeoTambo.vaquillonasReposicion !== undefined ? mergedDatos.censoRodeoTambo.vaquillonasReposicion : 178,
       ternerosCrianza: mergedDatos.censoRodeoTambo.ternerosCrianza || 26,
       detalleVacas: (tieneDetalleCompleto && mergedDatos.censoRodeoTambo.detalleVacas) ? mergedDatos.censoRodeoTambo.detalleVacas.map((v: any) => normalizarDatosReproductivosVaca(v)) : defaultVacas.map((v) => normalizarDatosReproductivosVaca(v)),
     };

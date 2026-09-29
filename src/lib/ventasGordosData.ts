@@ -1,5 +1,21 @@
 import { collection, doc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
+import {
+  getTropas,
+  saveTropas,
+  HJB_GANADERIA_SYNC_EVENT,
+  getNovillosTerminacion,
+  saveNovillosTerminacion,
+  HJB_NOVILLOS_CONFIRMADOS_EVENT,
+} from "./ganaderiaData";
+import {
+  getDelProConfig,
+  saveDelProConfig,
+  getAnimalesRecria,
+  saveAnimalesRecria,
+  HJB_DELPRO_SYNC_EVENT,
+  VacaTamboIndividual,
+} from "./delproData";
 
 // ==========================================
 // ESTADOS Y ENUMS
@@ -7,6 +23,7 @@ import { db } from "./firebase";
 export type EstadoVentaGordo = "PROYECCION" | "TEMPORAL" | "DEFINITIVO" | "CANCELADO";
 export type MetodoVentaGordo = "KILO_VIVO" | "RENDIMIENTO";
 export type TipoDocumentoVenta = "DTE_GUIA" | "ROMANEO" | "FACTURA_LIQUIDACION" | "OTRO";
+export type CategoriaAnimalVenta = "NOVILLOS" | "VAQUILLONAS" | "VACAS" | "TOROS";
 
 // ==========================================
 // COSTOS HISTÓRICOS PRODUCTIVOS DE REFERENCIA
@@ -183,6 +200,11 @@ export interface VentaGordoExpediente {
   // Eliminación Lógica
   eliminadoLogico: boolean;
   motivoEliminacion?: string;
+
+  // Categoría de Hacienda y Carga de Stock
+  categoriaAnimal?: CategoriaAnimalVenta;
+  stockDescontado?: boolean;
+  fechaDescuentoStock?: string;
 }
 
 // ==========================================
@@ -619,6 +641,322 @@ function sanitizeForFirestore(obj: any): any {
   return result;
 }
 
+/**
+ * Infiere la categoría de hacienda según observaciones, cliente o historial de la operación.
+ */
+export function inferirCategoriaAnimal(v: Partial<VentaGordoExpediente>): CategoriaAnimalVenta {
+  if (v.categoriaAnimal) return v.categoriaAnimal;
+  // Venta N° 3 es la vaquillona vendida recientemente (1 cab., 414 kg)
+  if (v.numeroVenta === 3) return "VAQUILLONAS";
+  const texto = `${v.observaciones || ""} ${v.clienteNombre || ""}`.toLowerCase();
+  if (texto.includes("vaquillon") || texto.includes("hemb") || texto.includes("vq")) return "VAQUILLONAS";
+  if (texto.includes("vaca") || texto.includes("seca") || texto.includes("lech") || texto.includes("descarte")) return "VACAS";
+  if (texto.includes("toro")) return "TOROS";
+  return "NOVILLOS";
+}
+
+/**
+ * Baja automáticamente el stock de la categoría vendida cuando una venta pasa a estado TEMPORAL
+ * (lo que indica que el camión ya cargó los animales en el establecimiento).
+ */
+export function descontarStockDeVentaGordo(venta: VentaGordoExpediente): {
+  categoria: CategoriaAnimalVenta;
+  cabezas: number;
+  mensaje: string;
+} {
+  const cat = venta.categoriaAnimal || inferirCategoriaAnimal(venta);
+  const cabezas = venta.cantidadReal || venta.cantidadEstimada || 1;
+
+  if (typeof window === "undefined") {
+    return { categoria: cat, cabezas, mensaje: "Server bypass" };
+  }
+
+  // 1. DESCUENTO DE NOVILLOS (Terminación / Gordos de Ganadería)
+  if (cat === "NOVILLOS") {
+    const tropasActuales = getTropas();
+    let cabARestar = cabezas;
+
+    const updatedTropas = tropasActuales.map((t) => {
+      if (t.corralId === "terminacion") {
+        const restar = Math.min(t.cabezas, cabARestar);
+        cabARestar -= restar;
+        return {
+          ...t,
+          cabezas: Math.max(0, t.cabezas - restar),
+        };
+      }
+      return t;
+    });
+
+    if (cabARestar > 0) {
+      const idxRm3 = updatedTropas.findIndex((t) => t.corralId === "rm3");
+      if (idxRm3 >= 0) {
+        const restar = Math.min(updatedTropas[idxRm3].cabezas, cabARestar);
+        cabARestar -= restar;
+        updatedTropas[idxRm3] = {
+          ...updatedTropas[idxRm3],
+          cabezas: Math.max(0, updatedTropas[idxRm3].cabezas - restar),
+        };
+      }
+    }
+    saveTropas(updatedTropas);
+
+    // Descontar en lista individual de animalesRecria
+    const recriaActual = getAnimalesRecria();
+    let eliminadosRecria = 0;
+    const nuevaRecria = recriaActual.filter((a) => {
+      if (eliminadosRecria < cabezas && a.corralId === "terminacion") {
+        eliminadosRecria++;
+        return false;
+      }
+      return true;
+    });
+    saveAnimalesRecria(nuevaRecria);
+
+    // Descontar en novillosTerminacion
+    const novillosTermActuales = getNovillosTerminacion();
+    let eliminadosTerm = 0;
+    const nuevosNovillosTerm = novillosTermActuales.filter((n) => {
+      if (eliminadosTerm < cabezas) {
+        eliminadosTerm++;
+        return false;
+      }
+      return true;
+    });
+    saveNovillosTerminacion(nuevosNovillosTerm);
+
+    // Actualizar censo DelPro
+    const delproConfig = getDelProConfig();
+    const censo = delproConfig?.datosSincronizados?.censoRodeoTambo;
+    const totalActual = censo?.totalRodeoGeneral ?? delproConfig?.datosSincronizados?.totalRodeoGeneral ?? 514;
+    const novillosActual = censo?.novillosRecriaEngorde ?? 84;
+    const nuevoTotalGeneral = Math.max(0, totalActual - cabezas);
+    const nuevosNovillos = Math.max(0, novillosActual - cabezas);
+    const terminacionRestante = updatedTropas.find((t) => t.corralId === "terminacion")?.cabezas ?? 15;
+
+    saveDelProConfig(
+      {
+        datosSincronizados: {
+          ...delproConfig.datosSincronizados,
+          totalRodeoGeneral: nuevoTotalGeneral,
+          machosEnRecriaEngorde: {
+            guachera: delproConfig.datosSincronizados.machosEnRecriaEngorde?.guachera ?? 9,
+            rm1: delproConfig.datosSincronizados.machosEnRecriaEngorde?.rm1 ?? 22,
+            rm2: delproConfig.datosSincronizados.machosEnRecriaEngorde?.rm2 ?? 28,
+            rm3: delproConfig.datosSincronizados.machosEnRecriaEngorde?.rm3 ?? 9,
+            terminacion: terminacionRestante,
+          },
+          animalesRecria: nuevaRecria,
+          censoRodeoTambo: censo
+            ? {
+                ...censo,
+                totalRodeoGeneral: nuevoTotalGeneral,
+                novillosRecriaEngorde: nuevosNovillos,
+              }
+            : undefined,
+        },
+      },
+      true
+    );
+
+    window.dispatchEvent(new CustomEvent(HJB_GANADERIA_SYNC_EVENT, { detail: { animalesRecria: nuevaRecria } }));
+    window.dispatchEvent(new CustomEvent(HJB_NOVILLOS_CONFIRMADOS_EVENT, { detail: nuevosNovillosTerm }));
+    window.dispatchEvent(new Event(HJB_DELPRO_SYNC_EVENT));
+
+    return {
+      categoria: cat,
+      cabezas,
+      mensaje: `Se descontaron ${cabezas} novillos del stock (Terminación).`,
+    };
+  }
+
+  // 2. DESCUENTO DE VAQUILLONAS (Tambo - Reposición)
+  if (cat === "VAQUILLONAS") {
+    const delproConfig = getDelProConfig();
+    const censo = delproConfig?.datosSincronizados?.censoRodeoTambo;
+    const totalActual = censo?.totalRodeoGeneral ?? delproConfig?.datosSincronizados?.totalRodeoGeneral ?? 514;
+    const vaquillonasActual = censo?.vaquillonasReposicion ?? 178;
+
+    const nuevoTotal = Math.max(0, totalActual - cabezas);
+    const nuevasVaquillonas = Math.max(0, vaquillonasActual - cabezas);
+
+    let detalleVacas = censo?.detalleVacas ? [...censo.detalleVacas] : [];
+    let removidas = 0;
+    detalleVacas = detalleVacas.filter((v: VacaTamboIndividual) => {
+      if (
+        removidas < cabezas &&
+        (v.estadoProductivo === "Vaquillona" || v.corralId === "rh3" || v.corralId === "rh2")
+      ) {
+        removidas++;
+        return false;
+      }
+      return true;
+    });
+
+    saveDelProConfig(
+      {
+        datosSincronizados: {
+          ...delproConfig.datosSincronizados,
+          totalRodeoGeneral: nuevoTotal,
+          hembrasEnReposicionTambo: Math.max(
+            0,
+            (delproConfig.datosSincronizados.hembrasEnReposicionTambo ?? 195) - cabezas
+          ),
+          censoRodeoTambo: censo
+            ? {
+                ...censo,
+                totalRodeoGeneral: nuevoTotal,
+                vaquillonasReposicion: nuevasVaquillonas,
+                detalleVacas,
+              }
+            : undefined,
+        },
+      },
+      true
+    );
+
+    window.dispatchEvent(new Event(HJB_DELPRO_SYNC_EVENT));
+    window.dispatchEvent(new CustomEvent(HJB_GANADERIA_SYNC_EVENT));
+
+    return {
+      categoria: cat,
+      cabezas,
+      mensaje: `Se descontó ${cabezas} vaquillona del stock del tambo.`,
+    };
+  }
+
+  // 3. DESCUENTO DE VACAS (Tambo - Secas / Descarte / Ordeñe)
+  if (cat === "VACAS") {
+    const delproConfig = getDelProConfig();
+    const censo = delproConfig?.datosSincronizados?.censoRodeoTambo;
+
+    if (censo) {
+      const vacasSecasActuales = censo.vacasSecas ?? 34;
+      const restarSecas = Math.min(vacasSecasActuales, cabezas);
+      const restoRestar = cabezas - restarSecas;
+
+      const nuevasSecas = Math.max(0, vacasSecasActuales - restarSecas);
+      const nuevasVO =
+        restoRestar > 0
+          ? Math.max(0, (censo.vacasEnOrdenie ?? 192) - restoRestar)
+          : censo.vacasEnOrdenie ?? 192;
+      const nuevasAdultas = nuevasVO + nuevasSecas;
+      const nuevoTotalGeneral = Math.max(0, (censo.totalRodeoGeneral ?? 514) - cabezas);
+
+      let detalleVacas = censo.detalleVacas ? [...censo.detalleVacas] : [];
+      let removidas = 0;
+      detalleVacas = detalleVacas.filter((v: VacaTamboIndividual) => {
+        if (removidas < cabezas && (v.corralId === "secas" || v.estadoProductivo === "Seca")) {
+          removidas++;
+          return false;
+        }
+        return true;
+      });
+      if (removidas < cabezas) {
+        detalleVacas = detalleVacas.filter((v: VacaTamboIndividual) => {
+          if (removidas < cabezas && (v.corralId === "ordenie" || v.estadoProductivo === "En Ordeñe")) {
+            removidas++;
+            return false;
+          }
+          return true;
+        });
+      }
+
+      saveDelProConfig(
+        {
+          datosSincronizados: {
+            ...delproConfig.datosSincronizados,
+            totalRodeoGeneral: nuevoTotalGeneral,
+            vacasEnOrdeñe: nuevasVO,
+            vacasSecasPreparto: nuevasSecas,
+            censoRodeoTambo: {
+              ...censo,
+              totalRodeoGeneral: nuevoTotalGeneral,
+              vacasSecas: nuevasSecas,
+              vacasEnOrdenie: nuevasVO,
+              totalVacasAdultas: nuevasAdultas,
+              detalleVacas,
+            },
+          },
+        },
+        true
+      );
+
+      window.dispatchEvent(new Event(HJB_DELPRO_SYNC_EVENT));
+      window.dispatchEvent(new CustomEvent(HJB_GANADERIA_SYNC_EVENT));
+    }
+
+    return {
+      categoria: cat,
+      cabezas,
+      mensaje: `Se descontaron ${cabezas} vacas del tambo.`,
+    };
+  }
+
+  // 4. OTROS / TOROS
+  const delproConfig = getDelProConfig();
+  const censo = delproConfig?.datosSincronizados?.censoRodeoTambo;
+  const nuevoTotal = Math.max(0, (censo?.totalRodeoGeneral ?? 514) - cabezas);
+  saveDelProConfig(
+    {
+      datosSincronizados: {
+        ...delproConfig.datosSincronizados,
+        totalRodeoGeneral: nuevoTotal,
+        censoRodeoTambo: censo ? { ...censo, totalRodeoGeneral: nuevoTotal } : undefined,
+      },
+    },
+    true
+  );
+
+  return { categoria: cat, cabezas, mensaje: `Se descontaron ${cabezas} cabezas del rodeo.` };
+}
+
+/**
+ * Revisa expedientes en estado TEMPORAL o DEFINITIVO y garantiza que su stock esté bajado.
+ * Aplica retroactivamente para Venta N° 2 (10 novillos) y Venta N° 3 (1 vaquillona).
+ */
+export function verificarYSincronizarStockVentasTemporales(ventas: VentaGordoExpediente[]): boolean {
+  if (typeof window === "undefined") return false;
+  let hubocambios = false;
+
+  for (const v of ventas) {
+    if (
+      (v.estado === "TEMPORAL" || v.estado === "DEFINITIVO") &&
+      v.numeroVenta > 1 &&
+      !v.stockDescontado &&
+      !v.eliminadoLogico
+    ) {
+      if (!v.categoriaAnimal) {
+        v.categoriaAnimal = inferirCategoriaAnimal(v);
+      }
+      descontarStockDeVentaGordo(v);
+      v.stockDescontado = true;
+      v.fechaDescuentoStock = new Date().toISOString();
+      hubocambios = true;
+      console.log(
+        `[HJB] Stock bajado automáticamente para Venta N° ${v.numeroVenta} (${v.categoriaAnimal}): ${
+          v.cantidadReal || v.cantidadEstimada
+        } cab.`
+      );
+    }
+  }
+
+  if (hubocambios) {
+    try {
+      localStorage.setItem(STORAGE_VENTAS_GORDOS, JSON.stringify(ventas));
+      for (const v of ventas) {
+        if (v.stockDescontado) {
+          setDoc(doc(db, "ventas_gordos", v.id), sanitizeForFirestore(v), { merge: true }).catch(console.error);
+        }
+      }
+    } catch (e) {
+      console.warn("Error persistiendo sincronización de stock de ventas:", e);
+    }
+  }
+
+  return hubocambios;
+}
+
 export function getVentasGordos(): VentaGordoExpediente[] {
   if (typeof window === "undefined") return [VENTA_HISTORICA_1_DEFAULT];
   try {
@@ -626,6 +964,7 @@ export function getVentasGordos(): VentaGordoExpediente[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        verificarYSincronizarStockVentasTemporales(parsed);
         return parsed;
       }
     }
@@ -705,6 +1044,7 @@ export function crearProyeccionVenta(datos: {
   precioKgResArs: number;
   desbasteTrasladoPct?: number;
   rendimientoEstimadoPct?: number;
+  categoriaAnimal?: CategoriaAnimalVenta;
   observaciones?: string;
   usuario: string;
 }): VentaGordoExpediente {
@@ -713,6 +1053,7 @@ export function crearProyeccionVenta(datos: {
   const id = `vg-${String(numeroVenta).padStart(4, "0")}`;
   const nowIso = new Date().toISOString();
   const pesoCampoTotalKg = Number((datos.cantidadEstimada * datos.pesoPromedioEstimadoKg).toFixed(1));
+  const cat = datos.categoriaAnimal || "NOVILLOS";
 
   const proyeccion = generarProyeccionComercial({
     pesoCampoTotalKg,
@@ -741,6 +1082,8 @@ export function crearProyeccionVenta(datos: {
     periodoCosto: datos.periodoCosto,
     costoDirectoUnitarioAplicado: datos.costoDirectoUnitario,
     porcentajeCostoIndirecto: datos.porcentajeCostoIndirecto ?? 5.0,
+    categoriaAnimal: cat,
+    stockDescontado: false,
     proyeccion,
     documentos: [],
     cronologia: [
@@ -749,7 +1092,7 @@ export function crearProyeccionVenta(datos: {
         fecha: new Date().toLocaleString("es-AR"),
         usuario: datos.usuario,
         accion: "Venta creada",
-        descripcion: `Expediente N° ${numeroVenta} iniciado en estado PROYECCIÓN para ${datos.cantidadEstimada} novillos (${datos.clienteNombre}).`,
+        descripcion: `Expediente N° ${numeroVenta} iniciado en estado PROYECCIÓN para ${datos.cantidadEstimada} cabezas de ${cat} (${datos.clienteNombre}).`,
       },
     ],
     auditoria: {
@@ -795,6 +1138,7 @@ export function editarVentaGordo(datos: {
   desbasteTrasladoPct?: number;
   rendimientoEstimadoPct?: number;
   metodoElegido?: MetodoVentaGordo;
+  categoriaAnimal?: CategoriaAnimalVenta;
   observaciones?: string;
   usuario: string;
 }): VentaGordoExpediente {
@@ -870,6 +1214,7 @@ export function editarVentaGordo(datos: {
     cantidadEstimada: cantEst,
     pesoCampoEstimadoKg: pesoCampoTotalKg,
     metodoElegido: datos.metodoElegido !== undefined ? datos.metodoElegido : vActual.metodoElegido,
+    categoriaAnimal: datos.categoriaAnimal !== undefined ? datos.categoriaAnimal : vActual.categoriaAnimal,
     proyeccion,
     observaciones: datos.observaciones !== undefined ? datos.observaciones : vActual.observaciones,
     cronologia: [nuevoEvento, ...(vActual.cronologia || [])],
@@ -879,6 +1224,13 @@ export function editarVentaGordo(datos: {
       modificadoPor: datos.usuario || "Operador",
     },
   };
+
+  // Si está en TEMPORAL y aún no se descontó el stock, descontar automáticamente
+  if (ventaActualizada.estado === "TEMPORAL" && !ventaActualizada.stockDescontado) {
+    descontarStockDeVentaGordo(ventaActualizada);
+    ventaActualizada.stockDescontado = true;
+    ventaActualizada.fechaDescuentoStock = nowIso;
+  }
 
   if (datos.clienteNombre) agregarClienteComprador(datos.clienteNombre);
   if (datos.frigorificoDestino) agregarFrigorificoDestino(datos.frigorificoDestino);
@@ -925,6 +1277,7 @@ export function pasarVentaATemporal(params: {
   metodoElegido: MetodoVentaGordo;
   usuario: string;
   observaciones?: string;
+  categoriaAnimal?: CategoriaAnimalVenta;
 }): VentaGordoExpediente {
   const all = getVentasGordos();
   const index = all.findIndex((v) => v.id === params.ventaId);
@@ -935,27 +1288,40 @@ export function pasarVentaATemporal(params: {
   const fechaStr = new Date().toLocaleString("es-AR");
 
   const metodoTexto = params.metodoElegido === "RENDIMIENTO" ? "A Rendimiento" : "Por Kilo Vivo";
-
-  const evento: EventoCronologiaVenta = {
-    id: `cro-${Date.now()}`,
-    fecha: fechaStr,
-    usuario: params.usuario,
-    accion: "Pase a Venta Temporal",
-    descripcion: `Decisión comercial confirmada. Método seleccionado: ${metodoTexto}. Operación guardada como TEMPORAL.`,
-  };
+  const catFinal = params.categoriaAnimal ?? v.categoriaAnimal ?? inferirCategoriaAnimal(v);
 
   const updated: VentaGordoExpediente = {
     ...v,
     estado: "TEMPORAL",
     metodoElegido: params.metodoElegido,
+    categoriaAnimal: catFinal,
     observaciones: params.observaciones ?? v.observaciones,
-    cronologia: [evento, ...v.cronologia],
     auditoria: {
       ...v.auditoria,
       modificadoPor: params.usuario,
       modificadoEn: nowIso,
     },
   };
+
+  // Cuando una venta pasa a TEMPORAL, el camión ya cargó los animales.
+  // Se baja automáticamente el stock del rodeo si aún no se había bajado.
+  if (!updated.stockDescontado) {
+    descontarStockDeVentaGordo(updated);
+    updated.stockDescontado = true;
+    updated.fechaDescuentoStock = nowIso;
+  }
+
+  const evento: EventoCronologiaVenta = {
+    id: `cro-${Date.now()}`,
+    fecha: fechaStr,
+    usuario: params.usuario,
+    accion: "Pase a Venta Temporal (Carga en Camión)",
+    descripcion: `Camión cargó los animales. Método: ${metodoTexto}. Operación guardada como TEMPORAL y stock bajado automáticamente del establecimiento (${catFinal}: ${
+      updated.cantidadReal || updated.cantidadEstimada
+    } cabezas).`,
+  };
+
+  updated.cronologia = [evento, ...v.cronologia];
 
   all[index] = updated;
   saveVentasGordos(all);
@@ -1041,6 +1407,13 @@ export function cerrarVentaADefinitivo(params: {
       cerradoEn: nowIso,
     },
   };
+
+  // Asegurar que el stock esté marcado como descontado
+  if (!updated.stockDescontado) {
+    descontarStockDeVentaGordo(updated);
+    updated.stockDescontado = true;
+    updated.fechaDescuentoStock = nowIso;
+  }
 
   all[index] = updated;
   saveVentasGordos(all);
@@ -1229,6 +1602,7 @@ export function initVentasGordosFirestoreSync(): () => void {
 
           if (remotos.length > 0) {
             remotos.sort((a, b) => (b.numeroVenta || 0) - (a.numeroVenta || 0));
+            verificarYSincronizarStockVentasTemporales(remotos);
             const newJson = JSON.stringify(remotos);
             const currentJson = localStorage.getItem(STORAGE_VENTAS_GORDOS);
 

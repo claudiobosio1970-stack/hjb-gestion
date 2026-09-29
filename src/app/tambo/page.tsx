@@ -199,9 +199,9 @@ export default function TamboPage() {
   // TOTAL ANIMALES (ESTABLECIMIENTO): 514 cabezas (100% stock DelPro: Machos + Hembras)
   // TOTAL HEMBRAS (TAMBO): 417 cabezas (Vacas 226 + Vaquillonas 178 + Terneras crianza 13)
   // TOTAL MACHOS (GANADERÍA): 97 cabezas (Novillos 84 + Terneros crianza 13)
-  const totalRodeoGeneral = (censoRodeo.totalRodeoGeneral && censoRodeo.totalRodeoGeneral >= 500)
+  const totalRodeoGeneral = (censoRodeo.totalRodeoGeneral && censoRodeo.totalRodeoGeneral > 0)
     ? censoRodeo.totalRodeoGeneral
-    : (delproConfig.datosSincronizados.censoRodeoTambo?.totalRodeoGeneral && delproConfig.datosSincronizados.censoRodeoTambo.totalRodeoGeneral >= 500)
+    : (delproConfig.datosSincronizados.censoRodeoTambo?.totalRodeoGeneral && delproConfig.datosSincronizados.censoRodeoTambo.totalRodeoGeneral > 0)
     ? delproConfig.datosSincronizados.censoRodeoTambo.totalRodeoGeneral
     : 514;
 

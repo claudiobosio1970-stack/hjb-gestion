@@ -9,6 +9,7 @@ import {
   getEstadoDocumentacion,
   TipoDocumentoVenta,
   MetodoVentaGordo,
+  inferirCategoriaAnimal,
 } from "@/lib/ventasGordosData";
 
 interface Props {
@@ -356,6 +357,26 @@ export default function ModalExpedienteCompleto({
                   <div>
                     <span style={{ color: "#64748b", fontSize: "11.5px", display: "block" }}>Fecha Estimada / Real:</span>
                     <strong>{venta.fechaReal || venta.fechaEstimada}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748b", fontSize: "11.5px", display: "block" }}>Categoría de Hacienda:</span>
+                    <strong style={{ color: "#0f172a" }}>
+                      {(venta.categoriaAnimal || inferirCategoriaAnimal(venta)) === "VAQUILLONAS"
+                        ? "🐄 Vaquillona"
+                        : (venta.categoriaAnimal || inferirCategoriaAnimal(venta)) === "VACAS"
+                        ? "🥛 Vaca (Tambo / Descarte)"
+                        : (venta.categoriaAnimal || inferirCategoriaAnimal(venta)) === "TOROS"
+                        ? "🐂 Toro"
+                        : "🐂 Novillos Terminación"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748b", fontSize: "11.5px", display: "block" }}>Estado de Carga & Stock:</span>
+                    {venta.estado === "TEMPORAL" || venta.estado === "DEFINITIVO" || venta.stockDescontado ? (
+                      <strong style={{ color: "#166534" }}>🚚 Camión cargado (Stock bajado)</strong>
+                    ) : (
+                      <span style={{ color: "#64748b" }}>Pendiente de carga en camión</span>
+                    )}
                   </div>
                   <div>
                     <span style={{ color: "#64748b", fontSize: "11.5px", display: "block" }}>Método Comercial Elegido:</span>

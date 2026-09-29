@@ -11,6 +11,7 @@ import {
   getEstadoDocumentacion,
   eliminarVentaGordoLogico,
   EstadoVentaGordo,
+  inferirCategoriaAnimal,
 } from "@/lib/ventasGordosData";
 import ModalProyeccionVenta from "@/components/ventas-gordos/ModalProyeccionVenta";
 import ModalExpedienteCompleto from "@/components/ventas-gordos/ModalExpedienteCompleto";
@@ -395,6 +396,11 @@ export default function VentasGordosPage() {
                         >
                           {stBadge.label}
                         </span>
+                        {(v.estado === "TEMPORAL" || v.estado === "DEFINITIVO" || v.stockDescontado) && (
+                          <div style={{ fontSize: "10px", color: "#166534", marginTop: "3px", fontWeight: 700 }}>
+                            🚚 Stock bajado
+                          </div>
+                        )}
                       </td>
                       <td style={{ fontSize: "12.5px" }}>{v.fechaReal || v.fechaEstimada}</td>
                       <td>
@@ -402,7 +408,39 @@ export default function VentasGordosPage() {
                         <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{v.frigorificoDestino}</div>
                       </td>
                       <td>
-                        <strong>{v.cantidadReal || v.cantidadEstimada}</strong> cab.
+                        <div>
+                          <strong>{v.cantidadReal || v.cantidadEstimada}</strong> cab.
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                            backgroundColor:
+                              (v.categoriaAnimal || inferirCategoriaAnimal(v)) === "VAQUILLONAS"
+                                ? "#fdf2f8"
+                                : (v.categoriaAnimal || inferirCategoriaAnimal(v)) === "VACAS"
+                                ? "#fef3c7"
+                                : "#eff6ff",
+                            color:
+                              (v.categoriaAnimal || inferirCategoriaAnimal(v)) === "VAQUILLONAS"
+                                ? "#be185d"
+                                : (v.categoriaAnimal || inferirCategoriaAnimal(v)) === "VACAS"
+                                ? "#92400e"
+                                : "#1e40af",
+                            display: "inline-block",
+                            marginTop: "2px",
+                          }}
+                        >
+                          {(v.categoriaAnimal || inferirCategoriaAnimal(v)) === "VAQUILLONAS"
+                            ? "Vaquillona"
+                            : (v.categoriaAnimal || inferirCategoriaAnimal(v)) === "VACAS"
+                            ? "Vaca"
+                            : (v.categoriaAnimal || inferirCategoriaAnimal(v)) === "TOROS"
+                            ? "Toro"
+                            : "Novillos"}
+                        </span>
                       </td>
                       <td>
                         {(v.pesoCampoRealKg || v.pesoCampoEstimadoKg).toLocaleString("es-AR")} kg

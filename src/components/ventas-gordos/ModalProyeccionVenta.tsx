@@ -14,6 +14,8 @@ import {
   agregarFrigorificoDestino,
   MetodoVentaGordo,
   VentaGordoExpediente,
+  CategoriaAnimalVenta,
+  inferirCategoriaAnimal,
 } from "@/lib/ventasGordosData";
 
 interface Props {
@@ -33,6 +35,7 @@ export default function ModalProyeccionVenta({
 }: Props) {
   // Lote y Parámetros Generales
   const [fechaEstimada, setFechaEstimada] = useState(() => new Date().toISOString().slice(0, 10));
+  const [categoriaAnimal, setCategoriaAnimal] = useState<CategoriaAnimalVenta>("NOVILLOS");
 
   // Clientes con Desplegable + Opción de Agregar Nuevo
   const [listaClientes, setListaClientes] = useState<string[]>(() => getClientesCompradores());
@@ -103,6 +106,9 @@ export default function ModalProyeccionVenta({
       }
       setObservaciones(ventaAEditar.observaciones || "");
       setMetodoElegidoManual(ventaAEditar.metodoElegido || null);
+      setCategoriaAnimal(ventaAEditar.categoriaAnimal || inferirCategoriaAnimal(ventaAEditar));
+    } else if (isOpen && !ventaAEditar) {
+      setCategoriaAnimal("NOVILLOS");
     }
   }, [isOpen, ventaAEditar]);
 
@@ -252,6 +258,7 @@ export default function ModalProyeccionVenta({
         desbasteTrasladoPct,
         rendimientoEstimadoPct,
         metodoElegido: metodoFinal,
+        categoriaAnimal,
         observaciones,
         usuario: usuarioActual || "Operador",
       });
@@ -290,6 +297,7 @@ export default function ModalProyeccionVenta({
       precioKgResArs,
       desbasteTrasladoPct,
       rendimientoEstimadoPct,
+      categoriaAnimal,
       observaciones,
       usuario: usuarioActual || "Operador",
     });
@@ -298,6 +306,7 @@ export default function ModalProyeccionVenta({
       const temporal = pasarVentaATemporal({
         ventaId: nueva.id,
         metodoElegido: metodoFinal,
+        categoriaAnimal,
         usuario: usuarioActual || "Operador",
       });
       onVentaGuardada(temporal);
@@ -480,6 +489,32 @@ export default function ModalProyeccionVenta({
               <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "#0f172a" }}>
                 1. Datos del Lote & Costos
               </h3>
+            </div>
+
+            {/* Selector de Categoría de Hacienda */}
+            <div>
+              <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#1e293b", display: "block", marginBottom: "4px" }}>
+                Categoría de Hacienda *
+              </label>
+              <select
+                value={categoriaAnimal}
+                onChange={(e) => setCategoriaAnimal(e.target.value as CategoriaAnimalVenta)}
+                style={{
+                  width: "100%",
+                  padding: "7px 10px",
+                  borderRadius: "6px",
+                  border: "1.5px solid #94a3b8",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  backgroundColor: "#ffffff",
+                  color: "#0f172a",
+                }}
+              >
+                <option value="NOVILLOS">🐂 Novillos Terminación (Gordos)</option>
+                <option value="VAQUILLONAS">🐄 Vaquillonas (Tambo Reposición / Engorde)</option>
+                <option value="VACAS">🥛 Vacas (Descarte / Refugo / Secas)</option>
+                <option value="TOROS">🐂 Toros</option>
+              </select>
             </div>
 
             <div>
