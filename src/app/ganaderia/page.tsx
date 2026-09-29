@@ -783,44 +783,10 @@ export default function GanaderiaPage() {
       {/* Encabezado */}
       <div className="pageHeader">
         <div>
-          <div className="badgeRow" style={{ marginBottom: "6px" }}>
-            <span className="pill badgeSlate">🏷️ {totalAnimalesEstablecimiento} Animales Totales (DelPro)</span>
-            <span className="pill badgeAmber">♂️ {totalMachosGanaderia} Total Machos (Ganadería)</span>
-            <span className="pill badgeGreen">Modelo HJB</span>
-          </div>
           <h1>Ganadería HJB</h1>
-          <p className="muted">
-            Gestión intensiva a corral exclusiva de machos desde nacimiento en guachera hasta los 400 kg de salida comercial a frigorífico.
-          </p>
         </div>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            type="button"
-            className="ghostButton"
-            onClick={() => setModalNuevaGuacheraOpen(true)}
-            style={{ display: "flex", alignItems: "center", gap: "6px" }}
-          >
-            🍼 + Camada Guachera
-          </button>
-          <button
-            type="button"
-            className="ghostButton"
-            onClick={() => {
-              if (tropas.length > 0) {
-                setFormPesaje({
-                  tropaId: tropas[0].id,
-                  cabezas: tropas[0].cabezas,
-                  pesoPromedio: tropas[0].pesoActualKg,
-                  observaciones: "",
-                });
-              }
-              setModalNuevoPesajeOpen(true);
-            }}
-            style={{ display: "flex", alignItems: "center", gap: "6px" }}
-          >
-            ⚖️ + Cargar Pesaje
-          </button>
           <button
             type="button"
             className="primaryButton"
@@ -1013,25 +979,6 @@ export default function GanaderiaPage() {
       {/* ========================================================================= */}
       {activeTab === "corrales" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          {/* Banner de Ayuda: Clic para entrar a cada corral */}
-          <div
-            style={{
-              background: "#eff6ff",
-              border: "1px solid #bfdbfe",
-              borderRadius: "8px",
-              padding: "10px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              fontSize: "13px",
-              color: "#1e40af",
-            }}
-          >
-            <span>
-              💡 <strong>Hacé clic en cualquier corral</strong> para abrir su Ficha Técnica Completa con costos de alimentación desglosados, ración para mixer y tropas.
-            </span>
-          </div>
-
           {/* Grid interactivo de los 5 corrales (Clickables) */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
             {corrales.map((c) => {
@@ -1205,13 +1152,7 @@ export default function GanaderiaPage() {
                     <h3 style={{ fontSize: "16px", margin: 0, fontWeight: 800, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       <span>🏷️</span>
                       <span>Trazabilidad Individual de Machos por Caravana ({soloMachosRecria.length} cabezas 100% Machos)</span>
-                      <span style={{ fontSize: "11px", fontWeight: 700, background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", border: "1px solid #bfdbfe" }}>
-                        🏷️ 2 y 3 dígitos (&lt; 1.000) = Machos
-                      </span>
                     </h3>
-                    <p className="muted" style={{ fontSize: "12px", margin: "2px 0 0 0" }}>
-                      Circuito exclusivo de terneros y novillos machos en recría y terminación comercial para frigorífico con curva biológica continua.
-                    </p>
                   </div>
 
                   {/* Buscador de Caravana */}
@@ -1398,12 +1339,6 @@ export default function GanaderiaPage() {
                                   ♂️ Macho
                                 </span>
                               </div>
-                              <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{a.origen}</div>
-                              {a.grupoDelPro && (
-                                <div style={{ fontSize: "10.5px", color: "#2563eb", fontWeight: 600 }}>
-                                  🚜 DelPro: {a.grupoDelPro}
-                                </div>
-                              )}
                             </td>
                             <td>
                               <span
@@ -1437,17 +1372,6 @@ export default function GanaderiaPage() {
                                 >
                                   {infoPeso.icono} {infoPeso.origenEtiqueta}
                                 </span>
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "10.5px",
-                                  color: infoPeso.esOficialDelPro ? "#15803d" : "#0284c7",
-                                  fontWeight: 600,
-                                  marginTop: "2px",
-                                }}
-                                title={infoPeso.detalleCalculo}
-                              >
-                                {infoPeso.detalleCalculo}
                               </div>
                             </td>
                             <td style={{ textAlign: "right" }}>
@@ -3044,12 +2968,6 @@ export default function GanaderiaPage() {
                                 <tr key={a.rp}>
                                   <td>
                                     <strong style={{ fontFamily: "monospace", fontSize: "13px" }}>{limpiarCaravana(a.rp)}</strong>
-                                    <div style={{ fontSize: "11px", color: "var(--slate-500)" }}>{a.origen}</div>
-                                    {a.grupoDelPro && (
-                                      <div style={{ fontSize: "10px", color: "#2563eb", fontWeight: 600 }}>
-                                        🚜 DelPro: {a.grupoDelPro}
-                                      </div>
-                                    )}
                                   </td>
                                   <td style={{ textAlign: "right" }}>
                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "5px" }}>
