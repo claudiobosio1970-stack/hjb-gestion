@@ -387,6 +387,305 @@ export interface ComprobanteGasto {
 }
 
 // =========================================================================
+// 4.1. TRANSFERENCIAS INTERNAS ENTRE UNIDADES (METODOLOGÍA CREA)
+// =========================================================================
+
+export type CriterioValuacionTransferencia =
+  | "PRECIO_MERCADO"
+  | "COSTO_PRODUCCION"
+  | "PRECIO_REFERENCIA"
+  | "VALOR_ACORDADO";
+
+export interface TransferenciaInterna {
+  id: string;
+  numeroInterno: number;
+  fecha: string; // YYYY-MM-DD
+  campana: string;
+  unidadCedenteId: DestinoEconomicoId;
+  unidadReceptoraId: DestinoEconomicoId;
+  concepto: string;
+  cantidad: number;
+  unidadMedida: "Tn" | "Cabezas" | "Horas" | "Litros" | "Rollos" | "Hectáreas";
+  precioUnitario: number;
+  importeTotal: number;
+  criterioValuacion: CriterioValuacionTransferencia;
+  detalleCriterio: string;
+  establecimientoOrigen?: string;
+  establecimientoDestino?: string;
+  observaciones?: string;
+  estado: "CONFIRMADA" | "BORRADOR" | "ANULADA";
+  usuarioCreador: string;
+  fechaCreacionIso: string;
+}
+
+export const TRANSFERENCIAS_DEFAULT: TransferenciaInterna[] = [
+  {
+    id: "trans-2026-001",
+    numeroInterno: 1,
+    fecha: "2026-09-18",
+    campana: "2026/27",
+    unidadCedenteId: "20-CEREALES",
+    unidadReceptoraId: "10-LECHE",
+    concepto: "Maíz Grano Húmedo para mixer TMR (Vacas en Ordeñe)",
+    cantidad: 120,
+    unidadMedida: "Tn",
+    precioUnitario: 195000,
+    importeTotal: 23400000,
+    criterioValuacion: "PRECIO_MERCADO",
+    detalleCriterio: "Precio Pizarra Rosario FAS disponible menos flete corto ($195.000 / Tn)",
+    establecimientoOrigen: "Campo Aguilera (Lote 3)",
+    establecimientoDestino: "Tambo Central (Silo Tolva)",
+    observaciones: "Transferencia para racionamiento septiembre. Se deduce de la necesidad de compra externa.",
+    estado: "CONFIRMADA",
+    usuarioCreador: "Administración HJB",
+    fechaCreacionIso: "2026-09-18T10:00:00.000Z",
+  },
+  {
+    id: "trans-2026-002",
+    numeroInterno: 2,
+    fecha: "2026-09-20",
+    campana: "2026/27",
+    unidadCedenteId: "10-LECHE",
+    unidadReceptoraId: "30-CARNE",
+    concepto: "Terneros Machos Holando de guachera (desleche 80 kg)",
+    cantidad: 25,
+    unidadMedida: "Cabezas",
+    precioUnitario: 220000,
+    importeTotal: 5500000,
+    criterioValuacion: "VALOR_ACORDADO",
+    detalleCriterio: "Valor de plaza consignatario local para ternero Holando 80kg ($2.750/kg vivo)",
+    establecimientoOrigen: "Guachera Tambo",
+    establecimientoDestino: "Corral de Recría RM1 (Campo Tambo)",
+    observaciones: "Traspaso de machos Holando deslechados para inicio de recría y terminación a corral.",
+    estado: "CONFIRMADA",
+    usuarioCreador: "Administración HJB",
+    fechaCreacionIso: "2026-09-20T14:30:00.000Z",
+  },
+  {
+    id: "trans-2026-003",
+    numeroInterno: 3,
+    fecha: "2026-09-22",
+    campana: "2026/27",
+    unidadCedenteId: "ADMINISTRACION",
+    unidadReceptoraId: "20-CEREALES",
+    concepto: "Servicio de distribución de estiércol líquido / efluentes de fosa con tanque estercolero",
+    cantidad: 45,
+    unidadMedida: "Horas",
+    precioUnitario: 65000,
+    importeTotal: 2925000,
+    criterioValuacion: "COSTO_PRODUCCION",
+    detalleCriterio: "Costo horario tractor Case Puma + desgaste tanque estercolero y operario ($65.000/h)",
+    establecimientoOrigen: "Parque de Maquinarias",
+    establecimientoDestino: "Campo Aguilera (Lote 2 preparación siembra)",
+    observaciones: "Aplicación de purines orgánicos como fertilizante de base para maíz.",
+    estado: "CONFIRMADA",
+    usuarioCreador: "Administración HJB",
+    fechaCreacionIso: "2026-09-22T16:00:00.000Z",
+  },
+];
+
+// =========================================================================
+// 4.2. INVERSIONES & BIENES DE USO (CAPEX)
+// =========================================================================
+
+export interface BienDeUsoActivo {
+  id: string;
+  codigoInterno: string;
+  nombre: string;
+  categoria: "Tractor" | "Implemento" | "Equipo Tambo" | "Instalación" | "Rodado" | "Mejora Suelo";
+  fechaAdquisicion: string;
+  valorAdquisicionArs: number;
+  vidaUtilAnos: number;
+  amortizacionAnualArs: number;
+  amortizacionAcumuladaArs: number;
+  valorResidualArs: number;
+  unidadesUsuarias: { unidadId: DestinoEconomicoId; porcentaje: number }[];
+  criterioDistribucion: string;
+  estado: "ACTIVO" | "EN_REPARACION" | "BAJA";
+}
+
+export const BIENES_DE_USO_DEFAULT: BienDeUsoActivo[] = [
+  {
+    id: "bdu-01",
+    codigoInterno: "TR-01",
+    nombre: "Tractor Case IH Puma 185 CV",
+    categoria: "Tractor",
+    fechaAdquisicion: "2023-04-15",
+    valorAdquisicionArs: 72000000,
+    vidaUtilAnos: 10,
+    amortizacionAnualArs: 7200000,
+    amortizacionAcumuladaArs: 21600000,
+    valorResidualArs: 50400000,
+    unidadesUsuarias: [
+      { unidadId: "20-CEREALES", porcentaje: 60 },
+      { unidadId: "10-LECHE", porcentaje: 30 },
+      { unidadId: "30-CARNE", porcentaje: 10 },
+    ],
+    criterioDistribucion: "Porcentaje de horas horómetro promedio anual (60% Cereales / 30% Leche / 10% Carne)",
+    estado: "ACTIVO",
+  },
+  {
+    id: "bdu-02",
+    codigoInterno: "TQ-01",
+    nombre: "Tanque Enfriador de Leche DeLaval 12.000 Lts",
+    categoria: "Equipo Tambo",
+    fechaAdquisicion: "2022-08-10",
+    valorAdquisicionArs: 38500000,
+    vidaUtilAnos: 15,
+    amortizacionAnualArs: 2566667,
+    amortizacionAcumuladaArs: 10266668,
+    valorResidualArs: 28233332,
+    unidadesUsuarias: [{ unidadId: "10-LECHE", porcentaje: 100 }],
+    criterioDistribucion: "100% Imputado a HJB Leche (Uso exclusivo ordeñe y conservación)",
+    estado: "ACTIVO",
+  },
+  {
+    id: "bdu-03",
+    codigoInterno: "MX-01",
+    nombre: "Mixer Vertical Akron MX14 (14 m3)",
+    categoria: "Implemento",
+    fechaAdquisicion: "2024-02-20",
+    valorAdquisicionArs: 28000000,
+    vidaUtilAnos: 8,
+    amortizacionAnualArs: 3500000,
+    amortizacionAcumuladaArs: 7000000,
+    valorResidualArs: 21000000,
+    unidadesUsuarias: [
+      { unidadId: "10-LECHE", porcentaje: 80 },
+      { unidadId: "30-CARNE", porcentaje: 20 },
+    ],
+    criterioDistribucion: "Proporción de raciones TMR repartidas (80% Tambo / 20% Feedlot novillos)",
+    estado: "ACTIVO",
+  },
+  {
+    id: "bdu-04",
+    codigoInterno: "BL-01",
+    nombre: "Balanza Electrónica Ganadera Trutest 3.000 kg",
+    categoria: "Instalación",
+    fechaAdquisicion: "2023-11-05",
+    valorAdquisicionArs: 6200000,
+    vidaUtilAnos: 10,
+    amortizacionAnualArs: 620000,
+    amortizacionAcumuladaArs: 1240000,
+    valorResidualArs: 4960000,
+    unidadesUsuarias: [
+      { unidadId: "30-CARNE", porcentaje: 60 },
+      { unidadId: "10-LECHE", porcentaje: 40 },
+    ],
+    criterioDistribucion: "Pesajes de control de recría/gordos (60% Carne) y vaquillonas (40% Leche)",
+    estado: "ACTIVO",
+  },
+  {
+    id: "bdu-05",
+    codigoInterno: "PO-01",
+    nombre: "Perforación y Bomba Sumergible Franklin 10 HP",
+    categoria: "Instalación",
+    fechaAdquisicion: "2022-03-12",
+    valorAdquisicionArs: 9800000,
+    vidaUtilAnos: 12,
+    amortizacionAnualArs: 816667,
+    amortizacionAcumuladaArs: 3266668,
+    valorResidualArs: 6533332,
+    unidadesUsuarias: [
+      { unidadId: "10-LECHE", porcentaje: 70 },
+      { unidadId: "ADMINISTRACION", porcentaje: 30 },
+    ],
+    criterioDistribucion: "Caudal de agua para lavado de fosa y bebederos tambo (70%) y sede central (30%)",
+    estado: "ACTIVO",
+  },
+];
+
+// =========================================================================
+// 4.3. REGLAS DE DISTRIBUCIÓN AUTOMÁTICA Y PRESETS DE COSTOS COMPARTIDOS
+// =========================================================================
+
+export interface ReglaDistribucionAutomatica {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  distribucion: {
+    destino: DestinoEconomicoId;
+    porcentaje: number;
+    centroCostoIdDefault?: string;
+    actividadDefault?: string;
+  }[];
+}
+
+export const REGLAS_DISTRIBUCION_DEFAULT: ReglaDistribucionAutomatica[] = [
+  {
+    id: "regla-combustible",
+    nombre: "Parque Maquinarias & Combustibles (60/30/10)",
+    descripcion: "Distribución típica por horas tractor: 60% Cereales, 30% Leche, 10% Carne.",
+    distribucion: [
+      { destino: "20-CEREALES", porcentaje: 60, centroCostoIdDefault: "cc-agri-aguilera", actividadDefault: "Agricultura Maquinaria" },
+      { destino: "10-LECHE", porcentaje: 30, centroCostoIdDefault: "cc-leche-tambo", actividadDefault: "Mixer & Tambo" },
+      { destino: "30-CARNE", porcentaje: 10, centroCostoIdDefault: "cc-carne-terminacion", actividadDefault: "Racionamiento Corral" },
+    ],
+  },
+  {
+    id: "regla-electricidad",
+    nombre: "Energía Eléctrica Trifásica (75/15/10)",
+    descripcion: "Consumo de bomba, ordeñadora y refrigeración: 75% Leche, 15% Admin, 10% Carne.",
+    distribucion: [
+      { destino: "10-LECHE", porcentaje: 75, centroCostoIdDefault: "cc-leche-tambo", actividadDefault: "Ordeñe & Frío" },
+      { destino: "ADMINISTRACION", porcentaje: 15, centroCostoIdDefault: "cc-admin-sede", actividadDefault: "Sede & Taller" },
+      { destino: "30-CARNE", porcentaje: 10, centroCostoIdDefault: "cc-carne-terminacion", actividadDefault: "Bomba Agua Corrales" },
+    ],
+  },
+  {
+    id: "regla-asesoria-crea",
+    nombre: "Asesoría Agronómica y Ganadera CREA (45/40/15)",
+    descripcion: "Honorarios de técnicos y asesor CREA: 45% Cereales, 40% Leche, 15% Carne.",
+    distribucion: [
+      { destino: "20-CEREALES", porcentaje: 45, centroCostoIdDefault: "cc-agri-aguilera", actividadDefault: "Planes Agrícolas CREA" },
+      { destino: "10-LECHE", porcentaje: 40, centroCostoIdDefault: "cc-leche-tambo", actividadDefault: "Gestión Tambo CREA" },
+      { destino: "30-CARNE", porcentaje: 15, centroCostoIdDefault: "cc-carne-terminacion", actividadDefault: "Engorde CREA" },
+    ],
+  },
+  {
+    id: "regla-infraestructura",
+    nombre: "Mantenimiento Caminos & Alambrados (40/30/20/10)",
+    descripcion: "Caminos, electrificación y alcantarillado general compartido.",
+    distribucion: [
+      { destino: "20-CEREALES", porcentaje: 40, centroCostoIdDefault: "cc-agri-aguilera", actividadDefault: "Caminos Lotes" },
+      { destino: "10-LECHE", porcentaje: 30, centroCostoIdDefault: "cc-leche-tambo", actividadDefault: "Entrada Tambo" },
+      { destino: "30-CARNE", porcentaje: 20, centroCostoIdDefault: "cc-carne-terminacion", actividadDefault: "Manga & Corrales" },
+      { destino: "ADMINISTRACION", porcentaje: 10, centroCostoIdDefault: "cc-infraestructura", actividadDefault: "Acceso Principal" },
+    ],
+  },
+  {
+    id: "regla-100-leche",
+    nombre: "100% HJB Leche (Tambo Directo)",
+    descripcion: "Asignación íntegra a la unidad de producción lechera.",
+    distribucion: [{ destino: "10-LECHE", porcentaje: 100, centroCostoIdDefault: "cc-leche-tambo", actividadDefault: "Tambo Ordeñe" }],
+  },
+  {
+    id: "regla-100-cereales",
+    nombre: "100% HJB Cereales (Agricultura)",
+    descripcion: "Asignación íntegra a la unidad de cereales comerciales.",
+    distribucion: [{ destino: "20-CEREALES", porcentaje: 100, centroCostoIdDefault: "cc-agri-aguilera", actividadDefault: "Agricultura Comercial" }],
+  },
+  {
+    id: "regla-100-carne",
+    nombre: "100% HJB Carne (Feedlot / Recría)",
+    descripcion: "Asignación íntegra a la unidad de terminación de hacienda.",
+    distribucion: [{ destino: "30-CARNE", porcentaje: 100, centroCostoIdDefault: "cc-carne-terminacion", actividadDefault: "Engorde Gordos" }],
+  },
+  {
+    id: "regla-100-admin",
+    nombre: "100% Administración & Estructura",
+    descripcion: "Asignación transversal a soporte administrativo y legal.",
+    distribucion: [{ destino: "ADMINISTRACION", porcentaje: 100, centroCostoIdDefault: "cc-admin-sede", actividadDefault: "Administración Sede" }],
+  },
+  {
+    id: "regla-100-particular",
+    nombre: "100% Particular (Aislado de HJB)",
+    descripcion: "Gastos personales de titulares sin impacto en el negocio.",
+    distribucion: [{ destino: "PARTICULAR", porcentaje: 100, centroCostoIdDefault: "cc-particular-retiros", actividadDefault: "Retiros Particulares" }],
+  },
+];
+
+// =========================================================================
 // 5. COMPROBANTES HISTÓRICOS Y REALISTAS DE EJEMPLO DE HJB (EN PRODUCCIÓN)
 // =========================================================================
 
@@ -896,39 +1195,169 @@ export function saveCentrosCosto(ccs: CentroCosto[]) {
   localStorage.setItem(STORAGE_ADMIN_CENTROS_COSTO, JSON.stringify(ccs));
 }
 
+const STORAGE_ADMIN_TRANSFERENCIAS = "hjb_admin_transferencias_v01";
+const STORAGE_ADMIN_BIENES_USO = "hjb_admin_bienes_uso_v01";
+
+export function getTransferenciasInternas(): TransferenciaInterna[] {
+  if (typeof window === "undefined") return TRANSFERENCIAS_DEFAULT;
+  try {
+    const raw = localStorage.getItem(STORAGE_ADMIN_TRANSFERENCIAS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  saveTransferenciasInternas(TRANSFERENCIAS_DEFAULT, false);
+  return TRANSFERENCIAS_DEFAULT;
+}
+
+export function saveTransferenciasInternas(trans: TransferenciaInterna[], notify: boolean = true) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_ADMIN_TRANSFERENCIAS, JSON.stringify(trans));
+    if (notify) window.dispatchEvent(new Event(HJB_ADMIN_SYNC_EVENT));
+    for (const t of trans) {
+      setDoc(doc(db, "admin_transferencias", t.id), sanitizeForFirestore(t), { merge: true }).catch(() => {});
+    }
+  } catch (e) {
+    console.error("Error guardando transferencias internas:", e);
+  }
+}
+
+export function guardarTransferenciaInterna(
+  trans: Omit<TransferenciaInterna, "id" | "numeroInterno" | "fechaCreacionIso" | "usuarioCreador"> & { id?: string },
+  usuario: string
+): { transferencia: TransferenciaInterna; error?: string } {
+  if (trans.unidadCedenteId === trans.unidadReceptoraId) {
+    return { transferencia: null as any, error: "La unidad cedente y la receptora no pueden ser la misma." };
+  }
+  if (!trans.cantidad || trans.cantidad <= 0) {
+    return { transferencia: null as any, error: "La cantidad debe ser mayor a cero." };
+  }
+  if (!trans.precioUnitario || trans.precioUnitario <= 0) {
+    return { transferencia: null as any, error: "El precio unitario de transferencia debe ser mayor a cero." };
+  }
+
+  const list = getTransferenciasInternas();
+  const esNueva = !trans.id;
+  const id = trans.id || `trans-${Date.now()}`;
+  const hoyIso = new Date().toISOString();
+  const maxNum = list.length > 0 ? Math.max(...list.map((t) => t.numeroInterno || 0)) : 0;
+  const numeroInterno = esNueva ? maxNum + 1 : list.find((t) => t.id === id)?.numeroInterno || maxNum + 1;
+  const importeTotal = Math.round(trans.cantidad * trans.precioUnitario);
+
+  const fullTransferencia: TransferenciaInterna = {
+    ...trans,
+    id,
+    numeroInterno,
+    importeTotal,
+    usuarioCreador: usuario,
+    fechaCreacionIso: hoyIso,
+  };
+
+  const updatedList = esNueva ? [fullTransferencia, ...list] : list.map((t) => (t.id === id ? fullTransferencia : t));
+  saveTransferenciasInternas(updatedList);
+  return { transferencia: fullTransferencia };
+}
+
+export function anularTransferenciaInterna(id: string, usuario: string): { success: boolean } {
+  const list = getTransferenciasInternas();
+  const updated = list.map((t) => (t.id === id ? { ...t, estado: "ANULADA" as const } : t));
+  saveTransferenciasInternas(updated);
+  return { success: true };
+}
+
+export function getBienesDeUso(): BienDeUsoActivo[] {
+  if (typeof window === "undefined") return BIENES_DE_USO_DEFAULT;
+  try {
+    const raw = localStorage.getItem(STORAGE_ADMIN_BIENES_USO);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  saveBienesDeUso(BIENES_DE_USO_DEFAULT, false);
+  return BIENES_DE_USO_DEFAULT;
+}
+
+export function saveBienesDeUso(bienes: BienDeUsoActivo[], notify: boolean = true) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_ADMIN_BIENES_USO, JSON.stringify(bienes));
+    if (notify) window.dispatchEvent(new Event(HJB_ADMIN_SYNC_EVENT));
+    for (const b of bienes) {
+      setDoc(doc(db, "admin_bienes_uso", b.id), sanitizeForFirestore(b), { merge: true }).catch(() => {});
+    }
+  } catch (e) {
+    console.error("Error guardando bienes de uso:", e);
+  }
+}
+
+export function guardarBienDeUso(bien: BienDeUsoActivo): { bien: BienDeUsoActivo } {
+  const list = getBienesDeUso();
+  const exists = list.some((b) => b.id === bien.id);
+  const updated = exists ? list.map((b) => (b.id === bien.id ? bien : b)) : [bien, ...list];
+  saveBienesDeUso(updated);
+  return { bien };
+}
+
 let firestoreAdminInitialized = false;
 
-export function initAdministracionFirestoreSync(onUpdate?: (list: ComprobanteGasto[]) => void) {
+export function initAdministracionFirestoreSync(
+  onUpdateComprobantes?: (list: ComprobanteGasto[]) => void,
+  onUpdateTransferencias?: (list: TransferenciaInterna[]) => void
+) {
   if (typeof window === "undefined" || firestoreAdminInitialized) return () => {};
   firestoreAdminInitialized = true;
 
-  const colRef = collection(db, "admin_comprobantes");
-  const unsubscribe = onSnapshot(
-    colRef,
+  const colComprobantes = collection(db, "admin_comprobantes");
+  const unsubComprobantes = onSnapshot(
+    colComprobantes,
     (snapshot) => {
       if (!snapshot.empty) {
         const docs: ComprobanteGasto[] = [];
         snapshot.forEach((d) => {
           docs.push(d.data() as ComprobanteGasto);
         });
-        // Ordenar por fecha reciente
         docs.sort((a, b) => b.fechaComprobante.localeCompare(a.fechaComprobante));
         localStorage.setItem(STORAGE_ADMIN_COMPROBANTES, JSON.stringify(docs));
-        if (onUpdate) onUpdate(docs);
+        if (onUpdateComprobantes) onUpdateComprobantes(docs);
         window.dispatchEvent(new Event(HJB_ADMIN_SYNC_EVENT));
       } else {
-        // Inicializar Firestore con datos de partida de HJB
         COMPROBANTES_INICIALES_DEFAULT.forEach((comp) => {
           setDoc(doc(db, "admin_comprobantes", comp.id), sanitizeForFirestore(comp), { merge: true }).catch(() => {});
         });
       }
     },
-    (err) => {
-      console.warn("Aviso Firestore Admin:", err);
-    }
+    (err) => console.warn("Aviso Firestore Comprobantes:", err)
   );
 
-  return unsubscribe;
+  const colTransferencias = collection(db, "admin_transferencias");
+  const unsubTransferencias = onSnapshot(
+    colTransferencias,
+    (snapshot) => {
+      if (!snapshot.empty) {
+        const docs: TransferenciaInterna[] = [];
+        snapshot.forEach((d) => {
+          docs.push(d.data() as TransferenciaInterna);
+        });
+        docs.sort((a, b) => b.fecha.localeCompare(a.fecha));
+        localStorage.setItem(STORAGE_ADMIN_TRANSFERENCIAS, JSON.stringify(docs));
+        if (onUpdateTransferencias) onUpdateTransferencias(docs);
+        window.dispatchEvent(new Event(HJB_ADMIN_SYNC_EVENT));
+      } else {
+        TRANSFERENCIAS_DEFAULT.forEach((t) => {
+          setDoc(doc(db, "admin_transferencias", t.id), sanitizeForFirestore(t), { merge: true }).catch(() => {});
+        });
+      }
+    },
+    (err) => console.warn("Aviso Firestore Transferencias:", err)
+  );
+
+  return () => {
+    unsubComprobantes();
+    unsubTransferencias();
+  };
 }
 
 // =========================================================================
@@ -1191,8 +1620,23 @@ export function anularComprobante(
 }
 
 // =========================================================================
-// 9. CÁLCULO DE RESULTADOS Y CONSOLIDACIÓN ECONÓMICA DE HJB
+// 9. CÁLCULO DE RESULTADOS Y CONSOLIDACIÓN ECONÓMICA DE HJB (METODOLOGÍA CREA)
 // =========================================================================
+
+export interface LineaCuadroCrea {
+  concepto: string;
+  leche: number;
+  cereales: number;
+  carne: number;
+  admin: number;
+  eliminaciones: number;
+  hjbConsolidado: number;
+  particular: number; // Aislado completamente de HJB
+  esSubtotal?: boolean;
+  esNegativo?: boolean;
+  esDestacado?: boolean;
+  tooltip?: string;
+}
 
 export interface ResumenEconomicoConsolidado {
   totalComprobantesCount: number;
@@ -1217,10 +1661,24 @@ export interface ResumenEconomicoConsolidado {
 
   pendientesDeImputacionCount: number;
   importePendienteImputarArs: number;
+
+  // Dimensión CREA: Transferencias Internas, CAPEX y P&L
+  transferenciasInternas: TransferenciaInterna[];
+  totalTransferenciasArs: number;
+  bienesDeUso: BienDeUsoActivo[];
+  totalActivosFijosArs: number;
+  amortizacionAnualTotalArs: number;
+  cuadroCrea: LineaCuadroCrea[];
 }
 
-export function calcularResumenEconomico(comprobantes?: ComprobanteGasto[]): ResumenEconomicoConsolidado {
+export function calcularResumenEconomico(
+  comprobantes?: ComprobanteGasto[],
+  transferencias?: TransferenciaInterna[],
+  bienesUso?: BienDeUsoActivo[]
+): ResumenEconomicoConsolidado {
   const list = (comprobantes || getComprobantes()).filter((c) => c.estadoImputacion !== "ANULADO");
+  const listaTransf = (transferencias || getTransferenciasInternas()).filter((t) => t.estado !== "ANULADA");
+  const listaBienes = bienesUso || getBienesDeUso();
 
   let totalGastoBrutoArs = 0;
   let totalGastoOperativoOpexArs = 0;
@@ -1230,12 +1688,12 @@ export function calcularResumenEconomico(comprobantes?: ComprobanteGasto[]): Res
   let pendientesDeImputacionCount = 0;
   let importePendienteImputarArs = 0;
 
-  const acumuladoUnidades: Record<DestinoEconomicoId, { total: number; count: Set<string> }> = {
-    "10-LECHE": { total: 0, count: new Set() },
-    "20-CEREALES": { total: 0, count: new Set() },
-    "30-CARNE": { total: 0, count: new Set() },
-    ADMINISTRACION: { total: 0, count: new Set() },
-    PARTICULAR: { total: 0, count: new Set() },
+  const acumuladoUnidades: Record<DestinoEconomicoId, { total: number; opex: number; count: Set<string> }> = {
+    "10-LECHE": { total: 0, opex: 0, count: new Set() },
+    "20-CEREALES": { total: 0, opex: 0, count: new Set() },
+    "30-CARNE": { total: 0, opex: 0, count: new Set() },
+    ADMINISTRACION: { total: 0, opex: 0, count: new Set() },
+    PARTICULAR: { total: 0, opex: 0, count: new Set() },
   };
 
   for (const c of list) {
@@ -1257,13 +1715,15 @@ export function calcularResumenEconomico(comprobantes?: ComprobanteGasto[]): Res
     for (const imp of c.imputaciones) {
       if (acumuladoUnidades[imp.destino]) {
         acumuladoUnidades[imp.destino].total += imp.importeCalculado;
+        if (c.tipoEgreso === "GASTO_OPERATIVO") {
+          acumuladoUnidades[imp.destino].opex += imp.importeCalculado;
+        }
         acumuladoUnidades[imp.destino].count.add(c.id);
       }
     }
   }
 
   totalGastoParticularAisladoArs = acumuladoUnidades.PARTICULAR.total;
-  // El consolidado empresarial HJB excluye rigurosamente el destino Particular
   const totalGastoEmpresarialHjbArs =
     acumuladoUnidades["10-LECHE"].total +
     acumuladoUnidades["20-CEREALES"].total +
@@ -1285,6 +1745,215 @@ export function calcularResumenEconomico(comprobantes?: ComprobanteGasto[]): Res
     };
   }
 
+  // Cálculos de Transferencias Internas
+  const transfIngresos: Record<DestinoEconomicoId, number> = { "10-LECHE": 0, "20-CEREALES": 0, "30-CARNE": 0, ADMINISTRACION: 0, PARTICULAR: 0 };
+  const transfCostos: Record<DestinoEconomicoId, number> = { "10-LECHE": 0, "20-CEREALES": 0, "30-CARNE": 0, ADMINISTRACION: 0, PARTICULAR: 0 };
+  let totalTransferenciasArs = 0;
+
+  for (const t of listaTransf) {
+    if (t.estado === "CONFIRMADA") {
+      totalTransferenciasArs += t.importeTotal;
+      if (transfIngresos[t.unidadCedenteId] !== undefined) {
+        transfIngresos[t.unidadCedenteId] += t.importeTotal;
+      }
+      if (transfCostos[t.unidadReceptoraId] !== undefined) {
+        transfCostos[t.unidadReceptoraId] += t.importeTotal;
+      }
+    }
+  }
+
+  // Cálculos de Amortizaciones de Bienes de Uso (CAPEX)
+  const amortizacionesPorUnidad: Record<DestinoEconomicoId, number> = { "10-LECHE": 0, "20-CEREALES": 0, "30-CARNE": 0, ADMINISTRACION: 0, PARTICULAR: 0 };
+  let totalActivosFijosArs = 0;
+  let amortizacionAnualTotalArs = 0;
+
+  for (const b of listaBienes) {
+    if (b.estado === "ACTIVO") {
+      totalActivosFijosArs += b.valorAdquisicionArs;
+      amortizacionAnualTotalArs += b.amortizacionAnualArs;
+      for (const u of b.unidadesUsuarias) {
+        const parte = Math.round(b.amortizacionAnualArs * (u.porcentaje / 100));
+        if (amortizacionesPorUnidad[u.unidadId] !== undefined) {
+          amortizacionesPorUnidad[u.unidadId] += parte;
+        }
+      }
+    }
+  }
+
+  // Valores de Producción y Ventas Comerciales (Ingresos Externos de HJB)
+  const ingresosExternos = {
+    leche: 54200000, // Facturación de leche entregada a usina
+    cereales: 68500000, // Venta comercial granos acopio
+    carne: 18400000, // Ventas de novillos y vaquillonas faena
+    admin: 0,
+    particular: 0,
+  };
+  const totalIngresosExternos = ingresosExternos.leche + ingresosExternos.cereales + ingresosExternos.carne;
+
+  // Construcción del Cuadro de Resultados de Gestión CREA
+  const prodBrutaLeche = ingresosExternos.leche + transfIngresos["10-LECHE"];
+  const prodBrutaCereales = ingresosExternos.cereales + transfIngresos["20-CEREALES"];
+  const prodBrutaCarne = ingresosExternos.carne + transfIngresos["30-CARNE"];
+  const prodBrutaAdmin = transfIngresos.ADMINISTRACION;
+  const prodBrutaConsolidada = totalIngresosExternos; // Las transferencias internas se anulan (Neto = 0)
+
+  const opexLeche = acumuladoUnidades["10-LECHE"].opex;
+  const opexCereales = acumuladoUnidades["20-CEREALES"].opex;
+  const opexCarne = acumuladoUnidades["30-CARNE"].opex;
+  const opexAdmin = acumuladoUnidades.ADMINISTRACION.opex;
+  const opexConsolidado = opexLeche + opexCereales + opexCarne + opexAdmin;
+
+  const costoTransfLeche = transfCostos["10-LECHE"];
+  const costoTransfCereales = transfCostos["20-CEREALES"];
+  const costoTransfCarne = transfCostos["30-CARNE"];
+  const costoTransfAdmin = transfCostos.ADMINISTRACION;
+
+  const margenBrutoLeche = prodBrutaLeche - opexLeche - costoTransfLeche;
+  const margenBrutoCereales = prodBrutaCereales - opexCereales - costoTransfCereales;
+  const margenBrutoCarne = prodBrutaCarne - opexCarne - costoTransfCarne;
+  const margenBrutoAdmin = prodBrutaAdmin - opexAdmin - costoTransfAdmin;
+  const margenBrutoConsolidado = prodBrutaConsolidada - opexConsolidado;
+
+  // Asignación de estructura central (Admin) a unidades productivas (ej. 50% Leche, 35% Cereales, 15% Carne)
+  const costoEstructuraNetoAdmin = Math.max(0, opexAdmin - prodBrutaAdmin);
+  const adminAsignadoLeche = Math.round(costoEstructuraNetoAdmin * 0.5);
+  const adminAsignadoCereales = Math.round(costoEstructuraNetoAdmin * 0.35);
+  const adminAsignadoCarne = Math.round(costoEstructuraNetoAdmin * 0.15);
+
+  const amortLeche = amortizacionesPorUnidad["10-LECHE"];
+  const amortCereales = amortizacionesPorUnidad["20-CEREALES"];
+  const amortCarne = amortizacionesPorUnidad["30-CARNE"];
+  const amortAdmin = amortizacionesPorUnidad.ADMINISTRACION;
+
+  const margenNetoLeche = margenBrutoLeche - adminAsignadoLeche - amortLeche;
+  const margenNetoCereales = margenBrutoCereales - adminAsignadoCereales - amortCereales;
+  const margenNetoCarne = margenBrutoCarne - adminAsignadoCarne - amortCarne;
+  const margenNetoConsolidado = margenBrutoConsolidado - amortizacionAnualTotalArs;
+
+  const cuadroCrea: LineaCuadroCrea[] = [
+    {
+      concepto: "1. Ingresos Externos (Ventas a Terceros)",
+      leche: ingresosExternos.leche,
+      cereales: ingresosExternos.cereales,
+      carne: ingresosExternos.carne,
+      admin: 0,
+      eliminaciones: 0,
+      hjbConsolidado: totalIngresosExternos,
+      particular: 0,
+      tooltip: "Facturación real por venta de productos a clientes externos (industria láctea, acopio, frigorífico).",
+    },
+    {
+      concepto: "2. (+) Ingresos por Transferencias Internas",
+      leche: transfIngresos["10-LECHE"],
+      cereales: transfIngresos["20-CEREALES"],
+      carne: transfIngresos["30-CARNE"],
+      admin: transfIngresos.ADMINISTRACION,
+      eliminaciones: -totalTransferenciasArs,
+      hjbConsolidado: 0,
+      particular: 0,
+      tooltip: "Valor económico cedido a otra unidad (Maíz a Tambo, Terneros a Carne, etc.). En HJB Consolidado se elimina a $0.",
+    },
+    {
+      concepto: "3. (=) PRODUCCIÓN BRUTA DE GESTIÓN",
+      leche: prodBrutaLeche,
+      cereales: prodBrutaCereales,
+      carne: prodBrutaCarne,
+      admin: prodBrutaAdmin,
+      eliminaciones: -totalTransferenciasArs,
+      hjbConsolidado: prodBrutaConsolidada,
+      particular: 0,
+      esSubtotal: true,
+      esDestacado: true,
+      tooltip: "Producción física y valorizada total generada por cada unidad en el período analizado.",
+    },
+    {
+      concepto: "4. (-) Gastos Operativos Directos (OPEX)",
+      leche: -opexLeche,
+      cereales: -opexCereales,
+      carne: -opexCarne,
+      admin: -opexAdmin,
+      eliminaciones: 0,
+      hjbConsolidado: -opexConsolidado,
+      particular: -acumuladoUnidades.PARTICULAR.opex,
+      esNegativo: true,
+      tooltip: "Gastos operativos corrientes devengados de insumos, energía, labores, fletes y servicios.",
+    },
+    {
+      concepto: "5. (-) Costos por Transferencias Internas Recibidas",
+      leche: -costoTransfLeche,
+      cereales: -costoTransfCereales,
+      carne: -costoTransfCarne,
+      admin: -costoTransfAdmin,
+      eliminaciones: totalTransferenciasArs,
+      hjbConsolidado: 0,
+      particular: 0,
+      esNegativo: true,
+      tooltip: "Insumos o hacienda recibida de otra unidad a precio de transferencia. En Consolidado se compensa a $0.",
+    },
+    {
+      concepto: "6. (=) MARGEN BRUTO OPERATIVO (CREA)",
+      leche: margenBrutoLeche,
+      cereales: margenBrutoCereales,
+      carne: margenBrutoCarne,
+      admin: margenBrutoAdmin,
+      eliminaciones: 0,
+      hjbConsolidado: margenBrutoConsolidado,
+      particular: 0,
+      esSubtotal: true,
+      esDestacado: true,
+      tooltip: "Indicador fundamental de eficiencia económica por actividad agropecuaria.",
+    },
+    {
+      concepto: "7. (-) Costos Transversales de Estructura / Admin",
+      leche: -adminAsignadoLeche,
+      cereales: -adminAsignadoCereales,
+      carne: -adminAsignadoCarne,
+      admin: costoEstructuraNetoAdmin,
+      eliminaciones: 0,
+      hjbConsolidado: 0,
+      particular: 0,
+      esNegativo: true,
+      tooltip: "Distribución del costo de la estructura administrativa transversal según uso del soporte central.",
+    },
+    {
+      concepto: "8. (-) Amortizaciones Proyectadas de Bienes de Uso (CAPEX)",
+      leche: -amortLeche,
+      cereales: -amortCereales,
+      carne: -amortCarne,
+      admin: -amortAdmin,
+      eliminaciones: 0,
+      hjbConsolidado: -amortizacionAnualTotalArs,
+      particular: 0,
+      esNegativo: true,
+      tooltip: "Depreciación contable anual de tractores, implementos y tanques según vida útil pluri-anual.",
+    },
+    {
+      concepto: "9. (=) RESULTADO / MARGEN NETO DE GESTIÓN HJB",
+      leche: margenNetoLeche,
+      cereales: margenNetoCereales,
+      carne: margenNetoCarne,
+      admin: 0,
+      eliminaciones: 0,
+      hjbConsolidado: margenNetoConsolidado,
+      particular: 0,
+      esSubtotal: true,
+      esDestacado: true,
+      tooltip: "Resultado final de la explotación después de cubrir OPEX, estructura y desgaste de bienes de uso.",
+    },
+    {
+      concepto: "(*) Gastos Particulares de Titulares (Aislados)",
+      leche: 0,
+      cereales: 0,
+      carne: 0,
+      admin: 0,
+      eliminaciones: 0,
+      hjbConsolidado: 0,
+      particular: -totalGastoParticularAisladoArs,
+      esNegativo: true,
+      tooltip: "Gastos personales de los socios. Aislados 100% sin afectar el margen del negocio agropecuario.",
+    },
+  ];
+
   return {
     totalComprobantesCount: list.length,
     totalGastoBrutoArs,
@@ -1296,5 +1965,11 @@ export function calcularResumenEconomico(comprobantes?: ComprobanteGasto[]): Res
     distribucionPorUnidad,
     pendientesDeImputacionCount,
     importePendienteImputarArs,
+    transferenciasInternas: listaTransf,
+    totalTransferenciasArs,
+    bienesDeUso: listaBienes,
+    totalActivosFijosArs,
+    amortizacionAnualTotalArs,
+    cuadroCrea,
   };
 }

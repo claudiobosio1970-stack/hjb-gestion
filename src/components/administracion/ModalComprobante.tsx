@@ -19,6 +19,7 @@ import {
   recalcularLineasImputacion,
   verificarComprobanteDuplicado,
   guardarComprobante,
+  REGLAS_DISTRIBUCION_DEFAULT,
 } from "@/lib/administracionData";
 
 interface Props {
@@ -249,41 +250,20 @@ export default function ModalComprobante({
     setLineas(actualizadas);
   }
 
-  function handleAplicarRegla603010() {
-    const l1: LineaImputacion = {
-      id: `imp-r-${Date.now()}-1`,
-      destino: "10-LECHE",
-      centroCostoId: "cc-leche-tambo",
-      actividad: "Tambo & Mixer",
-      establecimientoCampo: "Tambo",
+  function handleAplicarRegla(reglaId: string) {
+    const regla = REGLAS_DISTRIBUCION_DEFAULT.find((r) => r.id === reglaId);
+    if (!regla) return;
+    const nuevasLineas: LineaImputacion[] = regla.distribucion.map((d, idx) => ({
+      id: `imp-r-${Date.now()}-${idx}`,
+      destino: d.destino,
+      centroCostoId: d.centroCostoIdDefault || "",
+      actividad: d.actividadDefault || UNIDADES_ECONOMICAS_HJB[d.destino]?.nombreCorto || "",
       campanaPeriodo: campana,
-      porcentaje: 60,
-      importeCalculado: Math.round(totalComprobante * 0.6),
-      observacion: "Regla compartida HJB: 60% Leche.",
-    };
-    const l2: LineaImputacion = {
-      id: `imp-r-${Date.now()}-2`,
-      destino: "20-CEREALES",
-      centroCostoId: "cc-agri-aguilera",
-      actividad: "Agricultura",
-      establecimientoCampo: "Aguilera",
-      campanaPeriodo: campana,
-      porcentaje: 30,
-      importeCalculado: Math.round(totalComprobante * 0.3),
-      observacion: "Regla compartida HJB: 30% Cereales.",
-    };
-    const l3: LineaImputacion = {
-      id: `imp-r-${Date.now()}-3`,
-      destino: "30-CARNE",
-      centroCostoId: "cc-carne-terminacion",
-      actividad: "Engorde Gordos",
-      establecimientoCampo: "Tambo",
-      campanaPeriodo: campana,
-      porcentaje: 10,
-      importeCalculado: Math.round(totalComprobante * 0.1),
-      observacion: "Regla compartida HJB: 10% Carne.",
-    };
-    setLineas(recalcularLineasImputacion(totalComprobante, [l1, l2, l3]));
+      porcentaje: d.porcentaje,
+      importeCalculado: Math.round(totalComprobante * (d.porcentaje / 100)),
+      observacion: `Preset aplicado: ${regla.nombre}`,
+    }));
+    setLineas(recalcularLineasImputacion(totalComprobante, nuevasLineas));
   }
 
   // Validación en tiempo real
@@ -803,23 +783,34 @@ export default function ModalComprobante({
                 </span>
               </div>
 
-              {/* Botones de acción rápida */}
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={handleAplicarRegla603010}
+              {/* Presets y acciones de imputación */}
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleAplicarRegla(e.target.value);
+                      e.target.value = "";
+                    }
+                  }}
+                  defaultValue=""
                   style={{
                     background: "#f0fdf4",
                     border: "1px solid #86efac",
                     color: "#166534",
-                    fontSize: "11.5px",
-                    fontWeight: 700,
-                    padding: "5px 10px",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    padding: "6px 10px",
                     borderRadius: "6px",
+                    cursor: "pointer",
                   }}
                 >
-                  ⚡ Regla 60% Leche / 30% Cereales / 10% Carne
-                </button>
+                  <option value="" disabled>⚡ Aplicar Preset de Costo Compartido...</option>
+                  {REGLAS_DISTRIBUCION_DEFAULT.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.nombre}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   onClick={handleAgregarLinea}
@@ -827,13 +818,14 @@ export default function ModalComprobante({
                     background: "#eff6ff",
                     border: "1px solid #bfdbfe",
                     color: "#1d4ed8",
-                    fontSize: "11.5px",
+                    fontSize: "12px",
                     fontWeight: 700,
-                    padding: "5px 10px",
+                    padding: "6px 12px",
                     borderRadius: "6px",
+                    cursor: "pointer",
                   }}
                 >
-                  + Agregar Línea
+                  ➕ Agregar Línea
                 </button>
               </div>
             </div>
@@ -852,7 +844,7 @@ export default function ModalComprobante({
                   )}
                 </span>
                 <span>
-                  ${validacion.importeTotalImputado.toLocaleString("es-AR")} de ${totalComprobante.toLocaleString("es-AR")}
+                  ${validacion.importeTotalImputado.toLocaleString("es-AR")} de ${totalComprobante.toLocaleString("es-AR")} ({validacion.porcentajeTotal}%)
                 </span>
               </div>
 
@@ -878,7 +870,7 @@ export default function ModalComprobante({
               {lineas.map((linea, index) => {
                 const unidadInfo = UNIDADES_ECONOMICAS_HJB[linea.destino];
                 const ccsDeEstaUnidad = centrosCosto.filter(
-                  (c) => c.unidadId === linea.destino || linea.destino === "ADMINISTRACION"
+                  (c) => c.unidadId === linea.destino
                 );
 
                 return (
